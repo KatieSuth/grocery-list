@@ -1,0 +1,47 @@
+import { firstValueFrom } from 'rxjs';
+
+import { deleteItem } from '@/data/items-repo';
+import { observeListEntries, setChecked, setQuantity } from '@/data/list-repo';
+import { closeTestDatabases, createTestDatabase } from '@/test-utils/db';
+
+afterEach(closeTestDatabases);
+
+test('checking creates an entry with no quantity; unchecking removes it', async () => {
+  const db = await createTestDatabase();
+  await setChecked(db, 'i1', true);
+  expect(await firstValueFrom(observeListEntries(db))).toEqual({
+    i1: { itemId: 'i1', checkedAt: expect.any(Number) },
+  });
+  await setChecked(db, 'i1', false);
+  expect(await firstValueFrom(observeListEntries(db))).toEqual({});
+});
+
+test('re-checking an already checked item resets its quantity', async () => {
+  const db = await createTestDatabase();
+  await setChecked(db, 'i1', true);
+  await setQuantity(db, 'i1', '3');
+  await setChecked(db, 'i1', true);
+  expect((await firstValueFrom(observeListEntries(db))).i1.quantity).toBeUndefined();
+});
+
+test('setQuantity normalizes, clears when blank, and ignores unchecked items', async () => {
+  const db = await createTestDatabase();
+  await setChecked(db, 'i1', true);
+
+  await setQuantity(db, 'i1', '  half   a pound ');
+  expect((await firstValueFrom(observeListEntries(db))).i1.quantity).toBe('half a pound');
+
+  await setQuantity(db, 'i1', '   ');
+  expect('quantity' in (await firstValueFrom(observeListEntries(db))).i1).toBe(false);
+
+  await setQuantity(db, 'unchecked', '4');
+  expect(await db.listEntries.findOne('unchecked').exec()).toBeNull();
+});
+
+test('deleting an item removes its list entry', async () => {
+  const db = await createTestDatabase();
+  await db.items.insert({ id: 'i1', name: 'Milk', locations: [], createdAt: 1 });
+  await setChecked(db, 'i1', true);
+  await deleteItem(db, 'i1');
+  expect(await firstValueFrom(observeListEntries(db))).toEqual({});
+});
