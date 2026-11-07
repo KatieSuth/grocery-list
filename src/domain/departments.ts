@@ -1,5 +1,5 @@
 import { createId } from '@/utils/id';
-import { normalizeText, sameName } from '@/utils/text';
+import { nameKey, normalizeText, sameName } from '@/utils/text';
 
 import type { Department, Store } from './types';
 
@@ -29,6 +29,29 @@ export function removeDepartment(departments: Department[], id: string): Departm
   return departments.filter((d) => d.id !== id);
 }
 
+export type CopyDepartmentsResult = {
+  departments: Department[];
+  /** Names that were added; empty if every name was already in the list. */
+  added: string[];
+};
+
+/**
+ * Appends `source`'s departments, in `source`'s order, after `current`'s. Names already in the list
+ * (ignoring case and spacing) are skipped, so nothing is duplicated. Copies get fresh ids, because
+ * departments belong to one store.
+ */
+export function copyDepartments(current: Department[], source: Department[]): CopyDepartmentsResult {
+  const departments = [...current];
+  const added: string[] = [];
+  for (const dept of source) {
+    const name = normalizeText(dept.name);
+    if (!name || departments.some((d) => sameName(d.name, name))) continue;
+    departments.push({ id: createId(), name });
+    added.push(name);
+  }
+  return { departments, added };
+}
+
 /** Moves the department at `index` one step up (-1) or down (+1). Out-of-range moves are no-ops. */
 export function moveDepartment(
   departments: Department[],
@@ -42,6 +65,14 @@ export function moveDepartment(
   const next = [...departments];
   [next[index], next[target]] = [next[target], next[index]];
   return next;
+}
+
+/**
+ * Departments in A–Z order (ignoring case and accents), for picking one when adding an item.
+ * The store's own order is the walking order, used on the shopping trip. Doesn't mutate.
+ */
+export function sortDepartmentsByName(departments: Department[]): Department[] {
+  return [...departments].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 }
 
 export type DepartmentSuggestion = {
@@ -63,13 +94,13 @@ export function suggestDepartments(
   stores: Store[],
   current: Department[],
 ): DepartmentSuggestion[] {
-  const needle = normalizeText(query).toLocaleLowerCase();
+  const needle = nameKey(query);
   if (!needle) return [];
 
   const byKey = new Map<string, DepartmentSuggestion>();
   for (const store of stores) {
     for (const dept of store.departments) {
-      const key = normalizeText(dept.name).toLocaleLowerCase();
+      const key = nameKey(dept.name);
       const entry = byKey.get(key) ?? { name: normalizeText(dept.name), storeNames: [] };
       if (!entry.storeNames.includes(store.name)) entry.storeNames.push(store.name);
       byKey.set(key, entry);

@@ -1,5 +1,6 @@
 import { useLocalSearchParams, type Href } from 'expo-router';
 import { useState } from 'react';
+import Animated, { useAnimatedRef } from 'react-native-reanimated';
 
 import { Button } from '@/components/button';
 import { DepartmentEditor } from '@/components/department-editor';
@@ -44,6 +45,7 @@ function StoreForm({ store, stores, backTo }: Props & { store?: Store; stores: S
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>();
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
 
   const errors = submitted ? validateStoreDraft(draft) : {};
 
@@ -75,6 +77,7 @@ function StoreForm({ store, stores, backTo }: Props & { store?: Store; stores: S
 
   return (
     <Screen
+      scrollRef={scrollRef}
       footer={
         <>
           <Button variant="secondary" label="Cancel" onPress={() => goBack(backTo)} />
@@ -102,6 +105,8 @@ function StoreForm({ store, stores, backTo }: Props & { store?: Store; stores: S
         onChange={(departments) => setDraft({ ...draft, departments })}
         error={errors.departments}
         knownStores={stores}
+        currentStoreId={store?.id}
+        scrollableRef={scrollRef}
       />
       {saveError ? <ErrorText message={saveError} /> : null}
       {store ? <Button variant="danger" label="Delete store" onPress={() => handleDelete(store)} /> : null}

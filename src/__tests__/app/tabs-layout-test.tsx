@@ -20,7 +20,7 @@ jest.mock('expo-router/unstable-native-tabs', () => {
   return { NativeTabs };
 });
 
-test('three tabs in order: trip (cart), items (list), stores (storefront)', async () => {
+test('four tabs in order: trip (cart), items (list), stores (storefront), settings (gear)', async () => {
   await render(<TabsLayout />);
 
   const tabs = screen.getByTestId('tabs');
@@ -28,14 +28,17 @@ test('three tabs in order: trip (cart), items (list), stores (storefront)', asyn
     'tab-(trip)',
     'tab-items',
     'tab-stores',
+    'tab-settings',
   ]);
 
   expect(screen.getByText('Trip')).toBeOnTheScreen();
   expect(screen.getByText('Items')).toBeOnTheScreen();
   expect(screen.getByText('Stores')).toBeOnTheScreen();
+  expect(screen.getByText('Settings')).toBeOnTheScreen();
 
   // SF Symbols on iOS, Material Symbols on Android.
   expect(screen.getByText(/icon:.*"sf":\{"default":"cart","selected":"cart.fill"\}.*"md":"shopping_cart"/)).toBeOnTheScreen();
   expect(screen.getByText(/icon:.*"sf":"list.bullet".*"md":"list"/)).toBeOnTheScreen();
   expect(screen.getByText(/icon:.*"sf":\{"default":"storefront".*"md":"storefront"/)).toBeOnTheScreen();
+  expect(screen.getByText(/icon:.*"sf":\{"default":"gearshape","selected":"gearshape.fill"\}.*"md":"settings"/)).toBeOnTheScreen();
 });

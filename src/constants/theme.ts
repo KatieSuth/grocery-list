@@ -18,6 +18,8 @@ export const Colors = {
     onTint: '#ffffff',
     border: '#D9D9E0',
     danger: '#C62828',
+    /** A switch's track when off: at least 3:1 against the background and the white thumb. */
+    switchTrackOff: '#8B8D98',
   },
   dark: {
     text: '#ffffff',
@@ -29,6 +31,7 @@ export const Colors = {
     onTint: '#04140B',
     border: '#3A3D42',
     danger: '#FF6B6B',
+    switchTrackOff: '#62666E',
   },
 } as const;
 

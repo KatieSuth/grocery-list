@@ -4,9 +4,9 @@ An Expo app for iOS and Android that keeps your grocery items organized by store
 
 Built so far:
 - the first-run **setup flow**: add stores and departments, then the items you usually buy and where to find them;
-- the **main app**, with three tabs: Trip (placeholder), Items (the master list, with checkboxes and free-text quantities), and Stores (store configuration).
+- the **main app**, with four tabs: Trip (the shopping trip: pick a store, check items into the cart in department order, finish to log them as bought), Items (the master list, with checkboxes, free-text quantities, search, filters, sorting and "last bought"), Stores (store configuration), and Settings (light/dark mode, delete all data).
 
-The shopping trip is next. See the [functional specification](docs/functional-spec.md) for screen-by-screen behavior.
+See the [functional specification](docs/functional-spec.md) for screen-by-screen behavior.
 
 **Stack:** Expo SDK 57 · React Native 0.86 · React 19.2 (React Compiler on) · Expo Router · RxDB 17 · TypeScript · Jest + React Native Testing Library · pnpm
 
@@ -56,7 +56,7 @@ By default WSL2 uses NAT networking: `hostname -I` shows a `172.x` address that 
 
 While it runs: press `r` to reload. Saved code changes appear live.
 
-**To see the first-run screens again on a phone,** clear Expo Go's app data (Android: Settings → Apps → Expo Go → Storage → Clear data) or reinstall Expo Go (iOS). This also erases your stores and items.
+**To see the first-run screens again,** use **Settings → Delete all data** in the app. This erases your stores, items and trips.
 
 ---
 
@@ -85,42 +85,54 @@ First time only, for the browser tests: `npx playwright install chromium`.
 ```
 src/
   app/                    Expo Router routes ONLY (every file is a screen)
-    _layout.tsx           Root: theme, DatabaseProvider, setup-vs-main gate
+    _layout.tsx           Root: DatabaseProvider, AppearanceProvider, setup-vs-main gate
     setup/                First-run onboarding (Stack)
       index.tsx           Stores list
       store-form.tsx      → StoreFormScreen (back to /setup)
       items.tsx           Items list
       item-form.tsx       → ItemFormScreen (back to /setup/items)
     (tabs)/               Main app (NativeTabs); each tab has its own Stack
-      (trip)/index.tsx    "/"        Shopping trip (placeholder)
-      items/index.tsx     "/items"   Master list: checkbox + quantity per item
+      (trip)/index.tsx    "/"        Shopping trip: store dropdown, cart, Finish
+      items/index.tsx     "/items"   Master list: search, filters, checkbox + quantity per item
       items/form.tsx      "/items/form"   → ItemFormScreen
       stores/index.tsx    "/stores"  Store configuration
       stores/form.tsx     "/stores/form"  → StoreFormScreen
+      settings/index.tsx  "/settings"  Light/dark/system appearance, Delete all data
   screens/                Screens used by more than one route
     store-form-screen.tsx Add / edit store (?id=), takes backTo
     item-form-screen.tsx  Add / edit item (?id=), takes backTo
   domain/                 Pure logic: no React, no database
-    types.ts              Store, Department, Item, ItemLocation
-    departments.ts        Defaults, add/remove/move
+    types.ts              Store, Department, Item, ItemLocation, ListEntry, TripRecord
+    departments.ts        Defaults, add/remove/move/copy
     store-draft.ts        Store form state + validation
     item-draft.ts         Item form state + validation, location pruning
     describe.ts           "Store · Dept" display text
     quantity.ts           Free-text quantity cleanup
+    item-filter.ts        Master-list search + store/department/brand filters
+    item-sort.ts          Master-list sort: by name, department or last bought; either direction
+    trip.ts               Trip list: checked items at a store, by department in walking order
+    last-bought.ts        "Last bought yesterday" text
+    appearance.ts         System / Light / Dark choice and labels
   data/                   Repositories: the only code that touches collections
     stores-repo.ts        observe / save / delete stores (+ prune items)
     items-repo.ts         observe / save / delete items
-    list-repo.ts          check / uncheck items, set quantity
-    settings-repo.ts      setupComplete flag
+    list-repo.ts          check / uncheck items, set quantity, cart marks
+    settings-repo.ts      setupComplete flag, trip store + reverse order, appearance
+    trips-repo.ts         finishTrip(): log, set last bought, uncheck
+    erase-repo.ts         deleteAllData(): delete and purge everything, back to setup
   db/
     schema.ts             RxDB JSON schemas
     database.ts           createAppDatabase(), getAppDatabase() singleton
     storage.native.ts     iOS/Android storage (SQLite-backed localStorage)
     storage.ts            Web storage (browser localStorage)
     hash.ts               SHA-256 via expo-crypto
+    change-events.ts      Clears RxDB's leftover change-event keys after Delete all data
     database-provider.tsx <DatabaseProvider>, useDatabase()
   hooks/
-    use-data.ts           useStores(), useItems(), useListEntries(), useSetupComplete()
+    use-data.ts           useStores(), useItems(), useListEntries(), useSetupComplete(), useTripSettings(), useColorSchemeChoice()
+    use-color-scheme.ts   Device scheme unless overridden in Settings (.web.ts: also SSR-safe)
+    color-scheme-choice.ts  Context holding the Settings choice
+    use-theme.ts          Colors for the current scheme
     use-observable.ts     Subscribe a component to an RxJS observable
   components/             Shared UI (Button, TextField, Screen, Card, editors…)
   constants/theme.ts      Colors (light/dark), spacing
@@ -157,29 +169,60 @@ screens (src/app)  ──uses──▶  hooks (useStores…)  ──▶  reposit
 
 Flipping the flag (Finish or Skip for now) switches flows and drops the old flow's history.
 
+### Drag-to-reorder
+
+Departments are reordered with [`react-native-sortables`](https://github.com/MatiPl01/react-native-sortables): `Sortable.Grid` with one column, plus a `Sortable.Handle` on each row (`customHandle`). It builds on Reanimated and Gesture Handler, both included in Expo Go. Requirements:
+- The root layout wraps the app in `GestureHandlerRootView`.
+- The store form's `Screen` passes a Reanimated scroll ref as `scrollableRef`, so dragging near the edge auto-scrolls.
+
+`onDragEnd` returns the reordered list, which goes into the form draft.
+
 ### Main app tabs
 
 `(tabs)/_layout.tsx` renders `components/app-tabs`, which has a different file per platform:
 
 - **iOS/Android** (`app-tabs.tsx`): `NativeTabs` from `expo-router/unstable-native-tabs` (SDK 58 moves it to `expo-router/native-tabs`), so each platform's own tab bar is used. Icons are SF Symbols on iOS and Material Symbols on Android, set with the `sf` and `md` props; both ship in Expo Go.
+- Four tabs: Trip, Items, Stores, Settings (gear: `gearshape` / `settings`).
 - **Web** (`app-tabs.web.tsx`): `NativeTabs` draws its bar at the top of the page, over the screen header. Web instead gets a bottom tab bar built from expo-router's headless `Tabs` (`expo-router/ui`), with the same Material icons drawn by `SymbolView`.
 
 Each tab is a folder with its own `Stack`, so forms push inside the tab and keep the tab bar visible. The add/edit forms live in `src/screens/` and are reused by the setup and tab routes. A `backTo` prop says where Save, Cancel, and Delete return to. The splash screen stays up until the flag has loaded, so users never see the wrong flow flash.
 
+### Light and dark mode
+
+The Settings choice (`system`, `light` or `dark`) is saved in the `settings` document. `components/appearance-provider.tsx` sits inside `DatabaseProvider` in the root layout:
+- It puts the choice in `ColorSchemeChoiceContext`. `hooks/use-color-scheme` returns the choice, or the device's scheme for `system`, so `useTheme()` and every themed component follow it. It also sets the navigation theme for headers.
+- It calls `utils/apply-color-scheme` for UI the app doesn't draw. On iOS and Android that's `Appearance.setColorScheme()` (`'unspecified'` for system), which covers the native tab bar, alerts and keyboard. On web, React Native Web can't override the scheme, so it sets CSS `color-scheme` on `<html>` for scrollbars and form controls.
+- It renders nothing until the choice has loaded, while the splash screen is still up, so the wrong colors never flash.
+
+Screens outside it (the startup error) follow the device.
+
 ### Data model
 
-Four RxDB collections, all schema `version: 0`:
+Five RxDB collections:
 
-| Collection | Document | Notes |
-| --- | --- | --- |
-| `stores` | `{ id, name, location?, departments: [{ id, name }], createdAt }` | Departments are embedded and ordered. Indexed on `createdAt`. |
-| `items` | `{ id, name, brand?, locations: [{ storeId, departmentId }], createdAt }` | Locations reference store and department ids. |
-| `listEntries` | `{ itemId, quantity?, checkedAt }` | One per **checked** item; primary key is the item id. Unchecking deletes it, so a quantity never outlives its check. Deleting an item deletes its entry. |
-| `settings` | `{ id: 'app', setupComplete }` | Single document. |
+| Collection | Version | Document | Notes |
+| --- | --- | --- | --- |
+| `stores` | 0 | `{ id, name, location?, departments: [{ id, name }], createdAt }` | Departments are embedded and ordered. Indexed on `createdAt`. |
+| `items` | 1 | `{ id, name, brand?, locations: [{ storeId, departmentId }], createdAt, lastBoughtAt? }` | Locations reference store and department ids. `lastBoughtAt` is set when a trip that included the item is finished, so the master list never reads the trip log. |
+| `listEntries` | 1 | `{ itemId, quantity?, checkedAt, inCartAt? }` | One per **checked** item; primary key is the item id. Unchecking deletes it, so a quantity never outlives its check. `inCartAt` marks it as checked off on the current trip. Deleting an item deletes its entry. |
+| `settings` | 2 | `{ id: 'app', setupComplete, tripStoreId?, tripReversed?, colorScheme? }` | Single document. Only change it through `settings-repo.ts`, which patches it. An `upsert` would wipe the other fields. |
+| `trips` | 1 | `{ id, storeId, storeName, finishedAt, items: [{ itemId, name, brand?, quantity?, department }], pending? }` | The trip log: one document per finished trip. Names are copied so the record survives renames and deletions. `pending` is set only while a trip is being finished. Indexed on `finishedAt`. |
 
 IDs come from RxDB's `randomToken(16)`. Timestamps are epoch milliseconds.
 
-Checked state is a separate collection, not a field on `items`. Checks change constantly and items rarely do, and the shopping trip will build on entries without touching the item catalog.
+Checked state is a separate collection, not a field on `items`. Checks change constantly and items rarely do. The cart is a field on the entry, so unchecking an item on the master list takes it out of the cart too, and nothing can be left behind.
+
+**Finishing a trip** (`finishTrip` in `trips-repo.ts`) is several writes, not a transaction, so it's built to be retried:
+1. Insert the log record with `pending: true`.
+2. Set `lastBoughtAt` on its items (skipping deleted ones).
+3. Bulk-remove the entries still in the cart. `bulkRemove` reports failures in its result instead of throwing, so the result is checked and an error is thrown.
+4. Clear `pending`.
+
+Every step can be repeated safely. If any step fails, the user sees an error. The next `finishTrip` first completes every pending record, rather than logging a new trip, so a retry never logs twice or loses items. An item that was unchecked and checked again in between keeps its new check, because only entries still in the cart are removed.
+
+**Delete all data** (`deleteAllData` in `erase-repo.ts`) bulk-removes every trip, entry, item and store, checking each result. Only then does it reset `settings` to `{ setupComplete: false }`, keeping `colorScheme`. That sends the app back to setup only once everything is gone, so a failed attempt can simply be retried. RxDB keeps deleted documents as tombstones. The `RxDBCleanupPlugin` purges them a month after deletion, and `deleteAllData` purges them at once with `cleanup(0)`. The LocalStorage storage also keeps each collection's last change event, including the old document, for other tabs until the database closes, so `forgetChangeEvents` removes those keys too.
+
+**Migrations:** version 1 of `items`, `listEntries`, `settings` and `trips` only added optional fields, so each uses the identity strategy `addedOptionalFields` from `schema.ts`. Settings version 2 added `colorScheme` the same way (`settingsMigrations`). The `RxDBMigrationSchemaPlugin` is always registered, and `__tests__/db/database-test.ts` opens real version-0 databases to check they migrate.
 
 > **Adding a collection** needs no migration: existing databases simply gain it. A test in `__tests__/db/database-test.ts` covers this.
 >
@@ -272,6 +315,11 @@ test('adds a store', async () => {
 - **Native UI doesn't render in Jest.** Stack headers and the tab bar are invisible to tests, so header titles and tab presses can't be asserted on directly.
   - Switch tabs with `await act(() => router.navigate('/items'))`. Don't use `testRouter.navigate`: tab switches add an internal query param that breaks its pathname assertion.
   - `tabs-layout-test.tsx` mocks `NativeTabs` to check tab order, labels, and icons.
+- **Reanimated and drag-to-reorder have Jest stand-ins** (`jest.setup.ts`):
+  - Reanimated and Worklets use their official mocks.
+  - `react-native-sortables` uses `src/test-utils/sortables-mock.tsx`, which renders rows normally.
+  - In tests, reorder departments with `moveDepartment(name, 'up' | 'down')` (the screen-reader actions) or `dragDepartment(from, to)` (simulates a drop).
+  - Real dragging is covered by the Playwright tests.
 - **Fire-and-forget writes** (checkbox, quantity): assert on the DB with `eventually(...)` from `test-utils/app`. It retries while advancing the fake timers.
 - **Test files go in `__tests__/`** and are named `*-test.ts(x)`. Web-only tests are named `*.web-test.ts(x)`.
 
@@ -311,10 +359,9 @@ The project is on **SDK 57**, not the latest (58). The App Store and Google Play
 
 ## Status and known limitations
 
-- The Trip tab is a placeholder.
 - **Verified in a browser:** the full app runs in Chromium with no console errors, and data survives reloads (Playwright, `e2e/`).
 - **Not yet run on a phone or simulator.** Loading in Expo Go on Android from WSL2 failed at the network level: the tunnel gave "Failed to download remote update", and the dev server never received a request. The iOS and Android bundles build and all Jest tests pass, but the on-device storage path (`storage.native.ts`) is only checked by tests so far.
-- Departments are reordered with ↑/↓ buttons. Drag-and-drop isn't built.
+- Department drag-and-drop is verified in a real browser, but not yet on a phone. Known library issue to watch for: on iOS with Gesture Handler 2.x, a dragged item can get stuck after a screen is detached and re-attached (react-native-sortables issue #349; Gesture Handler 3 fixes it). Screen readers on **web** don't get the Move up / Move down actions, because React Native Web doesn't support accessibility actions.
 - On iOS, VoiceOver doesn't automatically announce validation messages.
-- There's no way back into the setup flow from the main app. Everything is edited from the tabs instead.
-- Out of scope for now: the shopping trip itself, backend sync, store addresses, UPC scanning, and the final default department list. See [functional spec §8](docs/functional-spec.md#8-out-of-scope-for-now).
+- The only way back into the setup flow from the main app is Settings → Delete all data. Everything else is edited from the tabs.
+- Out of scope for now: a screen for browsing the trip log, backend sync, store addresses, UPC scanning, and the final default department list. See [functional spec §8](docs/functional-spec.md#8-out-of-scope-for-now).

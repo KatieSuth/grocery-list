@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 
 import { observeItems } from '@/data/items-repo';
 import { observeListEntries } from '@/data/list-repo';
-import { observeSetupComplete } from '@/data/settings-repo';
+import { observeColorSchemeChoice, observeSetupComplete, observeTripSettings } from '@/data/settings-repo';
 import { observeStores } from '@/data/stores-repo';
 import { useDatabase } from '@/db/database-provider';
 
@@ -30,4 +30,16 @@ export function useSetupComplete() {
 export function useListEntries() {
   const db = useDatabase();
   return useObservable(useMemo(() => observeListEntries(db), [db]));
+}
+
+/** The Trip tab's chosen store and order; undefined while loading. */
+export function useTripSettings() {
+  const db = useDatabase();
+  return useObservable(useMemo(() => observeTripSettings(db), [db]));
+}
+
+/** Light, dark or following the device; undefined while loading. */
+export function useColorSchemeChoice() {
+  const db = useDatabase();
+  return useObservable(useMemo(() => observeColorSchemeChoice(db), [db]));
 }

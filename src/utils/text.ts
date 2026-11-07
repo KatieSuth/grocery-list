@@ -6,3 +6,8 @@ export function normalizeText(value: string): string {
 export function sameName(a: string, b: string): boolean {
   return normalizeText(a).toLocaleLowerCase() === normalizeText(b).toLocaleLowerCase();
 }
+
+/** A comparison key: normalized and lowercased, so "  Frozen  foods" and "frozen Foods" match. */
+export function nameKey(value: string): string {
+  return normalizeText(value).toLocaleLowerCase();
+}

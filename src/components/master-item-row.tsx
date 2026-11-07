@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { CheckboxBox } from '@/components/checkbox-box';
@@ -13,15 +12,22 @@ type Props = {
   item: Item;
   /** "Store · Department" text for where to find the item. */
   whereToFind: string;
+  /** e.g. "Last bought yesterday"; absent if never bought. */
+  lastBought?: string;
   /** Present when the item is checked. */
   entry?: ListEntry;
+  /**
+   * The quantity text to show while checked. Owned by the list, so every row showing this item
+   * (it can appear under several departments) shows the same text as the user types.
+   */
+  quantity: string;
   onToggle: () => void;
   onQuantityChange: (quantity: string) => void;
   onOpen: () => void;
 };
 
 /** A master-list row: checkbox, item summary (tap to edit), and a quantity field while checked. */
-export function MasterItemRow({ item, whereToFind, entry, onToggle, onQuantityChange, onOpen }: Props) {
+export function MasterItemRow({ item, whereToFind, lastBought, entry, quantity, onToggle, onQuantityChange, onOpen }: Props) {
   const theme = useTheme();
   const checked = !!entry;
   return (
@@ -53,21 +59,18 @@ export function MasterItemRow({ item, whereToFind, entry, onToggle, onQuantityCh
             <ThemedText type="small" themeColor="textSecondary">
               {whereToFind || 'No store selected'}
             </ThemedText>
+            {lastBought ? (
+              <ThemedText type="small" themeColor="textSecondary" style={styles.lastBought}>
+                {lastBought}
+              </ThemedText>
+            ) : null}
           </View>
           <ThemedText themeColor="textSecondary" accessibilityElementsHidden importantForAccessibility="no">
             ›
           </ThemedText>
         </Pressable>
 
-        {entry ? (
-          // Keyed by checkedAt so re-checking always starts from the saved (blank) value.
-          <QuantityInput
-            key={entry.checkedAt}
-            itemName={item.name}
-            initial={entry.quantity ?? ''}
-            onChange={onQuantityChange}
-          />
-        ) : null}
+        {entry ? <QuantityInput itemName={item.name} value={quantity} onChange={onQuantityChange} /> : null}
       </View>
     </View>
   );
@@ -75,16 +78,14 @@ export function MasterItemRow({ item, whereToFind, entry, onToggle, onQuantityCh
 
 function QuantityInput({
   itemName,
-  initial,
+  value,
   onChange,
 }: {
   itemName: string;
-  initial: string;
+  value: string;
   onChange: (quantity: string) => void;
 }) {
   const theme = useTheme();
-  // Local state keeps typing smooth; every change is also saved.
-  const [value, setValue] = useState(initial);
   return (
     <TextInput
       accessibilityLabel={`Quantity for ${itemName}`}
@@ -93,10 +94,7 @@ function QuantityInput({
       value={value}
       maxLength={QUANTITY_MAX_LENGTH}
       returnKeyType="done"
-      onChangeText={(text) => {
-        setValue(text);
-        onChange(text);
-      }}
+      onChangeText={onChange}
       style={[styles.quantity, { color: theme.text, backgroundColor: theme.background, borderColor: theme.border }]}
     />
   );
@@ -124,6 +122,7 @@ const styles = StyleSheet.create({
   },
   text: { flex: 1, gap: Spacing.half },
   name: { fontWeight: 600 },
+  lastBought: { fontStyle: 'italic' },
   quantity: {
     minHeight: 40,
     borderWidth: 1,

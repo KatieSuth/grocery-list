@@ -1,9 +1,11 @@
 import {
   addDepartment,
+  copyDepartments,
   createDefaultDepartments,
   DEFAULT_DEPARTMENT_NAMES,
   moveDepartment,
   removeDepartment,
+  sortDepartmentsByName,
 } from '@/domain/departments';
 
 const depts = [
@@ -58,5 +60,40 @@ describe('moveDepartment', () => {
     [5, -1],
   ] as const)('index %i direction %i is a no-op', (index, direction) => {
     expect(moveDepartment(depts, index, direction)).toBe(depts);
+  });
+});
+
+describe('sortDepartmentsByName', () => {
+  test('sorts A–Z ignoring case and accents, without mutating the input', () => {
+    const mixed = [...depts, { id: 'd', name: 'bakery' }, { id: 'e', name: 'Épicerie' }, { id: 'f', name: 'Dairy' }];
+    expect(names(sortDepartmentsByName(mixed))).toEqual(['bakery', 'Dairy', 'Deli', 'Épicerie', 'Frozen', 'Produce']);
+    expect(names(depts)).toEqual(['Produce', 'Deli', 'Frozen']);
+  });
+});
+
+describe('copyDepartments', () => {
+  test('appends new names in source order, skipping ones already listed', () => {
+    const source = [
+      { id: 'x', name: 'Bakery' },
+      { id: 'y', name: '  deli ' },
+      { id: 'z', name: 'Bulk   Bins' },
+      { id: 'w', name: 'bakery' },
+      { id: 'v', name: '   ' },
+    ];
+    const result = copyDepartments(depts, source);
+    expect(result.added).toEqual(['Bakery', 'Bulk Bins']);
+    expect(names(result.departments)).toEqual(['Produce', 'Deli', 'Frozen', 'Bakery', 'Bulk Bins']);
+    // Existing departments keep their ids; copies get new ones.
+    expect(result.departments.slice(0, 3)).toEqual(depts);
+    const newIds = result.departments.slice(3).map((d) => d.id);
+    expect(newIds).not.toContain('x');
+    expect(newIds).not.toContain('z');
+    expect(new Set(result.departments.map((d) => d.id)).size).toBe(5);
+    expect(names(depts)).toEqual(['Produce', 'Deli', 'Frozen']);
+  });
+
+  test('adds nothing when every name is already listed', () => {
+    const result = copyDepartments(depts, [{ id: 'x', name: 'FROZEN' }]);
+    expect(result).toEqual({ departments: depts, added: [] });
   });
 });

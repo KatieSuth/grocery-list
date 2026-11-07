@@ -23,6 +23,10 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Label>Stores</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'storefront', selected: 'storefront.fill' }} md="storefront" />
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="settings">
+        <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} md="settings" />
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }

@@ -30,3 +30,23 @@ export async function setQuantity(db: AppDatabase, itemId: string, value: string
     return quantity ? { ...rest, quantity } : rest;
   });
 }
+
+/** Marks a checked item as in the cart (checked off on the trip), or takes it back out. */
+export async function setInCart(db: AppDatabase, itemId: string, inCart: boolean): Promise<void> {
+  const doc = await db.listEntries.findOne(itemId).exec();
+  if (!doc) return;
+  await doc.incrementalModify((old) => {
+    const { inCartAt: _drop, ...rest } = old;
+    return inCart ? { ...rest, inCartAt: Date.now() } : rest;
+  });
+}
+
+/** Takes everything out of the cart; items stay checked on the master list. */
+export async function clearCart(db: AppDatabase): Promise<void> {
+  const docs = await db.listEntries.find().exec();
+  await Promise.all(
+    docs
+      .filter((doc) => doc.inCartAt !== undefined)
+      .map((doc) => doc.incrementalModify(({ inCartAt: _drop, ...rest }) => rest)),
+  );
+}

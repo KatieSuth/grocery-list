@@ -1,4 +1,4 @@
-import { confirmDestructive } from '@/utils/confirm';
+import { confirmAction, confirmDestructive } from '@/utils/confirm';
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -15,4 +15,12 @@ test('on web, cancelling does nothing', () => {
   const onConfirm = jest.fn();
   confirmDestructive({ title: 'Delete Shop?', confirmLabel: 'Delete', onConfirm });
   expect(onConfirm).not.toHaveBeenCalled();
+});
+
+test('on web, confirmAction uses the same dialog', () => {
+  jest.spyOn(window, 'confirm').mockReturnValue(true);
+  const onConfirm = jest.fn();
+  confirmAction({ title: 'Finish trip?', confirmLabel: 'Finish', onConfirm });
+  expect(window.confirm).toHaveBeenCalledWith('Finish trip?');
+  expect(onConfirm).toHaveBeenCalled();
 });

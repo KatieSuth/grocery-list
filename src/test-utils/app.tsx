@@ -3,6 +3,7 @@ import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-librar
 import { getAppDatabase, type AppDatabase } from '@/db/database';
 
 import { createTestDatabase } from './db';
+import { simulateSortableDrop } from './sortables-mock';
 
 /**
  * Renders the real app (src/app) against a fresh in-memory database.
@@ -60,4 +61,23 @@ export async function eventually(check: () => Promise<void>, attempts = 50): Pro
       });
     }
   }
+}
+
+/** Moves a department with its screen-reader action ("Move up" / "Move down") on the drag handle. */
+export async function moveDepartment(name: string, direction: 'up' | 'down'): Promise<void> {
+  const handle = await screen.findByLabelText(new RegExp(`^Reorder ${name},`));
+  await fireEvent(handle, 'accessibilityAction', {
+    nativeEvent: { actionName: direction === 'up' ? 'moveUp' : 'moveDown' },
+  });
+}
+
+/** Simulates dragging the department at `fromIndex` and dropping it at `toIndex`. */
+export async function dragDepartment(fromIndex: number, toIndex: number): Promise<void> {
+  await act(async () => simulateSortableDrop(fromIndex, toIndex));
+}
+
+/** The screen-reader actions offered on a department's drag handle. */
+export function departmentActions(name: string): string[] {
+  const handle = screen.getByLabelText(new RegExp(`^Reorder ${name},`));
+  return (handle.props.accessibilityActions as { name: string }[]).map((a) => a.name);
 }

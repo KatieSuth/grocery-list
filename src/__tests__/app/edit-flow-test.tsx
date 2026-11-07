@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor } from 'expo-router/testing-library
 import { Alert, type AlertButton } from 'react-native';
 
 import type { AppDatabase } from '@/db/database';
-import { press, renderApp, type } from '@/test-utils/app';
+import { departmentActions, moveDepartment, press, renderApp, type } from '@/test-utils/app';
 import { closeTestDatabases } from '@/test-utils/db';
 
 jest.mock('@/db/database', () => ({
@@ -60,12 +60,13 @@ test('editing a store updates it and removes item locations for deleted departme
   expect(screen).toHavePathnameWithParams('/setup/store-form?id=s1');
   expect(screen.getByLabelText('Store name')).toHaveDisplayValue('Corner Market');
   expect(screen.getByLabelText('Location')).toHaveDisplayValue('Main St');
-  expect(screen.getByRole('button', { name: 'Move Produce up' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: 'Move Deli down' })).toBeDisabled();
+  // The first department can only move down; the last only up.
+  expect(departmentActions('Produce')).toEqual(['moveDown']);
+  expect(departmentActions('Deli')).toEqual(['moveUp']);
 
   await type('Store name', 'Corner Mkt');
   await type('Location', '   ');
-  await press('Move Deli up');
+  await moveDepartment('Deli', 'up');
   await press('Remove Deli');
   await press('Save');
 

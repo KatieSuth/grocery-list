@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, screen } from 'expo-router/testing-library';
 import { Alert, type AlertButton } from 'react-native';
 
 import type { AppDatabase } from '@/db/database';
-import { eventually, press, renderApp, type } from '@/test-utils/app';
+import { dragDepartment, eventually, press, renderApp, type } from '@/test-utils/app';
 import { closeTestDatabases } from '@/test-utils/db';
 
 jest.mock('@/db/database', () => ({
@@ -52,7 +52,7 @@ const entryFor = async (db: AppDatabase, itemId: string) =>
 
 test('the main app opens on the shopping trip tab', async () => {
   await renderApp({ seed });
-  expect(await screen.findByText('Shopping trips are coming soon')).toBeOnTheScreen();
+  expect(await screen.findByText('Where are you shopping?')).toBeOnTheScreen();
   expect(screen).toHavePathname('/');
 });
 
@@ -205,7 +205,7 @@ test('the stores tab lists, adds and edits stores', async () => {
   await press('Corner Market');
   expect(screen).toHavePathname('/stores/form');
   expect(screen.getByLabelText('Store name')).toHaveDisplayValue('Corner Market');
-  await press('Move Deli up');
+  await dragDepartment(1, 0);
   await press('Save');
   expect(await screen.findByText('Deli → Produce')).toBeOnTheScreen();
 });

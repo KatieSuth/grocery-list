@@ -3,7 +3,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { observeSetupComplete } from '@/data/settings-repo';
 import { observeStores } from '@/data/stores-repo';
-import { press, renderApp, type } from '@/test-utils/app';
+import { dragDepartment, moveDepartment, press, renderApp, type } from '@/test-utils/app';
 import { closeTestDatabases } from '@/test-utils/db';
 
 jest.mock('@/db/database', () => ({
@@ -47,11 +47,13 @@ test('adding a store with custom, reordered departments', async () => {
   await type('Store name', '  Corner   Market ');
   await type('Location', 'Main St');
   await press('Remove Deli');
-  await press('Move Produce down');
-  await press('Move Produce up');
+  // Reorder with the screen-reader actions on the drag handle...
+  await moveDepartment('Produce', 'down');
+  await moveDepartment('Produce', 'up');
   await type('New department', 'Bakery');
   await press('Add department');
-  await press('Move Bakery up');
+  // ...and by dragging: Produce, Frozen, Bakery → drop Bakery in the middle.
+  await dragDepartment(2, 1);
   await press('Save');
 
   // Back on the store list, which now shows the store and a Next button.
@@ -83,7 +85,7 @@ test('skipping store setup goes straight to the main app', async () => {
 
   await press('Skip for now');
 
-  expect(await screen.findByText('Shopping trips are coming soon')).toBeOnTheScreen();
+  expect(await screen.findByText('No stores to shop at yet')).toBeOnTheScreen();
   expect(screen).toHavePathname('/');
   expect(await firstValueFrom(observeSetupComplete(db))).toBe(true);
 });
@@ -122,6 +124,12 @@ test('the full setup: store, items with add more / continue, back, finish', asyn
   await fireEvent.press(screen.getByRole('checkbox', { name: 'Corner Market' }));
   await press('Add more');
   expect(await screen.findByText('Choose a department in Corner Market.')).toBeOnTheScreen();
+  // Departments are offered A–Z here, not in the store's walking order (Produce, Deli, Frozen).
+  expect(screen.getAllByRole('radio').map((r) => r.props.accessibilityLabel)).toEqual([
+    'Deli in Corner Market',
+    'Frozen in Corner Market',
+    'Produce in Corner Market',
+  ]);
 
   await fireEvent.press(screen.getByRole('radio', { name: 'Deli in Corner Market' }));
   await fireEvent.press(screen.getByRole('checkbox', { name: 'Big Box' }));
@@ -155,7 +163,7 @@ test('the full setup: store, items with add more / continue, back, finish', asyn
   expect(await screen.findByText('Bananas')).toBeOnTheScreen();
 
   await press('Finish');
-  expect(await screen.findByText('Shopping trips are coming soon')).toBeOnTheScreen();
+  expect(await screen.findByText('Where are you shopping?')).toBeOnTheScreen();
   expect(screen).toHavePathname('/');
 });
 
@@ -192,7 +200,7 @@ test('returning users with setup complete land in the main app', async () => {
       await db.settings.insert({ id: 'app', setupComplete: true });
     },
   });
-  expect(await screen.findByText('Shopping trips are coming soon')).toBeOnTheScreen();
+  expect(await screen.findByText('No stores to shop at yet')).toBeOnTheScreen();
   expect(screen).toHavePathname('/');
 });
 
@@ -203,7 +211,7 @@ test('setup screens are not reachable once setup is complete', async () => {
       await db.settings.insert({ id: 'app', setupComplete: true });
     },
   });
-  expect(await screen.findByText('Shopping trips are coming soon')).toBeOnTheScreen();
+  expect(await screen.findByText('No stores to shop at yet')).toBeOnTheScreen();
 });
 
 test('shows a message if the database fails to open', async () => {

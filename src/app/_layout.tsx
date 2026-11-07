@@ -1,8 +1,10 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { AppearanceProvider } from '@/components/appearance-provider';
 import { StartupError } from '@/components/startup-error';
 import { DatabaseProvider } from '@/db/database-provider';
 import { useSetupComplete } from '@/hooks/use-data';
@@ -10,13 +12,16 @@ import { useSetupComplete } from '@/hooks/use-data';
 void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    // Gesture Handler's root view is required for drag-to-reorder (react-native-sortables).
+    <GestureHandlerRootView style={styles.root}>
       <DatabaseProvider fallback={(error) => (error ? <StartupError error={error} /> : null)}>
-        <RootNavigator />
+        {/* The light/dark choice is saved in the database. */}
+        <AppearanceProvider>
+          <RootNavigator />
+        </AppearanceProvider>
       </DatabaseProvider>
-    </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -44,3 +49,7 @@ function RootNavigator() {
     </Stack>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+});

@@ -4,6 +4,7 @@ import { CheckboxBox } from '@/components/checkbox-box';
 import { ErrorText } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
+import { sortDepartmentsByName } from '@/domain/departments';
 import type { Store } from '@/domain/types';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -64,7 +65,8 @@ export function StoreLocationPicker({
 
             {selected ? (
               <View style={styles.departments} accessibilityRole="radiogroup" accessibilityLabel={`Department in ${store.name}`}>
-                {store.departments.map((dept) => {
+                {/* A–Z is easiest to scan here; the store's walking order is for the shopping trip. */}
+                {sortDepartmentsByName(store.departments).map((dept) => {
                   const chosen = selections[store.id] === dept.id;
                   return (
                     <Pressable
