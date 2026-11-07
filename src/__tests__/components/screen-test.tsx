@@ -1,9 +1,11 @@
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { use } from 'react';
 import { Text, TextInput } from 'react-native';
 import type Animated from 'react-native-reanimated';
 import type { AnimatedRef } from 'react-native-reanimated';
 
 import { Screen } from '@/components/screen';
+import { SpaceBelowFocusedFieldContext } from '@/components/space-below-focused-field';
 
 const mockAssureFocusedInputVisible = jest.fn();
 
@@ -92,4 +94,27 @@ test('drag-to-reorder gets the scroll view through scrollRef', async () => {
     </Screen>
   );
   expect(objectRef.current).toEqual(scrollView);
+});
+
+test('an error shown under the focused field is kept above the keyboard too', async () => {
+  let reportSpaceBelow: (height: number) => void = () => {};
+  function Field() {
+    reportSpaceBelow = use(SpaceBelowFocusedFieldContext);
+    return <Text>New department</Text>;
+  }
+  await render(
+    <Screen>
+      <Field />
+    </Screen>
+  );
+  jest.spyOn(TextInput.State, 'currentlyFocusedInput').mockReturnValue({} as never);
+  mockAssureFocusedInputVisible.mockClear();
+
+  // "already in the list" appears under the field: keep 24 more points clear, and scroll again.
+  await act(async () => reportSpaceBelow(24));
+  expect(screen.getByText('bottomOffset:40')).toBeOnTheScreen();
+  expect(mockAssureFocusedInputVisible).toHaveBeenCalledTimes(1);
+
+  await act(async () => reportSpaceBelow(0));
+  expect(screen.getByText('bottomOffset:16')).toBeOnTheScreen();
 });

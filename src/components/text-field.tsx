@@ -1,5 +1,7 @@
+import { use, useEffect, useState } from 'react';
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
+import { SpaceBelowFocusedFieldContext } from '@/components/space-below-focused-field';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -10,8 +12,20 @@ type Props = Omit<TextInputProps, 'style'> & {
   optional?: boolean;
 };
 
-export function TextField({ label, error, optional, ...rest }: Props) {
+export function TextField({ label, error, optional, onFocus, onBlur, ...rest }: Props) {
   const theme = useTheme();
+  const [focused, setFocused] = useState(false);
+  const [errorHeight, setErrorHeight] = useState(0);
+
+  // While typing, keep the error message above the keyboard along with the field.
+  const reportSpaceBelow = use(SpaceBelowFocusedFieldContext);
+  const spaceBelow = focused && error && errorHeight > 0 ? errorHeight + Spacing.one : 0;
+  useEffect(() => {
+    if (spaceBelow === 0) return;
+    reportSpaceBelow(spaceBelow);
+    return () => reportSpaceBelow(0);
+  }, [spaceBelow, reportSpaceBelow]);
+
   return (
     <View style={styles.container}>
       <ThemedText type="smallBold">
@@ -30,8 +44,20 @@ export function TextField({ label, error, optional, ...rest }: Props) {
           },
         ]}
         {...rest}
+        onFocus={(e) => {
+          setFocused(true);
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          onBlur?.(e);
+        }}
       />
-      {error ? <ErrorText message={error} /> : null}
+      {error ? (
+        <View onLayout={(e) => setErrorHeight(e.nativeEvent.layout.height)}>
+          <ErrorText message={error} />
+        </View>
+      ) : null}
     </View>
   );
 }
