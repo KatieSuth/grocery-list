@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type HostInstance } from 'react-native';
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 import type Animated from 'react-native-reanimated';
 import type { AnimatedRef } from 'react-native-reanimated';
@@ -9,7 +9,8 @@ import { SpaceBelowFocusedFieldContext } from '@/components/space-below-focused-
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { isTextInputFocused } from '@/utils/focused-input';
+import { focusedTextInput } from '@/utils/focused-input';
+import { measureTopInWindow } from '@/utils/measure';
 import { setRef } from '@/utils/set-ref';
 
 type Props = {
@@ -32,6 +33,7 @@ export function Screen({ children, footer, scrollRef, testID }: Props) {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const keyboardAwareRef = useRef<KeyboardAwareScrollViewRef | null>(null);
+  const containerRef = useRef<HostInstance | null>(null);
 
   const setScrollView = (scrollView: KeyboardAwareScrollViewRef | null) => {
     keyboardAwareRef.current = scrollView;
@@ -41,10 +43,15 @@ export function Screen({ children, footer, scrollRef, testID }: Props) {
 
   // Content above a focused field can grow while typing (e.g. adding a department pushes the
   // "New department" field down); scroll again so the field doesn't slide under the keyboard.
+  // If the user has scrolled past the field (it's above the screen), leave the scroll alone:
+  // e.g. checking a second store on the item form while the name field still has focus.
   const keepFocusedFieldVisible = () => {
-    if (isTextInputFocused()) {
-      keyboardAwareRef.current?.assureFocusedInputVisible();
-    }
+    const input = focusedTextInput();
+    const container = containerRef.current;
+    if (!input || !container) return;
+    void Promise.all([measureTopInWindow(container), measureTopInWindow(input)]).then(([screenTop, inputTop]) => {
+      if (inputTop >= screenTop) keyboardAwareRef.current?.assureFocusedInputVisible();
+    });
   };
 
   // Room to keep above the keyboard under the focused field, e.g. for "already in the list".
@@ -52,7 +59,7 @@ export function Screen({ children, footer, scrollRef, testID }: Props) {
   useEffect(keepFocusedFieldVisible, [spaceBelowFocusedField]);
 
   return (
-    <ThemedView style={styles.flex} testID={testID}>
+    <ThemedView ref={containerRef} style={styles.flex} testID={testID}>
       <SpaceBelowFocusedFieldContext value={setSpaceBelowFocusedField}>
         <KeyboardAwareScrollView
           ref={setScrollView}

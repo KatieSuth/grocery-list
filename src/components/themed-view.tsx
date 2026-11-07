@@ -1,9 +1,11 @@
-import { View, type ViewProps } from 'react-native';
+import type { ComponentProps } from 'react';
+import { View } from 'react-native';
 
 import { ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-export type ThemedViewProps = ViewProps & {
+// View's own props, including `ref`.
+export type ThemedViewProps = ComponentProps<typeof View> & {
   lightColor?: string;
   darkColor?: string;
   type?: ThemeColor;

@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 
 import { CheckboxBox } from '@/components/checkbox-box';
 import { ErrorText } from '@/components/text-field';
@@ -18,7 +18,12 @@ type Props = {
   departmentErrors?: Record<string, string>;
 };
 
-/** Pick which stores carry an item, and the department it's in at each one. */
+/**
+ * Pick which stores carry an item, and the department it's in at each one.
+ *
+ * Choosing closes the keyboard: the user is done typing the name, and the keyboard would
+ * otherwise cover the departments that appear.
+ */
 export function StoreLocationPicker({
   stores,
   selections,
@@ -50,7 +55,10 @@ export function StoreLocationPicker({
               accessibilityRole="checkbox"
               aria-checked={selected}
               accessibilityLabel={store.location ? `${store.name}, ${store.location}` : store.name}
-              onPress={() => onToggleStore(store.id)}
+              onPress={() => {
+                Keyboard.dismiss();
+                onToggleStore(store.id);
+              }}
               style={styles.storeHeader}>
               <CheckboxBox checked={selected} />
               <View style={styles.flex}>
@@ -74,7 +82,10 @@ export function StoreLocationPicker({
                       accessibilityRole="radio"
                       aria-checked={chosen}
                       accessibilityLabel={`${dept.name} in ${store.name}`}
-                      onPress={() => onChooseDepartment(store.id, dept.id)}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        onChooseDepartment(store.id, dept.id);
+                      }}
                       style={[
                         styles.chip,
                         { borderColor: chosen ? theme.tint : theme.border },

@@ -1,6 +1,6 @@
-import { TextInput } from 'react-native';
+import { TextInput, type HostInstance } from 'react-native';
 
-/** Whether a text field has focus (and so the keyboard is up). */
-export function isTextInputFocused(): boolean {
-  return TextInput.State.currentlyFocusedInput() != null;
+/** The text field that has focus (so the keyboard is up), if any. */
+export function focusedTextInput(): HostInstance | null {
+  return TextInput.State.currentlyFocusedInput() ?? null;
 }
