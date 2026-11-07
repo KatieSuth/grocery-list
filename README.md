@@ -156,7 +156,7 @@ screens (src/app)  ──uses──▶  hooks (useStores…)  ──▶  reposit
        └────────── domain (pure validation / transforms) ◀──┘
 ```
 
-- **Domain** holds the rules: validation, default departments, reordering, location pruning. It's plain TypeScript, so it's trivial to test and reuse in the main app.
+- **Domain** holds the rules: validation, reordering, location pruning. It's plain TypeScript, so it's trivial to test and reuse in the main app.
 - **Repositories** are the only place that reads or writes RxDB. They normalize input (trim, collapse spaces, drop blank optional fields) and keep items consistent when stores change.
 - **Hooks** expose live queries. Screens re-render automatically when data changes, so after Save, a screen just navigates back and the list is already up to date.
 - **Screens** hold form state as a *draft* (`StoreDraft`, `ItemDraft`). They validate with domain functions and save through repositories.
@@ -348,4 +348,4 @@ When upgrading the SDK, also check the Reanimated rules copied into `jest.resolv
 - Department drag-and-drop is verified in a real browser, but not yet on a phone. Known library issue: on iOS with Gesture Handler 2.x, a dragged item could get stuck after a screen was detached and re-attached (react-native-sortables issue #349). SDK 58 ships Gesture Handler 3, which fixes it, but this isn't confirmed on a phone yet. Screen readers on **web** don't get the Move up / Move down actions, because React Native Web doesn't support accessibility actions.
 - On iOS, VoiceOver doesn't automatically announce validation messages.
 - The only way back into the setup flow from the main app is Settings → Delete all data. Everything else is edited from the tabs.
-- Out of scope for now: a screen for browsing the trip log, backend sync, store addresses, UPC scanning, and the final default department list. See [functional spec §8](docs/functional-spec.md#8-out-of-scope-for-now).
+- Out of scope for now: a screen for browsing the trip log, backend sync, store addresses, and UPC scanning. See [functional spec §8](docs/functional-spec.md#8-out-of-scope-for-now).

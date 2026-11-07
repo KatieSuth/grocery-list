@@ -1,6 +1,5 @@
 import { normalizeText } from '@/utils/text';
 
-import { createDefaultDepartments } from './departments';
 import type { Department, Store } from './types';
 
 export type StoreDraft = {
@@ -15,7 +14,7 @@ export type StoreDraftErrors = {
 };
 
 export function emptyStoreDraft(): StoreDraft {
-  return { name: '', location: '', departments: createDefaultDepartments() };
+  return { name: '', location: '', departments: [] };
 }
 
 export function storeToDraft(store: Store): StoreDraft {

@@ -44,14 +44,24 @@ function watchConsole(page: Page) {
   return problems;
 }
 
+async function addDepartment(page: Page, name: string) {
+  await page.getByLabel('New department').fill(name);
+  await button(page, 'Add department').click();
+  await expect(button(page, `Remove ${name}`)).toBeVisible();
+}
+
 async function setUpOneStoreAndItem(page: Page) {
   await page.goto('/');
   await expect(page.getByText('No stores yet')).toBeVisible({ timeout: 90_000 });
 
   await button(page, 'Add a store').click();
   await page.getByLabel('Store name').fill('Corner Market');
-  await page.getByLabel('New department').fill('Bakery');
-  await button(page, 'Add department').click();
+  // New stores start with no departments, and show an example instead.
+  await expect(page.getByText('No departments yet. For example: Produce, Deli, Frozen.')).toBeVisible();
+  for (const name of ['Produce', 'Deli', 'Frozen', 'Bakery']) {
+    await addDepartment(page, name);
+  }
+  await expect(page.getByText(/No departments yet/)).toHaveCount(0);
   // Produce, Deli, Frozen, Bakery → drag Bakery onto Frozen.
   await dragDepartment(page, 'Bakery', 'Frozen');
   await button(page, 'Save').click();
@@ -139,7 +149,8 @@ test('a new store can reuse departments from other stores', async ({ page }) => 
   await expect(button(page, 'Remove Bakery')).toBeVisible();
   await expect(page.getByLabel('New department')).toHaveValue('');
   await button(page, 'Save').click();
-  await expect(page.getByText('Produce → Deli → Frozen → Bakery')).toBeVisible();
+  await expect(page.getByText('Big Box')).toBeVisible();
+  await expect(page.getByText('Bakery', { exact: true })).toBeVisible();
 
   expect(problems).toEqual([]);
 });
@@ -157,10 +168,14 @@ test('a store can copy all departments from another store', async ({ page }) => 
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Copy from Corner Market' }).click();
   await expect(dialog).toHaveCount(0);
-  // Produce, Deli and Frozen were already there; only Bakery is new.
-  await expect(page.getByText('Copied 1 department from Corner Market: Bakery.')).toBeVisible();
+  // The new store had none, so all four are copied, in Corner Market's order.
+  await expect(
+    page.getByText('Copied 4 departments from Corner Market: Produce, Deli, Bakery, Frozen.')
+  ).toBeVisible();
   await button(page, 'Save').click();
-  await expect(page.getByText('Produce → Deli → Frozen → Bakery')).toBeVisible();
+  await expect(page.getByText('Big Box')).toBeVisible();
+  // Both stores now list the same departments.
+  await expect(page.getByText('Produce → Deli → Bakery → Frozen')).toHaveCount(2);
 
   expect(problems).toEqual([]);
 });
@@ -229,7 +244,9 @@ test('an item in two departments shows under both, sharing its check and quantit
   await page.getByRole('tab', { name: 'Stores' }).click();
   await button(page, 'Add a store').click();
   await page.getByLabel('Store name').fill('Big Box');
+  await addDepartment(page, 'Frozen');
   await button(page, 'Save').click();
+  await expect(page.getByText('Big Box')).toBeVisible();
   await page.getByRole('tab', { name: 'Items' }).click();
   await button(page, 'Milk').click();
   await page.getByRole('checkbox', { name: 'Big Box' }).click();
@@ -272,7 +289,9 @@ test('a shopping trip: choose a store, check off, finish', async ({ page }) => {
   await page.getByRole('tab', { name: 'Stores' }).click();
   await button(page, 'Add a store').click();
   await page.getByLabel('Store name').fill('Big Box');
+  await addDepartment(page, 'Frozen');
   await button(page, 'Save').click();
+  await expect(page.getByText('Big Box')).toBeVisible();
   await page.getByRole('tab', { name: 'Items' }).click();
   await button(page, 'Add an item').click();
   await page.getByLabel('Item name').fill('Apples');

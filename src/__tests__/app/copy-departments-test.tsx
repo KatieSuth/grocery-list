@@ -1,7 +1,7 @@
 import { cleanup, screen } from 'expo-router/testing-library';
 
 import type { AppDatabase } from '@/db/database';
-import { eventually, press, renderApp, type } from '@/test-utils/app';
+import { addDepartments, eventually, press, renderApp, type } from '@/test-utils/app';
 import { closeTestDatabases } from '@/test-utils/db';
 
 jest.mock('@/db/database', () => ({
@@ -45,6 +45,9 @@ test('copies another store’s departments after the current ones, skipping name
   const db = await renderApp({ seed });
   await press('Add a store');
   await type('Store name', 'Co-op');
+  // Typing "Deli" reuses Corner Market's spelling, "deli".
+  await addDepartments('Produce', 'Deli', 'Frozen');
+  expect(departmentNames()).toEqual(['Produce', 'deli', 'Frozen']);
 
   // The prompt lists every saved store, with a preview of its departments.
   await press('Copy departments from another store');
@@ -57,26 +60,26 @@ test('copies another store’s departments after the current ones, skipping name
   // Cancel changes nothing.
   await press('Cancel copying');
   expect(screen.queryByText('Copy departments from…')).toBeNull();
-  expect(departmentNames()).toEqual(['Produce', 'Deli', 'Frozen']);
+  expect(departmentNames()).toEqual(['Produce', 'deli', 'Frozen']);
 
-  // "deli" and "Produce" are already here (case doesn't matter), so only two are added.
+  // "deli" and "Produce" are already here, so only two are added.
   await press('Copy departments from another store');
   await press('Copy from Corner Market, Main St');
   expect(screen.queryByText('Copy departments from…')).toBeNull();
-  expect(departmentNames()).toEqual(['Produce', 'Deli', 'Frozen', 'Bakery', 'Frozen Foods']);
+  expect(departmentNames()).toEqual(['Produce', 'deli', 'Frozen', 'Bakery', 'Frozen Foods']);
   expect(screen.getByText('Copied 2 departments from Corner Market: Bakery, Frozen Foods.')).toBeOnTheScreen();
 
   // Copying again adds nothing, and says so.
   await press('Copy departments from another store');
   expect(screen.queryByText(/^Copied/)).toBeNull();
   await press('Copy from Corner Market, Main St');
-  expect(departmentNames()).toEqual(['Produce', 'Deli', 'Frozen', 'Bakery', 'Frozen Foods']);
+  expect(departmentNames()).toEqual(['Produce', 'deli', 'Frozen', 'Bakery', 'Frozen Foods']);
   expect(screen.getByText('Every department at Corner Market is already in this list.')).toBeOnTheScreen();
 
   await press('Save');
   await eventually(async () => {
     const saved = await db.stores.findOne({ selector: { name: 'Co-op' } }).exec();
-    expect(saved?.departments.map((d) => d.name)).toEqual(['Produce', 'Deli', 'Frozen', 'Bakery', 'Frozen Foods']);
+    expect(saved?.departments.map((d) => d.name)).toEqual(['Produce', 'deli', 'Frozen', 'Bakery', 'Frozen Foods']);
     // Copies are new departments, not shared with Corner Market.
     expect(saved?.departments.map((d) => d.id)).not.toContain('d1');
   });

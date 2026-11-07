@@ -3,13 +3,6 @@ import { nameKey, normalizeText, sameName } from '@/utils/text';
 
 import type { Department, Store } from './types';
 
-/** Departments every new store starts with. The full list is still to be decided. */
-export const DEFAULT_DEPARTMENT_NAMES = ['Produce', 'Deli', 'Frozen'] as const;
-
-export function createDefaultDepartments(): Department[] {
-  return DEFAULT_DEPARTMENT_NAMES.map((name) => ({ id: createId(), name }));
-}
-
 export type AddDepartmentResult =
   | { ok: true; departments: Department[] }
   | { ok: false; error: string };

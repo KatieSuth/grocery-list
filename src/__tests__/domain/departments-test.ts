@@ -1,8 +1,6 @@
 import {
   addDepartment,
   copyDepartments,
-  createDefaultDepartments,
-  DEFAULT_DEPARTMENT_NAMES,
   moveDepartment,
   removeDepartment,
   sortDepartmentsByName,
@@ -14,14 +12,6 @@ const depts = [
   { id: 'c', name: 'Frozen' },
 ];
 const names = (list: { name: string }[]) => list.map((d) => d.name);
-
-test('defaults are Produce, Deli, Frozen with unique ids', () => {
-  const defaults = createDefaultDepartments();
-  expect(names(defaults)).toEqual([...DEFAULT_DEPARTMENT_NAMES]);
-  expect(new Set(defaults.map((d) => d.id)).size).toBe(3);
-  // Fresh ids each time, so stores never share department ids.
-  expect(createDefaultDepartments()[0].id).not.toBe(defaults[0].id);
-});
 
 describe('addDepartment', () => {
   test('appends a normalized name', () => {

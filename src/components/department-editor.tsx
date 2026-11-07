@@ -139,7 +139,7 @@ export function DepartmentEditor({
       />
       {departments.length === 0 ? (
         <ThemedText type="small" themeColor="textSecondary">
-          No departments yet.
+          No departments yet. For example: Produce, Deli, Frozen.
         </ThemedText>
       ) : null}
       {error ? <ErrorText message={error} /> : null}

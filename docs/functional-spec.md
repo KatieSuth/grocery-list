@@ -112,7 +112,7 @@ The first screen on a new install.
 | Departments | At least one | See below. |
 
 **Departments**
-- A new store starts with the defaults **Produce, Deli, Frozen**, in that order.
+- A new store starts with **no departments**. While the list is empty it shows "No departments yet. For example: Produce, Deli, Frozen." The store can't be saved until it has at least one.
 - Each department row shows a **drag handle** on the left (☰ on iOS, ⋮⋮ on Android and web), its position number, its name, and **✕** to remove it.
 - **Reordering is drag-and-drop:** press and hold the handle, drag the row to its new place, and let go. The other rows move aside as you drag, and the numbers update when you drop.
   - Only the handle starts a drag, so scrolling the form and tapping ✕ work normally.
@@ -135,7 +135,7 @@ The first screen on a new install.
   - **No duplicates:** a department whose name is already in the list is skipped. Matching ignores case and extra spaces, so "deli" isn't added when "Deli" is there. The existing entry keeps its spelling and position.
   - A note under the button says what happened: "Copied 2 departments from Corner Market: Bakery, Frozen Foods." or "Every department at Corner Market is already in this list."
   - Copies are new departments belonging to this store; nothing is linked to the other store. As with any edit, nothing is saved until Save.
-- If every department is removed, the list shows "No departments yet."
+- If every department is removed, the list shows the same "No departments yet. For example: Produce, Deli, Frozen." message.
 
 **Footer**
 - **Cancel:** discards changes and returns to the Stores screen.
@@ -478,4 +478,3 @@ These were deliberately left out of the first build:
 - **Online backend and sync.** The data model is ready for it (RxDB supports replication), but nothing leaves the device today.
 - **Store addresses.** Location is free text only.
 - **UPC barcode scanning** to add items.
-- **The final default department list.** Currently Produce, Deli, Frozen.

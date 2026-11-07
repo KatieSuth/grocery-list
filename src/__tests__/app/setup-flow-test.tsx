@@ -3,7 +3,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { observeSetupComplete } from '@/data/settings-repo';
 import { observeStores } from '@/data/stores-repo';
-import { dragDepartment, moveDepartment, press, renderApp, type } from '@/test-utils/app';
+import { addDepartments, dragDepartment, moveDepartment, press, renderApp, type } from '@/test-utils/app';
 import { closeTestDatabases } from '@/test-utils/db';
 
 jest.mock('@/db/database', () => ({
@@ -34,10 +34,11 @@ test('adding a store with custom, reordered departments', async () => {
   await press('Add a store');
   expect(screen).toHavePathname('/setup/store-form');
 
-  // Defaults are pre-filled.
-  for (const name of ['Produce', 'Deli', 'Frozen']) {
-    expect(screen.getByText(name)).toBeOnTheScreen();
-  }
+  // A new store starts with no departments, and shows an example of what to add.
+  expect(screen.getByText('No departments yet. For example: Produce, Deli, Frozen.')).toBeOnTheScreen();
+  expect(screen.queryByLabelText(/^Reorder /)).toBeNull();
+  await addDepartments('Produce', 'Deli', 'Frozen');
+  expect(screen.queryByText(/No departments yet/)).toBeNull();
 
   // Name is required.
   await press('Save');
@@ -95,12 +96,14 @@ test('the full setup: store, items with add more / continue, back, finish', asyn
 
   await press('Add a store');
   await type('Store name', 'Corner Market');
+  await addDepartments('Produce', 'Deli', 'Frozen');
   await press('Save');
   await screen.findByText('Corner Market');
   // renderRouter freezes the clock; move it so stores sort in creation order.
   jest.setSystemTime(Date.now() + 1000);
   await press('Add a store');
   await type('Store name', 'Big Box');
+  await addDepartments('Produce', 'Deli', 'Frozen');
   await press('Save');
   await screen.findByText('Big Box');
 
@@ -186,12 +189,13 @@ test('a store with no departments cannot be saved', async () => {
   await renderApp();
   await press('Add a store');
   await type('Store name', 'Empty');
-  for (const name of ['Produce', 'Deli', 'Frozen']) {
-    await press(`Remove ${name}`);
-  }
-  expect(screen.getByText('No departments yet.')).toBeOnTheScreen();
   await press('Save');
   expect(await screen.findByText(/Add at least one department/)).toBeOnTheScreen();
+
+  // Removing the last department brings the example back.
+  await addDepartments('Deli');
+  await press('Remove Deli');
+  expect(screen.getByText('No departments yet. For example: Produce, Deli, Frozen.')).toBeOnTheScreen();
 });
 
 test('returning users with setup complete land in the main app', async () => {

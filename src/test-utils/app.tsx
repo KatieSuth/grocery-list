@@ -23,6 +23,14 @@ export const press = async (name: string | RegExp) =>
 export const type = async (label: string, text: string) =>
   fireEvent.changeText(await screen.findByLabelText(label), text);
 
+/** Adds departments on the store form, in order. New stores start with none. */
+export async function addDepartments(...names: string[]): Promise<void> {
+  for (const name of names) {
+    await type('New department', name);
+    await press('Add department');
+  }
+}
+
 /**
  * Retries `check` while letting pending database writes finish. Use for DB assertions after a
  * fire-and-forget write; don't await DB queries inside waitFor (it overlaps act() calls).

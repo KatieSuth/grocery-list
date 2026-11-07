@@ -31,7 +31,7 @@ test('while focused, a field reports the room its error message needs below it',
 
   // The error appears and is laid out: its height plus the gap above it.
   await rerender(renderField('"Deli" is already in the list.', { onFocus, onBlur }));
-  await fireEvent(screen.getByText('"Deli" is already in the list.'), 'layout', errorLayout);
+  await fireEvent(screen.getByText('"Deli" is already in the list.').parent!, 'layout', errorLayout);
   expect(reportSpaceBelow).toHaveBeenLastCalledWith(24);
 
   // Leaving the field clears it.
@@ -43,7 +43,7 @@ test('while focused, a field reports the room its error message needs below it',
 test('fixing the error clears the room it needed', async () => {
   const { rerender } = await render(renderField('"Deli" is already in the list.'));
   await fireEvent(screen.getByLabelText('New department'), 'focus');
-  await fireEvent(screen.getByText('"Deli" is already in the list.'), 'layout', errorLayout);
+  await fireEvent(screen.getByText('"Deli" is already in the list.').parent!, 'layout', errorLayout);
   expect(reportSpaceBelow).toHaveBeenLastCalledWith(24);
 
   await rerender(renderField(undefined));
@@ -52,14 +52,14 @@ test('fixing the error clears the room it needed', async () => {
 
 test('an unfocused field with an error needs no extra room', async () => {
   await render(renderField('"Deli" is already in the list.'));
-  await fireEvent(screen.getByText('"Deli" is already in the list.'), 'layout', errorLayout);
+  await fireEvent(screen.getByText('"Deli" is already in the list.').parent!, 'layout', errorLayout);
   expect(reportSpaceBelow).not.toHaveBeenCalled();
 });
 
 test('outside a Screen, a focused field with an error still works', async () => {
   await render(<TextField label="Store name" error="Enter a name." />);
   await fireEvent(screen.getByLabelText('Store name'), 'focus');
-  await fireEvent(screen.getByText('Enter a name.'), 'layout', errorLayout);
+  await fireEvent(screen.getByText('Enter a name.').parent!, 'layout', errorLayout);
   expect(screen.getByText('Enter a name.')).toBeOnTheScreen();
   expect(reportSpaceBelow).not.toHaveBeenCalled();
 });

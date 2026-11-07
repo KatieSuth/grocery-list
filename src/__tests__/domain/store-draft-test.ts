@@ -1,10 +1,7 @@
 import { emptyStoreDraft, hasErrors, storeToDraft, validateStoreDraft } from '@/domain/store-draft';
 
-test('a new draft has the default departments', () => {
-  const draft = emptyStoreDraft();
-  expect(draft.name).toBe('');
-  expect(draft.location).toBe('');
-  expect(draft.departments.map((d) => d.name)).toEqual(['Produce', 'Deli', 'Frozen']);
+test('a new draft is empty, with no departments to start', () => {
+  expect(emptyStoreDraft()).toEqual({ name: '', location: '', departments: [] });
 });
 
 test('storeToDraft copies a store without sharing department objects', () => {

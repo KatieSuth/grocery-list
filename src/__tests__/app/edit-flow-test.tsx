@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor } from 'expo-router/testing-library
 import { Alert, type AlertButton } from 'react-native';
 
 import type { AppDatabase } from '@/db/database';
-import { departmentActions, moveDepartment, press, renderApp, type } from '@/test-utils/app';
+import { addDepartments, departmentActions, moveDepartment, press, renderApp, type } from '@/test-utils/app';
 import { closeTestDatabases } from '@/test-utils/db';
 
 jest.mock('@/db/database', () => ({
@@ -184,6 +184,7 @@ test('save errors are shown to the user', async () => {
 
   await press('Add a store');
   await type('Store name', 'Fails');
+  await addDepartments('Deli');
   await press('Save');
   expect(await screen.findByText('Could not save this store. Please try again.')).toBeOnTheScreen();
   expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
@@ -202,6 +203,7 @@ test('save errors are shown to the user', async () => {
 test('adding a duplicate or blank department shows an error', async () => {
   await renderApp();
   await press('Add a store');
+  await addDepartments('Produce');
 
   await press('Add department');
   expect(await screen.findByText('Enter a department name.')).toBeOnTheScreen();
@@ -229,6 +231,7 @@ test('typing a new department suggests ones from other stores; tapping fills it 
     },
   });
   await press('Add a store');
+  await addDepartments('Deli');
 
   // Nothing until typing; then matching departments from other stores.
   expect(screen.queryByText('From your stores, tap to fill in:')).toBeNull();
@@ -251,7 +254,7 @@ test('typing a new department suggests ones from other stores; tapping fills it 
   expect(screen.getByRole('button', { name: 'Remove Bakery' })).toBeOnTheScreen();
   expect(screen.getByLabelText('New department')).toHaveDisplayValue('');
 
-  // Departments already in the list aren't suggested (Deli is a default; Bakery was just added).
+  // Departments already in the list aren't suggested (Deli and Bakery were just added).
   await type('New department', 'del');
   expect(screen.queryByRole('button', { name: 'Use Deli' })).toBeNull();
   await type('New department', 'bak');
