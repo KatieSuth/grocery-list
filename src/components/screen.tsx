@@ -1,4 +1,4 @@
-import type { ReactNode, Ref } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 import type Animated from 'react-native-reanimated';
@@ -8,6 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { isTextInputFocused } from '@/utils/focused-input';
+import { setRef } from '@/utils/set-ref';
 
 type Props = {
   children: ReactNode;
@@ -27,11 +29,27 @@ type Props = {
 export function Screen({ children, footer, scrollRef, testID }: Props) {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const keyboardAwareRef = useRef<KeyboardAwareScrollViewRef | null>(null);
+
+  const setScrollView = (scrollView: KeyboardAwareScrollViewRef | null) => {
+    keyboardAwareRef.current = scrollView;
+    // The inner view is a Reanimated ScrollView, which is what drag-to-reorder scrolls.
+    setRef(scrollRef as Parameters<typeof setRef>[0], scrollView);
+  };
+
+  // Content above a focused field can grow while typing (e.g. adding a department pushes the
+  // "New department" field down); scroll again so the field doesn't slide under the keyboard.
+  const keepFocusedFieldVisible = () => {
+    if (isTextInputFocused()) {
+      keyboardAwareRef.current?.assureFocusedInputVisible();
+    }
+  };
+
   return (
     <ThemedView style={styles.flex} testID={testID}>
       <KeyboardAwareScrollView
-        // The inner view is a Reanimated ScrollView, which is what drag-to-reorder scrolls.
-        ref={scrollRef as unknown as Ref<KeyboardAwareScrollViewRef>}
+        ref={setScrollView}
+        onContentSizeChange={keepFocusedFieldVisible}
         bottomOffset={Spacing.three}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
