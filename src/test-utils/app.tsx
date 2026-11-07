@@ -13,30 +13,8 @@ export async function renderApp(options: { initialUrl?: string; seed?: (db: AppD
   const db = await createTestDatabase();
   await options.seed?.(db);
   jest.mocked(getAppDatabase).mockResolvedValue(db);
-  await renderRouterWithRouteHelpers(options.initialUrl);
+  await renderRouter('./src/app', { initialUrl: options.initialUrl });
   return db;
-}
-
-const ROUTE_HELPERS = [
-  'getPathname',
-  'getPathnameWithParams',
-  'getSegments',
-  'getSearchParams',
-  'getRouterState',
-] as const;
-
-/**
- * SDK 57 shim; delete when back on SDK 58. SDK 57's renderRouter predates async render(): it
- * attaches its route helpers to the promise it returns rather than to `screen`, which the
- * toHavePathname matchers read. Copy them across.
- */
-async function renderRouterWithRouteHelpers(initialUrl?: string) {
-  const rendering = renderRouter('./src/app', { initialUrl }) as unknown as Promise<unknown> &
-    Record<(typeof ROUTE_HELPERS)[number], () => unknown>;
-  await rendering;
-  for (const name of ROUTE_HELPERS) {
-    (screen as unknown as Record<string, unknown>)[name] = rendering[name];
-  }
 }
 
 export const press = async (name: string | RegExp) =>

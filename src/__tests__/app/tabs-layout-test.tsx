@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react-native';
 import TabsLayout from '@/app/(tabs)/_layout';
 
 // The native tab bar can't render in Jest; stand-ins expose what the layout passes it.
-jest.mock('expo-router/unstable-native-tabs', () => {
+jest.mock('expo-router/native-tabs', () => {
   const React = jest.requireActual('react');
   const { Text, View } = jest.requireActual('react-native');
   const NativeTabs = ({ children, tintColor }: { children: unknown; tintColor: string }) =>

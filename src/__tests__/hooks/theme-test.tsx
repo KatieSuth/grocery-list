@@ -20,7 +20,7 @@ const choosing = (choice: ColorSchemeChoice) =>
 test.each([
   ['light', Colors.light],
   ['dark', Colors.dark],
-  ['unspecified', Colors.light],
+  [null, Colors.light],
 ] as const)('useTheme for a %s system scheme', async (scheme, colors) => {
   jest.spyOn(ReactNative, 'useColorScheme').mockReturnValue(scheme);
   const { result } = await renderHook(() => useTheme());

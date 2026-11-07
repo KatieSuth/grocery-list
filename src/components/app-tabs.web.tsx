@@ -1,5 +1,6 @@
 import { TabList, TabSlot, TabTrigger, Tabs, type TabTriggerSlotProps } from 'expo-router/ui';
 import { SymbolView, type AndroidSymbol } from 'expo-symbols';
+import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -33,7 +34,13 @@ export default function AppTabs() {
   );
 }
 
-type TabButtonProps = TabTriggerSlotProps & { label: string; icon: AndroidSymbol };
+// expo-router types the slot's ref as Ref<View>, which no longer fits Pressable now that View is a
+// function component in React Native 0.88. The ref is still forwarded; only its type is corrected.
+type TabButtonProps = Omit<TabTriggerSlotProps, 'ref'> & {
+  ref?: ComponentProps<typeof Pressable>['ref'];
+  label: string;
+  icon: AndroidSymbol;
+};
 
 function TabButton({ label, icon, isFocused, ...props }: TabButtonProps) {
   const theme = useTheme();

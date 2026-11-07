@@ -8,7 +8,7 @@ Built so far:
 
 See the [functional specification](docs/functional-spec.md) for screen-by-screen behavior.
 
-**Stack:** Expo SDK 57 · React Native 0.86 · React 19.2 (React Compiler on) · Expo Router · RxDB 17 · TypeScript · Jest + React Native Testing Library · pnpm
+**Stack:** Expo SDK 58 · React Native 0.88 · React 19.3 (React Compiler on) · Expo Router · RxDB 17 · TypeScript · Jest + React Native Testing Library · pnpm
 
 ---
 
@@ -181,7 +181,7 @@ Departments are reordered with [`react-native-sortables`](https://github.com/Mat
 
 `(tabs)/_layout.tsx` renders `components/app-tabs`, which has a different file per platform:
 
-- **iOS/Android** (`app-tabs.tsx`): `NativeTabs` from `expo-router/unstable-native-tabs` (SDK 58 moves it to `expo-router/native-tabs`), so each platform's own tab bar is used. Icons are SF Symbols on iOS and Material Symbols on Android, set with the `sf` and `md` props; both ship in Expo Go.
+- **iOS/Android** (`app-tabs.tsx`): `NativeTabs` from `expo-router/native-tabs`, so each platform's own tab bar is used. Icons are SF Symbols on iOS and Material Symbols on Android, set with the `sf` and `md` props; both ship in Expo Go.
 - Four tabs: Trip, Items, Stores, Settings (gear: `gearshape` / `settings`).
 - **Web** (`app-tabs.web.tsx`): `NativeTabs` draws its bar at the top of the page, over the screen header. Web instead gets a bottom tab bar built from expo-router's headless `Tabs` (`expo-router/ui`), with the same Material icons drawn by `SymbolView`.
 
@@ -257,7 +257,7 @@ pnpm test          # everything, iOS + Android, coverage enforced at 100%
 npx jest src/__tests__/domain --coverage=false   # a subset
 ```
 
-The Jest config (`package.json` → `jest`, Jest 29) has three projects:
+The Jest config (`package.json` → `jest`, Jest 30) has three projects:
 
 | Project | Runs | Preset |
 | --- | --- | --- |
@@ -316,7 +316,7 @@ test('adds a store', async () => {
   - Switch tabs with `await act(() => router.navigate('/items'))`. Don't use `testRouter.navigate`: tab switches add an internal query param that breaks its pathname assertion.
   - `tabs-layout-test.tsx` mocks `NativeTabs` to check tab order, labels, and icons.
 - **Reanimated and drag-to-reorder have Jest stand-ins** (`jest.setup.ts`):
-  - Reanimated and Worklets use their official mocks.
+  - Reanimated and Worklets use their official mocks. Reanimated 4.7's mock also needs a custom resolver, `jest.resolver.js`. Reanimated ships one, but it doesn't work with pnpm; see the comment at the top of the file.
   - `react-native-sortables` uses `src/test-utils/sortables-mock.tsx`, which renders rows normally.
   - In tests, reorder departments with `moveDepartment(name, 'up' | 'down')` (the screen-reader actions) or `dragDepartment(from, to)` (simulates a drop).
   - Real dragging is covered by the Playwright tests.
@@ -327,26 +327,9 @@ test('adds a store', async () => {
 
 ## Expo SDK version
 
-The project is on **SDK 57**, not the latest (58). The App Store and Google Play versions of Expo Go only run SDK 57 projects until Expo ships Expo Go for SDK 58, so the project was moved down to 57 on 2026-11-05.
+The project is on **SDK 58**. It was on SDK 57 from 2026-11-05 to 2026-11-07, while the store versions of Expo Go only supported 57. The SDK 57 workarounds were removed when it moved back.
 
-**SDK 57 workarounds** (each marked in the code):
-
-| Workaround | Where | Why |
-| --- | --- | --- |
-| `babel.config.js` with `babel-preset-expo` | project root | SDK 57's `jest-expo` doesn't apply Expo's Babel preset by itself. |
-| `mingo` added to `transformIgnorePatterns` | `package.json` → `jest` | RxDB's query engine resolves to ES modules under Jest 29. |
-| `test-renderer` pinned to `~1.2.0` | `package.json` | 1.3 needs React 19.3; SDK 57 ships React 19.2. |
-| Route-helper shim in `renderRouterWithRouteHelpers` | `src/test-utils/app.tsx` | SDK 57's `renderRouter` was written for Testing Library 13's synchronous `render`. |
-| Typings for `toHavePathname` and the other router matchers | `src/test-utils/router-matchers.d.ts` | SDK 57 ships those matchers without type declarations. |
-| Path assertions instead of exact-URL ones after tab switches | `__tests__/app/main-app-test.tsx` | SDK 57's router adds an internal `__internal_expo_router_no_animation` param to the URL. |
-
-**Moving back to SDK 58** once Expo Go for 58 is in the stores:
-
-1. `npx expo install expo@^58.0.0 && npx expo install --fix`
-2. Change the tabs import back to `expo-router/native-tabs`, in `(tabs)/_layout.tsx` and `tabs-layout-test.tsx`.
-3. Remove the route-helper shim and `router-matchers.d.ts` (SDK 58 provides both), and the `test-renderer` pin.
-4. Try removing `babel.config.js` and the `mingo` pattern. Keep whichever turn out to still be needed.
-5. Run `pnpm typecheck && pnpm lint && pnpm test`, `npx expo-doctor`, and a native export.
+When upgrading the SDK, also check the Reanimated rules copied into `jest.resolver.js` (`REANIMATED_WEB_ONLY`) against `react-native-reanimated/jest/resolver.js`.
 
 ## Conventions
 
@@ -361,7 +344,7 @@ The project is on **SDK 57**, not the latest (58). The App Store and Google Play
 
 - **Verified in a browser:** the full app runs in Chromium with no console errors, and data survives reloads (Playwright, `e2e/`).
 - **Not yet run on a phone or simulator.** Loading in Expo Go on Android from WSL2 failed at the network level: the tunnel gave "Failed to download remote update", and the dev server never received a request. The iOS and Android bundles build and all Jest tests pass, but the on-device storage path (`storage.native.ts`) is only checked by tests so far.
-- Department drag-and-drop is verified in a real browser, but not yet on a phone. Known library issue to watch for: on iOS with Gesture Handler 2.x, a dragged item can get stuck after a screen is detached and re-attached (react-native-sortables issue #349; Gesture Handler 3 fixes it). Screen readers on **web** don't get the Move up / Move down actions, because React Native Web doesn't support accessibility actions.
+- Department drag-and-drop is verified in a real browser, but not yet on a phone. Known library issue: on iOS with Gesture Handler 2.x, a dragged item could get stuck after a screen was detached and re-attached (react-native-sortables issue #349). SDK 58 ships Gesture Handler 3, which fixes it, but this isn't confirmed on a phone yet. Screen readers on **web** don't get the Move up / Move down actions, because React Native Web doesn't support accessibility actions.
 - On iOS, VoiceOver doesn't automatically announce validation messages.
 - The only way back into the setup flow from the main app is Settings → Delete all data. Everything else is edited from the tabs.
 - Out of scope for now: a screen for browsing the trip log, backend sync, store addresses, UPC scanning, and the final default department list. See [functional spec §8](docs/functional-spec.md#8-out-of-scope-for-now).
