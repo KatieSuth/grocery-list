@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { HeaderHeightContext } from 'expo-router/react-navigation';
+import { use, type ReactNode } from 'react';
+import { KeyboardAvoidingView, StyleSheet, View } from 'react-native';
 import Animated, { type AnimatedRef } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -20,12 +21,16 @@ type Props = {
 export function Screen({ children, footer, scrollRef, testID }: Props) {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  // 0 when the screen has no navigation header above it.
+  const headerHeight = use(HeaderHeightContext) ?? 0;
   return (
     <ThemedView style={styles.flex} testID={testID}>
+      {/* `padding` on both platforms: Android apps are edge-to-edge, so the window no longer
+          resizes for the keyboard, and without a behavior the keyboard covers the inputs. */}
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}>
+        behavior="padding"
+        keyboardVerticalOffset={headerHeight}>
         <Animated.ScrollView
           ref={scrollRef}
           contentContainerStyle={styles.content}
