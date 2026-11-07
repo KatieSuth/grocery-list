@@ -318,6 +318,7 @@ test('adds a store', async () => {
 - **Reanimated and drag-to-reorder have Jest stand-ins** (`jest.setup.ts`):
   - Reanimated and Worklets use their official mocks. Reanimated 4.7's mock also needs a custom resolver, `jest.resolver.js`. Reanimated ships one, but it doesn't work with pnpm; see the comment at the top of the file.
   - `react-native-sortables` uses `src/test-utils/sortables-mock.tsx`, which renders rows normally.
+  - `react-native-keyboard-controller` (which keeps the focused field above the keyboard in `Screen`) uses its official mock.
   - In tests, reorder departments with `moveDepartment(name, 'up' | 'down')` (the screen-reader actions) or `dragDepartment(from, to)` (simulates a drop).
   - Real dragging is covered by the Playwright tests.
 - **Fire-and-forget writes** (checkbox, quantity): assert on the DB with `eventually(...)` from `test-utils/app`. It retries while advancing the fake timers.

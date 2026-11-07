@@ -1,7 +1,8 @@
-import { HeaderHeightContext } from 'expo-router/react-navigation';
-import { use, type ReactNode } from 'react';
-import { KeyboardAvoidingView, StyleSheet, View } from 'react-native';
-import Animated, { type AnimatedRef } from 'react-native-reanimated';
+import type { ReactNode, Ref } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
+import type Animated from 'react-native-reanimated';
+import type { AnimatedRef } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
@@ -17,37 +18,35 @@ type Props = {
   testID?: string;
 };
 
-/** Scrollable content area with an optional fixed footer of actions. */
+/**
+ * Scrollable content area with an optional fixed footer of actions.
+ *
+ * When the keyboard opens, the content scrolls up with it so the focused field stays visible
+ * just above the keyboard. The footer stays where it is, behind the keyboard.
+ */
 export function Screen({ children, footer, scrollRef, testID }: Props) {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
-  // 0 when the screen has no navigation header above it.
-  const headerHeight = use(HeaderHeightContext) ?? 0;
   return (
     <ThemedView style={styles.flex} testID={testID}>
-      {/* `padding` on both platforms: Android apps are edge-to-edge, so the window no longer
-          resizes for the keyboard, and without a behavior the keyboard covers the inputs. */}
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior="padding"
-        keyboardVerticalOffset={headerHeight}>
-        <Animated.ScrollView
-          ref={scrollRef}
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          contentInsetAdjustmentBehavior="automatic">
-          {children}
-        </Animated.ScrollView>
-        {footer ? (
-          <View
-            style={[
-              styles.footer,
-              { paddingBottom: Math.max(insets.bottom, Spacing.three), borderColor: theme.border },
-            ]}>
-            {footer}
-          </View>
-        ) : null}
-      </KeyboardAvoidingView>
+      <KeyboardAwareScrollView
+        // The inner view is a Reanimated ScrollView, which is what drag-to-reorder scrolls.
+        ref={scrollRef as unknown as Ref<KeyboardAwareScrollViewRef>}
+        bottomOffset={Spacing.three}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        contentInsetAdjustmentBehavior="automatic">
+        {children}
+      </KeyboardAwareScrollView>
+      {footer ? (
+        <View
+          style={[
+            styles.footer,
+            { paddingBottom: Math.max(insets.bottom, Spacing.three), borderColor: theme.border },
+          ]}>
+          {footer}
+        </View>
+      ) : null}
     </ThemedView>
   );
 }

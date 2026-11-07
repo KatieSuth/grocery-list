@@ -3,6 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { AppearanceProvider } from '@/components/appearance-provider';
 import { StartupError } from '@/components/startup-error';
@@ -15,12 +16,15 @@ export default function RootLayout() {
   return (
     // Gesture Handler's root view is required for drag-to-reorder (react-native-sortables).
     <GestureHandlerRootView style={styles.root}>
-      <DatabaseProvider fallback={(error) => (error ? <StartupError error={error} /> : null)}>
-        {/* The light/dark choice is saved in the database. */}
-        <AppearanceProvider>
-          <RootNavigator />
-        </AppearanceProvider>
-      </DatabaseProvider>
+      {/* Tracks the keyboard so screens can keep the focused field above it (see Screen). */}
+      <KeyboardProvider>
+        <DatabaseProvider fallback={(error) => (error ? <StartupError error={error} /> : null)}>
+          {/* The light/dark choice is saved in the database. */}
+          <AppearanceProvider>
+            <RootNavigator />
+          </AppearanceProvider>
+        </DatabaseProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

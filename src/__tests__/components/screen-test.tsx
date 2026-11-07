@@ -1,44 +1,35 @@
-import { render, screen } from '@testing-library/react-native';
-import { HeaderHeightContext } from 'expo-router/react-navigation';
+import { render, screen, within } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
 import { Screen } from '@/components/screen';
 
-// Stand-in that shows the keyboard settings Screen passes, as text.
-jest.mock('react-native/Libraries/Components/Keyboard/KeyboardAvoidingView', () => {
+// Stand-in that shows which content the keyboard-aware scroll view wraps, and its offset.
+jest.mock('react-native-keyboard-controller', () => {
   const React = jest.requireActual('react');
   const { Text: RNText, View } = jest.requireActual('react-native');
   return {
-    __esModule: true,
-    default: ({ behavior, keyboardVerticalOffset, children }: Record<string, unknown>) =>
+    KeyboardAwareScrollView: ({ bottomOffset, children }: { bottomOffset: number; children: unknown }) =>
       React.createElement(
         View,
-        null,
-        React.createElement(RNText, null, `keyboard:${behavior}:${keyboardVerticalOffset}`),
+        { testID: 'keyboard-aware' },
+        React.createElement(RNText, null, `bottomOffset:${bottomOffset}`),
         children
       ),
   };
 });
 
-// Android apps are edge-to-edge, so the window doesn't resize for the keyboard: without a
-// behavior, the keyboard covers inputs near the bottom (e.g. "New department" on the store form).
-test('content moves up for the keyboard on every platform, below the navigation header', async () => {
+// When the keyboard opens, the content scrolls up with it so the focused field stays visible
+// (e.g. "New department" on the store form). The Cancel/Save footer stays behind the keyboard.
+test('the content moves up with the keyboard; the footer does not', async () => {
   await render(
-    <HeaderHeightContext value={64}>
-      <Screen>
-        <Text>Form</Text>
-      </Screen>
-    </HeaderHeightContext>
-  );
-  expect(screen.getByText('keyboard:padding:64')).toBeOnTheScreen();
-  expect(screen.getByText('Form')).toBeOnTheScreen();
-});
-
-test('a screen without a navigation header needs no keyboard offset', async () => {
-  await render(
-    <Screen>
-      <Text>Form</Text>
+    <Screen footer={<Text>Save</Text>}>
+      <Text>New department</Text>
     </Screen>
   );
-  expect(screen.getByText('keyboard:padding:0')).toBeOnTheScreen();
+  const keyboardAware = screen.getByTestId('keyboard-aware');
+  expect(within(keyboardAware).getByText('New department')).toBeOnTheScreen();
+  expect(within(keyboardAware).queryByText('Save')).toBeNull();
+  expect(screen.getByText('Save')).toBeOnTheScreen();
+  // A little space between the focused field and the top of the keyboard.
+  expect(within(keyboardAware).getByText('bottomOffset:16')).toBeOnTheScreen();
 });
