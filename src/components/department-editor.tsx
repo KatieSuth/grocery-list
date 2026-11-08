@@ -1,6 +1,6 @@
 import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useDeferredValue, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import Sortable, { type SortableGridProps } from 'react-native-sortables';
 
 import { Button } from '@/components/button';
@@ -33,20 +33,17 @@ type Props = {
 };
 
 /** Ordered department list: reorder, remove, and add departments (with suggestions from other stores). */
-export function DepartmentEditor({
-  departments,
-  onChange,
-  error,
-  knownStores,
-  currentStoreId,
-  scrollableRef,
-}: Props) {
+export function DepartmentEditor({ departments, onChange, error, knownStores, currentStoreId, scrollableRef }: Props) {
   const theme = useTheme();
   const [newName, setNewName] = useState('');
   const [addError, setAddError] = useState<string>();
   const [choosingCopySource, setChoosingCopySource] = useState(false);
   const [copyNote, setCopyNote] = useState<string>();
   const [suggestionsHeight, setSuggestionsHeight] = useState(0);
+  // Each draggable row is costly to build (animated views, a gesture handler, a measurement pass),
+  // so with many departments the screen would be slow to open. Show the rest of the form first
+  // and build the list in the render right after.
+  const showList = useDeferredValue(true, false);
 
   const copySources = knownStores.filter((s) => s.id !== currentStoreId && s.departments.length > 0);
 
@@ -95,51 +92,60 @@ export function DepartmentEditor({
         </ThemedText>
       </View>
 
-      <Sortable.Grid
-        data={departments}
-        keyExtractor={(dept) => dept.id}
-        rowGap={Spacing.two}
-        customHandle
-        scrollableRef={scrollableRef}
-        activeItemScale={1.03}
-        inactiveItemOpacity={0.7}
-        onDragEnd={({ data }) => onChange(data)}
-        renderItem={({ item: dept, index }) => (
-          <View style={[styles.row, { backgroundColor: theme.backgroundElement }]}>
-            <Sortable.Handle>
-              <View
-                accessible
-                accessibilityLabel={`Reorder ${dept.name}, position ${index + 1} of ${departments.length}`}
-                accessibilityHint="Drag to move. Screen reader users: use the actions to move up or down."
-                accessibilityActions={[
-                  ...(index > 0 ? [{ name: 'moveUp', label: 'Move up' }] : []),
-                  ...(index < departments.length - 1 ? [{ name: 'moveDown', label: 'Move down' }] : []),
-                ]}
-                onAccessibilityAction={(event) =>
-                  onChange(moveDepartment(departments, index, event.nativeEvent.actionName === 'moveUp' ? -1 : 1))
-                }
-                style={styles.handle}>
-                <SymbolView
-                  name={{ ios: 'line.3.horizontal', android: 'drag_indicator', web: 'drag_indicator' }}
-                  tintColor={theme.textSecondary}
-                  size={22}
-                />
-              </View>
-            </Sortable.Handle>
-            <ThemedText themeColor="textSecondary" style={styles.position}>
-              {index + 1}
-            </ThemedText>
-            <ThemedText style={styles.name}>{dept.name}</ThemedText>
-            <Button
-              compact
-              variant="ghost"
-              label="✕"
-              accessibilityLabel={`Remove ${dept.name}`}
-              onPress={() => onChange(removeDepartment(departments, dept.id))}
-            />
-          </View>
-        )}
-      />
+      {!showList && departments.length > 0 ? (
+        <ActivityIndicator
+          accessibilityLabel="Loading departments"
+          color={theme.textSecondary}
+          style={styles.loading}
+        />
+      ) : null}
+      {showList ? (
+        <Sortable.Grid
+          data={departments}
+          keyExtractor={(dept) => dept.id}
+          rowGap={Spacing.two}
+          customHandle
+          scrollableRef={scrollableRef}
+          activeItemScale={1.03}
+          inactiveItemOpacity={0.7}
+          onDragEnd={({ data }) => onChange(data)}
+          renderItem={({ item: dept, index }) => (
+            <View style={[styles.row, { backgroundColor: theme.backgroundElement }]}>
+              <Sortable.Handle>
+                <View
+                  accessible
+                  accessibilityLabel={`Reorder ${dept.name}, position ${index + 1} of ${departments.length}`}
+                  accessibilityHint="Drag to move. Screen reader users: use the actions to move up or down."
+                  accessibilityActions={[
+                    ...(index > 0 ? [{ name: 'moveUp', label: 'Move up' }] : []),
+                    ...(index < departments.length - 1 ? [{ name: 'moveDown', label: 'Move down' }] : []),
+                  ]}
+                  onAccessibilityAction={(event) =>
+                    onChange(moveDepartment(departments, index, event.nativeEvent.actionName === 'moveUp' ? -1 : 1))
+                  }
+                  style={styles.handle}>
+                  <SymbolView
+                    name={{ ios: 'line.3.horizontal', android: 'drag_indicator', web: 'drag_indicator' }}
+                    tintColor={theme.textSecondary}
+                    size={22}
+                  />
+                </View>
+              </Sortable.Handle>
+              <ThemedText themeColor="textSecondary" style={styles.position}>
+                {index + 1}
+              </ThemedText>
+              <ThemedText style={styles.name}>{dept.name}</ThemedText>
+              <Button
+                compact
+                variant="ghost"
+                label="✕"
+                accessibilityLabel={`Remove ${dept.name}`}
+                onPress={() => onChange(removeDepartment(departments, dept.id))}
+              />
+            </View>
+          )}
+        />
+      ) : null}
       {departments.length === 0 ? (
         <ThemedText type="small" themeColor="textSecondary">
           No departments yet. For example: Produce, Deli, Frozen.
@@ -243,6 +249,7 @@ const styles = StyleSheet.create({
   addRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
   flex: { flex: 1 },
   addButton: { paddingTop: 26 },
+  loading: { paddingVertical: Spacing.three },
   suggestions: { gap: Spacing.one },
   suggestion: {
     flexDirection: 'row',

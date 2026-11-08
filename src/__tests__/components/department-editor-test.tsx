@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import React from 'react';
 
 import { DepartmentEditor } from '@/components/department-editor';
 import { SpaceBelowFocusedFieldContext } from '@/components/space-below-focused-field';
@@ -31,4 +32,27 @@ test('suggestions while typing a new department get room above the keyboard', as
   await fireEvent.changeText(input, 'xyz');
   expect(screen.queryByLabelText('Departments from your other stores')).toBeNull();
   expect(reportSpaceBelow).toHaveBeenLastCalledWith(0);
+});
+
+// Building many draggable rows is slow, so the form opens first and the list follows a moment
+// later, with a spinner in its place until then.
+test('the department list is built just after the rest of the form', async () => {
+  const departments = Array.from({ length: 18 }, (_, i) => ({ id: `d${i}`, name: `Aisle ${i + 1}` }));
+
+  // The first, quick render: the form without the list.
+  const realUseDeferredValue = React.useDeferredValue;
+  const deferred = jest.spyOn(React, 'useDeferredValue').mockImplementation((value, initial) => {
+    realUseDeferredValue(value, initial); // keep React's hook order
+    return initial;
+  });
+  const { rerender } = await render(<DepartmentEditor departments={departments} onChange={jest.fn()} knownStores={[]} />);
+  expect(screen.getByLabelText('Loading departments')).toBeOnTheScreen();
+  expect(screen.queryByText('Aisle 1')).toBeNull();
+  expect(screen.getByLabelText('New department')).toBeOnTheScreen();
+
+  // The render right after: the full list.
+  deferred.mockRestore();
+  await rerender(<DepartmentEditor departments={departments} onChange={jest.fn()} knownStores={[]} />);
+  expect(screen.queryByLabelText('Loading departments')).toBeNull();
+  expect(screen.getByText('Aisle 18')).toBeOnTheScreen();
 });
