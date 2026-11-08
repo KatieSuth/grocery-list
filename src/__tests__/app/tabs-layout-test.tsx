@@ -1,6 +1,9 @@
 import { render, screen } from '@testing-library/react-native';
+import { use } from 'react';
+import { Text } from 'react-native';
 
 import TabsLayout from '@/app/(tabs)/_layout';
+import { TabBarClearsSystemBarContext } from '@/components/tab-bar-clears-system-bar';
 
 // The native tab bar can't render in Jest; stand-ins expose what the layout passes it.
 jest.mock('expo-router/native-tabs', () => {
@@ -41,4 +44,17 @@ test('four tabs in order: items (list), trip (cart), stores (storefront), settin
   expect(screen.getByText(/icon:.*"sf":"list.bullet".*"md":"list"/)).toBeOnTheScreen();
   expect(screen.getByText(/icon:.*"sf":\{"default":"storefront".*"md":"storefront"/)).toBeOnTheScreen();
   expect(screen.getByText(/icon:.*"sf":\{"default":"gearshape","selected":"gearshape.fill"\}.*"md":"settings"/)).toBeOnTheScreen();
+});
+
+// The native tab bar already leaves room for the system navigation bar, so screens in the tabs
+// (e.g. the trip's footer) don't add it again.
+test('screens in the tabs know the tab bar clears the system navigation bar', async () => {
+  function Probe() {
+    return <Text>{`clears:${use(TabBarClearsSystemBarContext)}`}</Text>;
+  }
+  jest.requireMock('expo-router/native-tabs').NativeTabs.Trigger.Label = function Label() {
+    return <Probe />;
+  };
+  await render(<TabsLayout />);
+  expect(screen.getAllByText('clears:true')).toHaveLength(4);
 });

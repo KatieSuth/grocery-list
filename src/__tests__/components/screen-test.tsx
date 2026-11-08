@@ -1,11 +1,14 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { use } from 'react';
-import { Text, TextInput } from 'react-native';
+import { StyleSheet, Text, TextInput } from 'react-native';
 import type Animated from 'react-native-reanimated';
 import type { AnimatedRef } from 'react-native-reanimated';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Screen } from '@/components/screen';
 import { SpaceBelowFocusedFieldContext } from '@/components/space-below-focused-field';
+import { TabBarClearsSystemBarContext } from '@/components/tab-bar-clears-system-bar';
+import { Spacing } from '@/constants/theme';
 
 const mockAssureFocusedInputVisible = jest.fn();
 
@@ -155,4 +158,27 @@ test('an error shown under the focused field is kept above the keyboard too', as
 
   await act(async () => reportSpaceBelow(0));
   expect(screen.getByText('bottomOffset:16')).toBeOnTheScreen();
+});
+
+// On a phone with on-screen system buttons, the footer normally leaves room for them. Inside the
+// main app's tabs the tab bar already does, so the footer would otherwise leave a gap above it.
+test('the footer leaves room for the system navigation bar, except above the tab bar', async () => {
+  const metrics = { frame: { x: 0, y: 0, width: 400, height: 800 }, insets: { top: 0, left: 0, right: 0, bottom: 48 } };
+  const footerPadding = () => StyleSheet.flatten(screen.getByText('Save').parent!.props.style).paddingBottom;
+
+  const { rerender } = await render(
+    <SafeAreaProvider initialMetrics={metrics}>
+      <Screen footer={<Text>Save</Text>}>{null}</Screen>
+    </SafeAreaProvider>
+  );
+  expect(footerPadding()).toBe(48);
+
+  await rerender(
+    <SafeAreaProvider initialMetrics={metrics}>
+      <TabBarClearsSystemBarContext value>
+        <Screen footer={<Text>Save</Text>}>{null}</Screen>
+      </TabBarClearsSystemBarContext>
+    </SafeAreaProvider>
+  );
+  expect(footerPadding()).toBe(Spacing.three);
 });

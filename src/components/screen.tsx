@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { use, useEffect, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, View, type HostInstance } from 'react-native';
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 import type Animated from 'react-native-reanimated';
@@ -6,6 +6,7 @@ import type { AnimatedRef } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SpaceBelowFocusedFieldContext } from '@/components/space-below-focused-field';
+import { TabBarClearsSystemBarContext } from '@/components/tab-bar-clears-system-bar';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -15,7 +16,7 @@ import { setRef } from '@/utils/set-ref';
 
 type Props = {
   children: ReactNode;
-  /** Pinned to the bottom of the screen, above the home indicator. */
+  /** Pinned to the bottom of the screen, above the home indicator (or the tab bar). */
   footer?: ReactNode;
   /** Lets children (e.g. drag-to-reorder lists) scroll this screen. */
   scrollRef?: AnimatedRef<Animated.ScrollView>;
@@ -31,6 +32,8 @@ type Props = {
  */
 export function Screen({ children, footer, scrollRef, testID }: Props) {
   const insets = useSafeAreaInsets();
+  // Below the tabs' screens, the tab bar already leaves room for the system navigation bar.
+  const systemBarSpace = use(TabBarClearsSystemBarContext) ? 0 : insets.bottom;
   const theme = useTheme();
   const keyboardAwareRef = useRef<KeyboardAwareScrollViewRef | null>(null);
   const containerRef = useRef<HostInstance | null>(null);
@@ -75,7 +78,7 @@ export function Screen({ children, footer, scrollRef, testID }: Props) {
         <View
           style={[
             styles.footer,
-            { paddingBottom: Math.max(insets.bottom, Spacing.three), borderColor: theme.border },
+            { paddingBottom: Math.max(systemBarSpace, Spacing.three), borderColor: theme.border },
           ]}>
           {footer}
         </View>
