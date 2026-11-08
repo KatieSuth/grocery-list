@@ -1,6 +1,6 @@
 import AppTabs from '@/components/app-tabs';
 
-/** The main app: shopping trip, master item list, store configuration, and settings. */
+/** The main app: master item list (the home screen), shopping trip, store configuration, and settings. */
 export default function TabsLayout() {
   return <AppTabs />;
 }

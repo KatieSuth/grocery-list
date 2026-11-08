@@ -46,6 +46,7 @@ export function DepartmentEditor({
   const [addError, setAddError] = useState<string>();
   const [choosingCopySource, setChoosingCopySource] = useState(false);
   const [copyNote, setCopyNote] = useState<string>();
+  const [suggestionsHeight, setSuggestionsHeight] = useState(0);
 
   const copySources = knownStores.filter((s) => s.id !== currentStoreId && s.departments.length > 0);
 
@@ -63,6 +64,8 @@ export function DepartmentEditor({
   const suggestions = suggestDepartments(newName, knownStores, departments);
   // Once the box holds exactly a suggested name (e.g. after tapping it), don't offer it again.
   const visibleSuggestions = suggestions.filter((s) => s.name !== normalizeText(newName));
+  // The suggestions sit below the field; keep them above the keyboard too, so they can be tapped.
+  const suggestionsSpace = visibleSuggestions.length > 0 && suggestionsHeight > 0 ? suggestionsHeight + Spacing.two : 0;
 
   const handleChangeText = (text: string) => {
     setNewName(text);
@@ -182,6 +185,7 @@ export function DepartmentEditor({
             returnKeyType="done"
             submitBehavior="submit"
             error={addError}
+            extraSpaceBelow={suggestionsSpace}
           />
         </View>
         <View style={styles.addButton}>
@@ -190,7 +194,10 @@ export function DepartmentEditor({
       </View>
 
       {visibleSuggestions.length > 0 ? (
-        <View style={styles.suggestions} accessibilityLabel="Departments from your other stores">
+        <View
+          style={styles.suggestions}
+          accessibilityLabel="Departments from your other stores"
+          onLayout={(e) => setSuggestionsHeight(e.nativeEvent.layout.height)}>
           <ThemedText type="small" themeColor="textSecondary">
             From your stores, tap to fill in:
           </ThemedText>

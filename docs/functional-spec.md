@@ -183,7 +183,7 @@ The first screen on a new install.
 | Field | Required | Notes |
 | --- | --- | --- |
 | Item name | Yes | Placeholder "e.g. Milk". |
-| Brand | No | Placeholder "e.g. Organic Valley". |
+| Brand/Distinguisher | No | Placeholder "e.g. 'Organic Valley,' '3-pack,' etc." |
 | Where to find it | At least one store, each with a department | See below. |
 
 **Where to find it**
@@ -219,13 +219,13 @@ After setup, the app has four tabs along the bottom:
 
 | Tab | Icon | Purpose |
 | --- | --- | --- |
-| **Trip** | Shopping cart | The shopping trip (§4.5.1). |
 | **Items** | List | The master item list, with checkboxes and quantities (§4.5.2). |
+| **Trip** | Shopping cart | The shopping trip (§4.5.1). |
 | **Stores** | Storefront | Store and department configuration (§4.5.3). |
 | **Settings** | Gear | Appearance and deleting all data (§4.5.4). |
 
-- The app opens on **Trip**.
-- Icons are each platform's standard symbols: SF Symbols on iOS (`cart`, `list.bullet`, `storefront`, `gearshape`), Material Symbols on Android (`shopping_cart`, `list`, `storefront`, `settings`). The Trip, Stores and Settings icons switch to their filled versions when selected on iOS.
+- The app opens on **Items**, including right after setup is finished or skipped.
+- Icons are each platform's standard symbols: SF Symbols on iOS (`list.bullet`, `cart`, `storefront`, `gearshape`), Material Symbols on Android (`list`, `shopping_cart`, `storefront`, `settings`). The Trip, Stores and Settings icons switch to their filled versions when selected on iOS.
 - Each tab keeps its own history. Editing an item or store opens inside its tab, with the tab bar still visible, and Save, Cancel, or Delete return to that tab's list.
 
 #### 4.5.1 Trip tab ("Shopping trip")

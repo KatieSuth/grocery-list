@@ -11,13 +11,14 @@ export default function AppTabs() {
       indicatorColor={theme.backgroundElement}
       tintColor={theme.tint}
       labelStyle={{ selected: { color: theme.tint } }}>
-      <NativeTabs.Trigger name="(trip)">
-        <NativeTabs.Trigger.Label>Trip</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: 'cart', selected: 'cart.fill' }} md="shopping_cart" />
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="items">
+      {/* Items is first, and is the app's home screen ("/"), e.g. right after setup. */}
+      <NativeTabs.Trigger name="(items)">
         <NativeTabs.Trigger.Label>Items</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="list.bullet" md="list" />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="trip">
+        <NativeTabs.Trigger.Label>Trip</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'cart', selected: 'cart.fill' }} md="shopping_cart" />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="stores">
         <NativeTabs.Trigger.Label>Stores</NativeTabs.Trigger.Label>

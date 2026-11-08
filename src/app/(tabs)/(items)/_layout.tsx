@@ -6,7 +6,7 @@ export default function ItemsLayout() {
   return (
     <Stack>
       <Stack.Screen name="index" options={{ title: 'Items' }} />
-      <Stack.Screen name="form" options={formTitle(ITEM_FORM_TITLES)} />
+      <Stack.Screen name="items/form" options={formTitle(ITEM_FORM_TITLES)} />
     </Stack>
   );
 }

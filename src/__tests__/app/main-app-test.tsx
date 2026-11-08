@@ -45,22 +45,26 @@ async function seed(db: AppDatabase) {
 }
 
 /** The native tab bar isn't rendered in Jest, so switch tabs the way a tab press does. */
-const openTab = (path: '/' | '/items' | '/stores') => act(() => router.navigate(path));
+const openTab = (path: '/' | '/trip' | '/stores') => act(() => router.navigate(path));
 
 const entryFor = async (db: AppDatabase, itemId: string) =>
   (await db.listEntries.findOne(itemId).exec())?.toJSON();
 
-test('the main app opens on the shopping trip tab', async () => {
+test('the main app opens on the items tab; the shopping trip is the next tab', async () => {
   await renderApp({ seed });
-  expect(await screen.findByText('Where are you shopping?')).toBeOnTheScreen();
+  expect(await screen.findByRole('checkbox', { name: 'Soup' })).toBeOnTheScreen();
   expect(screen).toHavePathname('/');
+
+  await openTab('/trip');
+  expect(await screen.findByText('Where are you shopping?')).toBeOnTheScreen();
+  expect(screen).toHavePathname('/trip');
 });
 
 test('the master list shows every item with an unchecked checkbox', async () => {
   await renderApp({ seed });
-  await openTab('/items');
+  await openTab('/');
 
-  expect(screen).toHavePathname('/items');
+  expect(screen).toHavePathname('/');
   expect(await screen.findByText('Soup')).toBeOnTheScreen();
   expect(screen.getByText('Acme')).toBeOnTheScreen();
   expect(screen.getByText('Corner Market · Deli')).toBeOnTheScreen();
@@ -73,7 +77,7 @@ test('the master list shows every item with an unchecked checkbox', async () => 
 
 test('checking an item saves it with an optional free-text quantity', async () => {
   const db = await renderApp({ seed });
-  await openTab('/items');
+  await openTab('/');
 
   await fireEvent.press(await screen.findByRole('checkbox', { name: 'Strawberries' }));
   expect(screen.getByRole('checkbox', { name: 'Strawberries' })).toBeChecked();
@@ -92,7 +96,7 @@ test('checking an item saves it with an optional free-text quantity', async () =
 
 test('unchecking discards the quantity, so re-checking starts blank', async () => {
   const db = await renderApp({ seed });
-  await openTab('/items');
+  await openTab('/');
 
   await fireEvent.press(await screen.findByRole('checkbox', { name: 'Soup' }));
   await type('Quantity for Soup', '4');
@@ -114,7 +118,7 @@ test('checked items and quantities are restored from storage', async () => {
       await db.listEntries.insert({ itemId: 'i1', quantity: '1/2 pound', checkedAt: 5 });
     },
   });
-  await openTab('/items');
+  await openTab('/');
 
   expect(await screen.findByRole('checkbox', { name: 'Strawberries' })).toBeChecked();
   expect(screen.getByLabelText('Quantity for Strawberries')).toHaveDisplayValue('1/2 pound');
@@ -123,7 +127,7 @@ test('checked items and quantities are restored from storage', async () => {
 
 test('adding an item from the master list returns to it', async () => {
   await renderApp({ seed });
-  await openTab('/items');
+  await openTab('/');
 
   await press('Add an item');
   expect(screen).toHavePathname('/items/form');
@@ -133,7 +137,7 @@ test('adding an item from the master list returns to it', async () => {
   await press('Continue');
 
   expect(await screen.findByText('Bread')).toBeOnTheScreen();
-  expect(screen).toHavePathname('/items');
+  expect(screen).toHavePathname('/');
   expect(screen.getByRole('checkbox', { name: 'Bread' })).not.toBeChecked();
 });
 
@@ -147,7 +151,7 @@ test('tapping an item opens it for editing; deleting it also unchecks it', async
       await d.listEntries.insert({ itemId: 'i2', quantity: '2 cans', checkedAt: 5 });
     },
   });
-  await openTab('/items');
+  await openTab('/');
 
   await press('Soup, Acme');
   // The exact URL can carry an internal router flag after a tab switch; check the form instead.
@@ -156,7 +160,7 @@ test('tapping an item opens it for editing; deleting it also unchecks it', async
   await type('Item name', 'Tomato soup');
   await press('Save');
   expect(await screen.findByText('Tomato soup')).toBeOnTheScreen();
-  expect(screen).toHavePathname('/items');
+  expect(screen).toHavePathname('/');
   // Editing the item keeps it checked.
   expect(screen.getByLabelText('Quantity for Tomato soup')).toHaveDisplayValue('2 cans');
 
@@ -173,7 +177,7 @@ test('the master list explains when there are no items', async () => {
       await db.settings.insert({ id: 'app', setupComplete: true });
     },
   });
-  await openTab('/items');
+  await openTab('/');
   expect(await screen.findByText('No items yet')).toBeOnTheScreen();
 });
 
@@ -184,7 +188,7 @@ test('an item with no stores left says so on the master list', async () => {
       await db.items.findOne('i1').patch({ locations: [] });
     },
   });
-  await openTab('/items');
+  await openTab('/');
   expect(await screen.findByText('No store selected')).toBeOnTheScreen();
 });
 

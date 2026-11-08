@@ -63,3 +63,25 @@ test('outside a Screen, a focused field with an error still works', async () => 
   expect(screen.getByText('Enter a name.')).toBeOnTheScreen();
   expect(reportSpaceBelow).not.toHaveBeenCalled();
 });
+
+// e.g. autofill suggestions under the field, which need to stay above the keyboard to be tapped.
+test('while focused, a field also reports the room for content shown below it', async () => {
+  const field = (extra: number, error?: string) => (
+    <SpaceBelowFocusedFieldContext value={reportSpaceBelow}>
+      <TextField label="New department" error={error} extraSpaceBelow={extra} />
+    </SpaceBelowFocusedFieldContext>
+  );
+  const { rerender } = await render(field(100));
+  expect(reportSpaceBelow).not.toHaveBeenCalled();
+
+  await fireEvent(screen.getByLabelText('New department'), 'focus');
+  expect(reportSpaceBelow).toHaveBeenLastCalledWith(100);
+
+  // With an error too, there's room for both.
+  await rerender(field(100, 'Enter a name.'));
+  await fireEvent(screen.getByText('Enter a name.').parent!, 'layout', errorLayout);
+  expect(reportSpaceBelow).toHaveBeenLastCalledWith(124);
+
+  await rerender(field(0));
+  expect(reportSpaceBelow).toHaveBeenLastCalledWith(0);
+});

@@ -111,7 +111,7 @@ test('editing an item', async () => {
   // Edit mode uses Save/Cancel instead of Add more/Continue.
   expect(screen.queryByRole('button', { name: 'Add more' })).toBeNull();
 
-  await type('Brand', '');
+  await type('Brand/Distinguisher', '');
   await fireEvent.press(screen.getByRole('checkbox', { name: 'Big Box' }));
   await fireEvent.press(screen.getByRole('radio', { name: 'Produce in Corner Market' }));
   await press('Save');

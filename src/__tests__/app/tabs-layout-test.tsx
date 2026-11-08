@@ -20,13 +20,13 @@ jest.mock('expo-router/native-tabs', () => {
   return { NativeTabs };
 });
 
-test('four tabs in order: trip (cart), items (list), stores (storefront), settings (gear)', async () => {
+test('four tabs in order: items (list), trip (cart), stores (storefront), settings (gear)', async () => {
   await render(<TabsLayout />);
 
   const tabs = screen.getByTestId('tabs');
   expect(tabs.children.map((c) => (typeof c === 'string' ? c : c.props.testID))).toEqual([
-    'tab-(trip)',
-    'tab-items',
+    'tab-(items)',
+    'tab-trip',
     'tab-stores',
     'tab-settings',
   ]);

@@ -10,16 +10,22 @@ type Props = Omit<TextInputProps, 'style'> & {
   label: string;
   error?: string;
   optional?: boolean;
+  /**
+   * Height of content shown just below this field (e.g. autofill suggestions) that should stay
+   * above the keyboard with it while it's focused.
+   */
+  extraSpaceBelow?: number;
 };
 
-export function TextField({ label, error, optional, onFocus, onBlur, ...rest }: Props) {
+export function TextField({ label, error, optional, extraSpaceBelow = 0, onFocus, onBlur, ...rest }: Props) {
   const theme = useTheme();
   const [focused, setFocused] = useState(false);
   const [errorHeight, setErrorHeight] = useState(0);
 
-  // While typing, keep the error message above the keyboard along with the field.
+  // While typing, keep the error message (and anything else below) above the keyboard with the field.
   const reportSpaceBelow = use(SpaceBelowFocusedFieldContext);
-  const spaceBelow = focused && error && errorHeight > 0 ? errorHeight + Spacing.one : 0;
+  const errorSpace = error && errorHeight > 0 ? errorHeight + Spacing.one : 0;
+  const spaceBelow = focused ? errorSpace + extraSpaceBelow : 0;
   useEffect(() => {
     if (spaceBelow === 0) return;
     reportSpaceBelow(spaceBelow);

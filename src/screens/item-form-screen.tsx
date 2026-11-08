@@ -1,14 +1,14 @@
-import { useLocalSearchParams, type Href } from 'expo-router';
-import { useState } from 'react';
+import { useLocalSearchParams, type Href } from "expo-router";
+import { useState } from "react";
 
-import { Button } from '@/components/button';
-import { EmptyState } from '@/components/empty-state';
-import { Screen } from '@/components/screen';
-import { StoreLocationPicker } from '@/components/store-location-picker';
-import { ErrorText, TextField } from '@/components/text-field';
-import { ThemedText } from '@/components/themed-text';
-import { deleteItem, saveItem } from '@/data/items-repo';
-import { useDatabase } from '@/db/database-provider';
+import { Button } from "@/components/button";
+import { EmptyState } from "@/components/empty-state";
+import { Screen } from "@/components/screen";
+import { StoreLocationPicker } from "@/components/store-location-picker";
+import { ErrorText, TextField } from "@/components/text-field";
+import { ThemedText } from "@/components/themed-text";
+import { deleteItem, saveItem } from "@/data/items-repo";
+import { useDatabase } from "@/db/database-provider";
 import {
   chooseDepartment,
   draftToLocations,
@@ -17,13 +17,12 @@ import {
   itemToDraft,
   toggleStore,
   validateItemDraft,
-} from '@/domain/item-draft';
-import { hasErrors } from '@/domain/store-draft';
-import type { Item, Store } from '@/domain/types';
-import { useItems, useStores } from '@/hooks/use-data';
-import { confirmDestructive } from '@/utils/confirm';
-import { goBack } from '@/utils/navigation';
-
+} from "@/domain/item-draft";
+import { hasErrors } from "@/domain/store-draft";
+import type { Item, Store } from "@/domain/types";
+import { useItems, useStores } from "@/hooks/use-data";
+import { confirmDestructive } from "@/utils/confirm";
+import { goBack } from "@/utils/navigation";
 
 type Props = {
   /** Where Save, Cancel and Delete return to. */
@@ -41,17 +40,34 @@ export function ItemFormScreen({ backTo }: Props) {
   const item = items.find((i) => i.id === id);
   if (!item) {
     return (
-      <Screen footer={<Button variant="secondary" label="Back" onPress={() => goBack(backTo)} />}>
-        <EmptyState title="Item not found" message="It may have been deleted." />
+      <Screen
+        footer={
+          <Button
+            variant="secondary"
+            label="Back"
+            onPress={() => goBack(backTo)}
+          />
+        }
+      >
+        <EmptyState
+          title="Item not found"
+          message="It may have been deleted."
+        />
       </Screen>
     );
   }
   return <ItemForm key={item.id} item={item} stores={stores} backTo={backTo} />;
 }
 
-function ItemForm({ item, stores, backTo }: Props & { item?: Item; stores: Store[] }) {
+function ItemForm({
+  item,
+  stores,
+  backTo,
+}: Props & { item?: Item; stores: Store[] }) {
   const db = useDatabase();
-  const [draft, setDraft] = useState(() => (item ? itemToDraft(item) : emptyItemDraft()));
+  const [draft, setDraft] = useState(() =>
+    item ? itemToDraft(item) : emptyItemDraft(),
+  );
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string>();
@@ -69,11 +85,15 @@ function ItemForm({ item, stores, backTo }: Props & { item?: Item; stores: Store
     try {
       return await saveItem(
         db,
-        { name: draft.name, brand: draft.brand, locations: draftToLocations(draft, stores) },
+        {
+          name: draft.name,
+          brand: draft.brand,
+          locations: draftToLocations(draft, stores),
+        },
         item?.id,
       );
     } catch {
-      setSaveError('Could not save this item. Please try again.');
+      setSaveError("Could not save this item. Please try again.");
       return null;
     } finally {
       setSaving(false);
@@ -100,7 +120,7 @@ function ItemForm({ item, stores, backTo }: Props & { item?: Item; stores: Store
   const handleDelete = (target: Item) => {
     confirmDestructive({
       title: `Delete ${target.name}?`,
-      confirmLabel: 'Delete',
+      confirmLabel: "Delete",
       onConfirm: () => {
         goBack(backTo);
         void deleteItem(db, target.id);
@@ -113,18 +133,40 @@ function ItemForm({ item, stores, backTo }: Props & { item?: Item; stores: Store
       footer={
         item ? (
           <>
-            <Button variant="secondary" label="Cancel" onPress={() => goBack(backTo)} />
-            <Button label="Save" disabled={saving} onPress={() => void handleContinue()} />
+            <Button
+              variant="secondary"
+              label="Cancel"
+              onPress={() => goBack(backTo)}
+            />
+            <Button
+              label="Save"
+              disabled={saving}
+              onPress={() => void handleContinue()}
+            />
           </>
         ) : (
           <>
-            <Button variant="secondary" label="Add more" disabled={saving} onPress={() => void handleAddMore()} />
-            <Button label="Continue" disabled={saving} onPress={() => void handleContinue()} />
+            <Button
+              variant="secondary"
+              label="Add more"
+              disabled={saving}
+              onPress={() => void handleAddMore()}
+            />
+            <Button
+              label="Continue"
+              disabled={saving}
+              onPress={() => void handleContinue()}
+            />
           </>
         )
-      }>
+      }
+    >
       {message ? (
-        <ThemedText type="small" themeColor="textSecondary" accessibilityLiveRegion="polite">
+        <ThemedText
+          type="small"
+          themeColor="textSecondary"
+          accessibilityLiveRegion="polite"
+        >
           {message}
         </ThemedText>
       ) : null}
@@ -137,9 +179,9 @@ function ItemForm({ item, stores, backTo }: Props & { item?: Item; stores: Store
         autoFocus={!item}
       />
       <TextField
-        label="Brand"
+        label="Brand/Distinguisher"
         optional
-        placeholder="e.g. Organic Valley"
+        placeholder="e.g. 'Organic Valley,' '3-pack,' etc."
         value={draft.brand}
         onChangeText={(brand) => setDraft({ ...draft, brand })}
       />
@@ -161,7 +203,13 @@ function ItemForm({ item, stores, backTo }: Props & { item?: Item; stores: Store
         />
       )}
       {saveError ? <ErrorText message={saveError} /> : null}
-      {item ? <Button variant="danger" label="Delete item" onPress={() => handleDelete(item)} /> : null}
+      {item ? (
+        <Button
+          variant="danger"
+          label="Delete item"
+          onPress={() => handleDelete(item)}
+        />
+      ) : null}
     </Screen>
   );
 }

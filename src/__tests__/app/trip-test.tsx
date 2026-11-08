@@ -93,7 +93,7 @@ async function chooseStore(name: string) {
 const entry = async (db: AppDatabase, itemId: string) => (await db.listEntries.findOne(itemId).exec())?.toJSON();
 
 test('choosing a store lists what to get there, by department in walking order', async () => {
-  const db = await renderApp({ seed: (db) => seed(db) });
+  const db = await renderApp({ initialUrl: '/trip', seed: (db) => seed(db) });
   expect(await screen.findByText('Where are you shopping?')).toBeOnTheScreen();
   expect(screen.queryByRole('button', { name: 'Finish trip' })).toBeNull();
 
@@ -137,7 +137,7 @@ test('choosing a store lists what to get there, by department in walking order',
 });
 
 test('checking off keeps items on the list until the trip is finished and confirmed', async () => {
-  const db = await renderApp({ seed: (db) => seed(db, { tripStoreId: 'corner' }) });
+  const db = await renderApp({ initialUrl: '/trip', seed: (db) => seed(db, { tripStoreId: 'corner' }) });
   await trip().findByRole('checkbox', { name: 'Ham, Acme, 1 lb' });
 
   await fireEvent.press(checkbox('Ham, Acme, 1 lb'));
@@ -178,7 +178,7 @@ test('checking off keeps items on the list until the trip is finished and confir
   expect((await db.items.findOne('ham').exec())?.lastBoughtAt).toBe(logged.finishedAt);
 
   // The master list shows it unchecked, bought today.
-  await act(() => router.navigate('/items'));
+  await act(() => router.navigate('/'));
   expect(await screen.findByText('Last bought today')).toBeOnTheScreen();
   const items = within(screen.getByTestId('master-list'));
   expect(items.getByRole('checkbox', { name: 'Ham' })).not.toBeChecked();
@@ -186,7 +186,7 @@ test('checking off keeps items on the list until the trip is finished and confir
 });
 
 test('finishing with everything checked off says nothing about items left behind', async () => {
-  await renderApp({ seed: (db) => seed(db, { tripStoreId: 'corner' }) });
+  await renderApp({ initialUrl: '/trip', seed: (db) => seed(db, { tripStoreId: 'corner' }) });
   await fireEvent.press(await trip().findByRole('checkbox', { name: 'Apples' }));
   await fireEvent.press(checkbox('Ham, Acme, 1 lb'));
   await eventually(async () => expect(screen.getByText('2 of 2 in cart')).toBeOnTheScreen());
@@ -204,7 +204,7 @@ test('finishing with everything checked off says nothing about items left behind
 });
 
 test('switching stores with items checked off asks to finish first', async () => {
-  const db = await renderApp({ seed: (db) => seed(db, { tripStoreId: 'corner' }) });
+  const db = await renderApp({ initialUrl: '/trip', seed: (db) => seed(db, { tripStoreId: 'corner' }) });
   await fireEvent.press(await trip().findByRole('checkbox', { name: 'Apples' }));
   await eventually(async () => expect(screen.getByText('1 of 2 in cart')).toBeOnTheScreen());
 
@@ -234,7 +234,7 @@ test('switching stores with items checked off asks to finish first', async () =>
 });
 
 test('switching stores with nothing checked off just switches', async () => {
-  await renderApp({ seed: (db) => seed(db, { tripStoreId: 'corner' }) });
+  await renderApp({ initialUrl: '/trip', seed: (db) => seed(db, { tripStoreId: 'corner' }) });
   await trip().findByRole('checkbox', { name: 'Apples' });
   const alert = jest.spyOn(Alert, 'alert');
   await chooseStore('Big Box');
@@ -244,7 +244,7 @@ test('switching stores with nothing checked off just switches', async () => {
 });
 
 test('if finishing fails, the user is told and the store does not switch', async () => {
-  const db = await renderApp({ seed: (db) => seed(db, { tripStoreId: 'corner' }) });
+  const db = await renderApp({ initialUrl: '/trip', seed: (db) => seed(db, { tripStoreId: 'corner' }) });
   await fireEvent.press(await trip().findByRole('checkbox', { name: 'Apples' }));
   await eventually(async () => expect(screen.getByText('1 of 2 in cart')).toBeOnTheScreen());
   jest.spyOn(db.trips, 'insert').mockRejectedValue(new Error('disk full'));
@@ -258,6 +258,7 @@ test('if finishing fails, the user is told and the store does not switch', async
 
 test('a deleted store is treated as no store chosen; several items elsewhere are counted', async () => {
   await renderApp({
+    initialUrl: '/trip',
     seed: async (db) => {
       await seed(db, { tripStoreId: 'gone' });
       await db.listEntries.insert({ itemId: 'bread', checkedAt: 1 });
@@ -269,7 +270,7 @@ test('a deleted store is treated as no store chosen; several items elsewhere are
 });
 
 test('if the cart empties while the confirmation is open, nothing is logged', async () => {
-  const db = await renderApp({ seed: (db) => seed(db, { tripStoreId: 'corner' }) });
+  const db = await renderApp({ initialUrl: '/trip', seed: (db) => seed(db, { tripStoreId: 'corner' }) });
   await fireEvent.press(await trip().findByRole('checkbox', { name: 'Apples' }));
   await eventually(async () => expect(trip().getByRole('button', { name: 'Finish trip' })).toBeEnabled());
 
@@ -287,7 +288,7 @@ test('if the cart empties while the confirmation is open, nothing is logged', as
 });
 
 test('if finishing fails partway, pressing Finish again completes it without logging it twice', async () => {
-  const db = await renderApp({ seed: (db) => seed(db, { tripStoreId: 'corner' }) });
+  const db = await renderApp({ initialUrl: '/trip', seed: (db) => seed(db, { tripStoreId: 'corner' }) });
   await fireEvent.press(await trip().findByRole('checkbox', { name: 'Apples' }));
   await eventually(async () => expect(trip().getByRole('button', { name: 'Finish trip' })).toBeEnabled());
   jest.spyOn(db.listEntries, 'bulkRemove').mockResolvedValueOnce({ success: [], error: [{} as never] });

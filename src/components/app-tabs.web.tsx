@@ -8,8 +8,8 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 const TABS = [
-  { name: '(trip)', href: '/', label: 'Trip', icon: 'shopping_cart' },
-  { name: 'items', href: '/items', label: 'Items', icon: 'list' },
+  { name: '(items)', href: '/', label: 'Items', icon: 'list' },
+  { name: 'trip', href: '/trip', label: 'Trip', icon: 'shopping_cart' },
   { name: 'stores', href: '/stores', label: 'Stores', icon: 'storefront' },
   { name: 'settings', href: '/settings', label: 'Settings', icon: 'settings' },
 ] as const;

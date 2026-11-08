@@ -45,7 +45,7 @@ async function seed(db: AppDatabase) {
 }
 
 const openItems = async () => {
-  await act(() => router.navigate('/items'));
+  await act(() => router.navigate('/'));
   await screen.findByRole('checkbox', { name: 'Milk' });
 };
 
@@ -166,7 +166,7 @@ test('the filter panel explains when there is nothing to filter by', async () =>
       await db.settings.insert({ id: 'app', setupComplete: true });
     },
   });
-  await act(() => router.navigate('/items'));
+  await act(() => router.navigate('/'));
   await press('Filters');
   expect(screen.getByText('No stores yet.')).toBeOnTheScreen();
   expect(screen.getByText('No departments yet.')).toBeOnTheScreen();

@@ -86,7 +86,8 @@ test('skipping store setup goes straight to the main app', async () => {
 
   await press('Skip for now');
 
-  expect(await screen.findByText('No stores to shop at yet')).toBeOnTheScreen();
+  // The main app opens on the Items tab.
+  expect(await screen.findByText('No items yet')).toBeOnTheScreen();
   expect(screen).toHavePathname('/');
   expect(await firstValueFrom(observeSetupComplete(db))).toBe(true);
 });
@@ -123,7 +124,7 @@ test('the full setup: store, items with add more / continue, back, finish', asyn
   expect(screen.getByText('Choose at least one store.')).toBeOnTheScreen();
 
   await type('Item name', 'Milk');
-  await type('Brand', 'Organic Valley');
+  await type('Brand/Distinguisher', 'Organic Valley');
   await fireEvent.press(screen.getByRole('checkbox', { name: 'Corner Market' }));
   await press('Add more');
   expect(await screen.findByText('Choose a department in Corner Market.')).toBeOnTheScreen();
@@ -166,7 +167,8 @@ test('the full setup: store, items with add more / continue, back, finish', asyn
   expect(await screen.findByText('Bananas')).toBeOnTheScreen();
 
   await press('Finish');
-  expect(await screen.findByText('Where are you shopping?')).toBeOnTheScreen();
+  // Finishing setup lands on the Items tab, showing what was just added.
+  expect(await screen.findByRole('checkbox', { name: 'Bananas' })).toBeOnTheScreen();
   expect(screen).toHavePathname('/');
 });
 
@@ -204,7 +206,7 @@ test('returning users with setup complete land in the main app', async () => {
       await db.settings.insert({ id: 'app', setupComplete: true });
     },
   });
-  expect(await screen.findByText('No stores to shop at yet')).toBeOnTheScreen();
+  expect(await screen.findByText('No items yet')).toBeOnTheScreen();
   expect(screen).toHavePathname('/');
 });
 

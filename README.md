@@ -92,9 +92,9 @@ src/
       items.tsx           Items list
       item-form.tsx       → ItemFormScreen (back to /setup/items)
     (tabs)/               Main app (NativeTabs); each tab has its own Stack
-      (trip)/index.tsx    "/"        Shopping trip: store dropdown, cart, Finish
-      items/index.tsx     "/items"   Master list: search, filters, checkbox + quantity per item
-      items/form.tsx      "/items/form"   → ItemFormScreen
+      (items)/index.tsx   "/"        Master list (the home tab): search, filters, checkbox + quantity per item
+      (items)/items/form.tsx  "/items/form"   → ItemFormScreen
+      trip/index.tsx      "/trip"    Shopping trip: store dropdown, cart, Finish
       stores/index.tsx    "/stores"  Store configuration
       stores/form.tsx     "/stores/form"  → StoreFormScreen
       settings/index.tsx  "/settings"  Light/dark/system appearance, Delete all data
@@ -103,7 +103,7 @@ src/
     item-form-screen.tsx  Add / edit item (?id=), takes backTo
   domain/                 Pure logic: no React, no database
     types.ts              Store, Department, Item, ItemLocation, ListEntry, TripRecord
-    departments.ts        Defaults, add/remove/move/copy
+    departments.ts        Add/remove/move/copy
     store-draft.ts        Store form state + validation
     item-draft.ts         Item form state + validation, location pruning
     describe.ts           "Store · Dept" display text
@@ -313,7 +313,7 @@ test('adds a store', async () => {
 - **Don't await database queries inside `waitFor`.** It causes overlapping `act()` calls and breaks later tests. Assert on the screen instead, and query the DB afterwards.
 - **The clock is frozen under `renderRouter`.** Documents created in the same test get the same `createdAt`. Call `jest.setSystemTime(Date.now() + 1000)` between creates if order matters.
 - **Native UI doesn't render in Jest.** Stack headers and the tab bar are invisible to tests, so header titles and tab presses can't be asserted on directly.
-  - Switch tabs with `await act(() => router.navigate('/items'))`. Don't use `testRouter.navigate`: tab switches add an internal query param that breaks its pathname assertion.
+  - Switch tabs with `await act(() => router.navigate('/trip'))`. Don't use `testRouter.navigate`: tab switches add an internal query param that breaks its pathname assertion.
   - `tabs-layout-test.tsx` mocks `NativeTabs` to check tab order, labels, and icons.
 - **Reanimated and drag-to-reorder have Jest stand-ins** (`jest.setup.ts`):
   - Reanimated and Worklets use their official mocks. Reanimated 4.7's mock also needs a custom resolver, `jest.resolver.js`. Reanimated ships one, but it doesn't work with pnpm; see the comment at the top of the file.

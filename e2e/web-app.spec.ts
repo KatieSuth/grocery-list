@@ -77,20 +77,31 @@ async function setUpOneStoreAndItem(page: Page) {
   await expect(page.getByText('Corner Market · Deli')).toBeVisible();
 
   await button(page, 'Finish').click();
-  await expect(page.getByText('Where are you shopping?')).toBeVisible();
+  // The main app opens on the Items tab.
+  await expect(page.getByRole('checkbox', { name: 'Milk' })).toBeVisible();
 }
 
 test('first-run setup, then the main app tabs', async ({ page }) => {
   const problems = watchConsole(page);
   await setUpOneStoreAndItem(page);
 
-  // Bottom tab bar.
-  await expect(page.getByRole('tab', { name: 'Trip' })).toHaveAttribute('aria-selected', 'true');
+  // Bottom tab bar: Items first, and it's where the app opens ("/").
+  const tabs = page.getByRole('tab');
+  await expect(tabs).toHaveCount(4);
+  for (const [i, name] of ['Items', 'Trip', 'Stores', 'Settings'].entries()) {
+    await expect(tabs.nth(i)).toHaveAccessibleName(name);
+  }
+  await expect(page.getByRole('tab', { name: 'Items' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page).toHaveURL(/:\d+\/$/);
+
+  await page.getByRole('tab', { name: 'Trip' }).click();
+  await expect(page).toHaveURL(/\/trip$/);
+  await expect(page.getByText('Where are you shopping?')).toBeVisible();
   await page.getByRole('tab', { name: 'Stores' }).click();
   await expect(page).toHaveURL(/\/stores$/);
   await expect(page.getByText('Produce → Deli → Bakery → Frozen')).toBeVisible();
   await page.getByRole('tab', { name: 'Items' }).click();
-  await expect(page).toHaveURL(/\/items$/);
+  await expect(page).toHaveURL(/:\d+\/$/);
   await expect(page.getByRole('checkbox', { name: 'Milk' })).toBeVisible();
 
   expect(problems).toEqual([]);
