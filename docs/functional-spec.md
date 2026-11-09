@@ -367,7 +367,16 @@ With no stores: "No stores yet."
 - A line under the choices explains the current one: "Follows your device’s light or dark setting." or "Always dark, whatever your device is set to."
 - The choice applies immediately and is remembered between launches.
 
-**Your data:** "Your stores, items, list and trip history are stored only on this device." and a **Delete all data** button.
+**Your data:** "Your stores, items, list and trip history are stored only on this device.", an **Import from CSV** button, and a **Delete all data** button.
+
+**Import from CSV** adds stores, departments and items from a CSV file (see "Importing a CSV file" in Data rules).
+- Under the button: "Columns: Store, Item name, Department, Brand (optional). A header row is fine. New stores and departments are added, and items already in your list are skipped."
+- Tapping it opens the system file picker (the browser's file chooser on the web), limited to one CSV or text file.
+- If the file can't be used, an alert titled "Can’t import this file" says why and ends "Nothing was imported." Problems in rows are listed as "Row 3: Department is empty.", up to five, then "…and N more problems."
+- If the file is fine, the app asks first, e.g. "Import from CSV?" / "This adds 3 new items, 1 new store and 2 new departments. 1 row is already in your list and will be skipped." with **Cancel** and **Import**. Afterwards: "Imported" / "Added 3 new items, 1 new store and 2 new departments."
+- If everything in the file is already in the app: "Nothing new to import" / "Everything in this file is already in your list."
+- If the import fails while saving: "Could not finish the import. Some of it may have been saved; check your stores and items."
+
 - It asks first: "Delete all data?" / "This permanently deletes your stores, items, shopping list and trip history from this device, then starts setup again. It can’t be undone." with **Cancel** and **Delete everything** (destructive). The web shows the browser's OK/Cancel dialog.
 - On confirming, every store, item, check, quantity, last-bought date and logged trip is deleted, the trip tab's store and order are forgotten, and the app returns to the first setup screen ("No stores yet").
 - The appearance choice is kept.
@@ -409,6 +418,19 @@ With no stores: "No stores yet."
 - Checking off on the trip, the Reverse order switch and the chosen store save immediately.
 - Finishing a trip saves the log record, the last-bought dates and the unchecks.
 - The trip log is kept indefinitely. Deleting an item or store later doesn't change past records, which keep the names as they were.
+
+**Importing a CSV file**
+- Columns, in order: Store, Item name, Department, Brand. Brand may be empty or left out. Extra empty cells at the end of a row are ignored; more than four columns is an error.
+- The first row is skipped if it's a header (Store, Item name or Item, Department, and optionally Brand, in any case). Blank rows are skipped.
+- Values are text only and are cleaned up like typed names. Commas, quotes and line breaks work inside quoted values (`"Bread, sourdough"`); a quote inside a quoted value is doubled (`""`).
+- Names are matched ignoring case and spacing, and existing spellings are kept.
+  - A store that doesn't exist is created, with its departments in the order they first appear in the file.
+  - A department that doesn't exist at a store is added to the end of that store's order.
+  - An item is the same item if its name and brand match (no brand matches no brand). If it's already at that store in that department, the row is skipped. If it exists but isn't at that store, the store is added to it. Otherwise a new item is created.
+- An item can be in only one department per store, so a row that would put an item in a second department at a store (compared with the app, or with an earlier row) is an error.
+- The whole file is checked first. If any row has a problem, nothing is imported.
+- Limits: files up to 1 MB, up to 2,000 rows, names up to 100 characters, up to 200 departments per store, and up to 100 stores in total.
+- Not allowed in any value: control characters, invisible zero-width characters, and characters that change text direction. Accents, emoji and other languages are fine.
 
 **Persistence**
 - Everything is saved on the device as soon as the user taps Save, Add more, Continue, Delete, Finish, Skip for now, or a master-list checkbox. Quantities save as they're typed.
@@ -467,6 +489,9 @@ The original request left these open. They are easy to revisit.
 | 28 | Delete all data keeps the appearance choice. | It's how the app looks, not shopping data. Someone using dark mode shouldn't be blinded by a reset. |
 | 29 | Delete all data returns to the first setup screen rather than an empty main app. | It's the same as a fresh install, and setup is the quickest way to add stores again. |
 | 30 | Last bought: newest first is the default, same-trip items are A–Z, and never-bought items go last under a heading. | Recent purchases are what people look for. Never-bought items have no date to compare, and putting them at the top of "oldest first" would bury the actual dates. |
+| 31 | CSV import checks the whole file and imports nothing if any row has a problem, and asks before saving. (Chosen with the user.) | A partial import of a messy file is harder to fix than a rejected one. The summary lets the user catch a wrong file before it changes anything. |
+| 32 | CSV import treats the file as untrusted: size, row, length and count limits; no hidden, control or direction-changing characters; values are only ever text (never numbers, formulas or code); ids always come from the app; the picker's cached copy is deleted after reading. | The file comes from outside the app. The limits keep storage and screens (like the drag-to-reorder list) usable, and hidden characters could make two names look the same. Formula characters (`=`, `+`, `-`, `@`) are allowed because the app never writes spreadsheets; a future export must escape them. |
+| 33 | An item that's in a different department at a store than the CSV says blocks the import instead of moving the item. (Chosen with the user.) | Moving items without asking could quietly change the shopping order. |
 
 ---
 

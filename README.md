@@ -97,7 +97,7 @@ src/
       trip/index.tsx      "/trip"    Shopping trip: store dropdown, cart, Finish
       stores/index.tsx    "/stores"  Store configuration
       stores/form.tsx     "/stores/form"  → StoreFormScreen
-      settings/index.tsx  "/settings"  Light/dark/system appearance, Delete all data
+      settings/index.tsx  "/settings"  Light/dark/system appearance, Import from CSV, Delete all data
   screens/                Screens used by more than one route
     store-form-screen.tsx Add / edit store (?id=), takes backTo
     item-form-screen.tsx  Add / edit item (?id=), takes backTo
@@ -113,6 +113,7 @@ src/
     trip.ts               Trip list: checked items at a store, by department in walking order
     last-bought.ts        "Last bought yesterday" text
     appearance.ts         System / Light / Dark choice and labels
+    csv-import.ts         CSV import: parse + validate the file (papaparse), plan the changes, messages
   data/                   Repositories: the only code that touches collections
     stores-repo.ts        observe / save / delete stores (+ prune items)
     items-repo.ts         observe / save / delete items
@@ -120,6 +121,7 @@ src/
     settings-repo.ts      setupComplete flag, trip store + reverse order, appearance
     trips-repo.ts         finishTrip(): log, set last bought, uncheck
     erase-repo.ts         deleteAllData(): delete and purge everything, back to setup
+    import-repo.ts        applyImportPlan(): write a checked CSV import (add-only)
   db/
     schema.ts             RxDB JSON schemas
     database.ts           createAppDatabase(), getAppDatabase() singleton
@@ -134,6 +136,9 @@ src/
     color-scheme-choice.ts  Context holding the Settings choice
     use-theme.ts          Colors for the current scheme
     use-observable.ts     Subscribe a component to an RxJS observable
+  utils/                  Small helpers; platform splits as .web.ts
+    pick-csv-file.ts      Pick + read one CSV (expo-document-picker, expo-file-system; .web.ts: browser File)
+    notify.ts             Message with OK (Alert; .web.ts: window.alert)
   components/             Shared UI (Button, TextField, Screen, Card, editors…)
   constants/theme.ts      Colors (light/dark), spacing
   test-utils/             Test helpers (not shipped)
@@ -243,6 +248,17 @@ RxDB's SQLite and Expo Filesystem storages are **paid (premium) plugins**, so th
 This suits a personal grocery list's data volume. To move to a faster storage later (e.g. RxDB Premium SQLite), change only `getStorageConfig()`; schemas, repositories, and screens are untouched.
 
 Development builds also enable RxDB dev-mode and wrap storage in **z-schema validation**, which rejects documents that don't match the schema. Production builds skip both for speed. z-schema is used instead of ajv because ajv relies on `eval`.
+
+### CSV import
+
+Settings → Import from CSV reads a "Store, Item name, Department, Brand" file. The file is untrusted input, so:
+
+- **Picking** uses `expo-document-picker` (the system picker; no storage permission) with `copyToCacheDirectory`. The size is checked before reading (1 MB), the copy is read with `expo-file-system`'s `File.text()`, and the copy is deleted afterwards, but only if it's in the app's cache. On web, the browser's `File` is read instead.
+- **Parsing** uses papaparse on the string only: `header: false` (arrays, so file contents never become object keys), `dynamicTyping: false`, a fixed `,` delimiter, and no workers or downloads. Quote errors reject the file.
+- **Validation** (`domain/csv-import.ts`) checks every row before anything is written. It enforces the row, length, department and store limits, and rejects control, zero-width and bidi characters. Lookups use `Map`s, and ids always come from `createId()`.
+- **Writing** (`data/import-repo.ts`) creates stores first, then appends departments, then creates items, then appends locations. It only ever adds, so if a later step fails, nothing is left pointing at a missing department.
+
+The rules users see are in [functional spec §5](docs/functional-spec.md#5-data-rules).
 
 ### Future sync
 

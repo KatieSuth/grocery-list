@@ -407,3 +407,57 @@ test('settings: dark mode sticks across reloads; deleting all data starts over',
 
   expect(problems).toEqual([]);
 });
+
+test('settings: a CSV file adds stores, departments and items; a bad file changes nothing', async ({ page }) => {
+  const problems = watchConsole(page);
+  await setUpOneStoreAndItem(page);
+  await page.getByRole('tab', { name: 'Settings' }).click();
+
+  /** Picks a CSV in the browser's file chooser and returns the dialogs it led to. */
+  async function importCsv(contents: string, answer: 'accept' | 'dismiss') {
+    const dialogs: string[] = [];
+    const handler = (d: import('@playwright/test').Dialog) => {
+      dialogs.push(d.message());
+      void (answer === 'accept' ? d.accept() : d.dismiss());
+    };
+    page.on('dialog', handler);
+    const chooser = page.waitForEvent('filechooser');
+    await button(page, 'Import from CSV').click();
+    await (await chooser).setFiles({ name: 'list.csv', mimeType: 'text/csv', buffer: Buffer.from(contents) });
+    return { dialogs, done: () => page.off('dialog', handler) };
+  }
+
+  // A row with no department: explained, and nothing is added.
+  const bad = await importCsv('Store,Item name,Department,Brand\nAldi,Apples,\n', 'accept');
+  await expect.poll(() => bad.dialogs).toEqual(['Can’t import this file\n\nRow 2: Department is empty.\n\nNothing was imported.']);
+  bad.done();
+
+  // Cancelling the question adds nothing either.
+  const cancelled = await importCsv('Aldi,Apples,Produce', 'dismiss');
+  await expect.poll(() => cancelled.dialogs).toHaveLength(1);
+  cancelled.done();
+
+  const good = await importCsv(
+    '﻿Store,Item name,Department,Brand\r\nCorner Market,Milk,Deli\r\nCorner Market,"Bread, sourdough",Bakery,Acme\r\nAldi,Apples,Produce\r\n',
+    'accept'
+  );
+  await expect
+    .poll(() => good.dialogs)
+    .toEqual([
+      'Import from CSV?\n\nThis adds 2 new items, 1 new store and 1 new department. 1 row is already in your list and will be skipped.',
+      'Imported\n\nAdded 2 new items, 1 new store and 1 new department.',
+    ]);
+  good.done();
+
+  await page.getByRole('tab', { name: 'Items' }).click();
+  const items = page.getByTestId('master-list');
+  await expect(page.getByText('Corner Market · Bakery')).toBeVisible();
+  await expect(page.getByText('Aldi · Produce')).toBeVisible();
+  await expect(page.getByText('Bread, sourdough')).toBeVisible();
+  await expect(items.getByRole('checkbox', { name: 'Apples' })).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Stores' }).click();
+  await expect(page.getByText('Produce → Deli → Bakery → Frozen')).toBeVisible();
+
+  expect(problems).toEqual([]);
+});

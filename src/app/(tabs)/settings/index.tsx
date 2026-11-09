@@ -8,18 +8,75 @@ import { ErrorText } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { deleteAllData } from '@/data/erase-repo';
+import { applyImportPlan, loadImportContext } from '@/data/import-repo';
 import { setColorSchemeChoice } from '@/data/settings-repo';
 import { useDatabase } from '@/db/database-provider';
 import { COLOR_SCHEME_CHOICES, COLOR_SCHEME_LABELS, COLOR_SCHEME_SPOKEN } from '@/domain/appearance';
+import {
+  describeImportErrors,
+  describeImportPlan,
+  describeImportResult,
+  isEmptyImport,
+  parseImportCsv,
+  planImport,
+  type ImportPlan,
+} from '@/domain/csv-import';
 import { ColorSchemeChoiceContext } from '@/hooks/color-scheme-choice';
-import { confirmDestructive } from '@/utils/confirm';
+import { confirmAction, confirmDestructive } from '@/utils/confirm';
+import { notify } from '@/utils/notify';
+import { pickCsvFile } from '@/utils/pick-csv-file';
 
-/** Light/dark appearance, and deleting everything to start over. */
+const CANT_IMPORT = 'Can’t import this file';
+
+/** Light/dark appearance, importing from a CSV file, and deleting everything to start over. */
 export default function SettingsScreen() {
   const db = useDatabase();
   const colorScheme = use(ColorSchemeChoiceContext);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string>();
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string>();
+
+  const applyImport = async (plan: ImportPlan) => {
+    setImporting(true);
+    try {
+      await applyImportPlan(db, plan);
+      notify('Imported', describeImportResult(plan.counts));
+    } catch {
+      setImportError('Could not finish the import. Some of it may have been saved; check your stores and items.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // Pick → read → check every row → ask → write. Nothing is written unless the whole file is valid.
+  const handleImport = async () => {
+    setImportError(undefined);
+    try {
+      const picked = await pickCsvFile();
+      if (picked.status === 'canceled') return;
+      if (picked.status === 'error') return notify(CANT_IMPORT, picked.message);
+
+      const parsed = parseImportCsv(picked.text);
+      if (!parsed.ok) return notify(CANT_IMPORT, describeImportErrors(parsed.errors));
+      const { stores, items } = await loadImportContext(db);
+      const planned = planImport(parsed.rows, stores, items);
+      if (!planned.ok) return notify(CANT_IMPORT, describeImportErrors(planned.errors));
+
+      const { plan } = planned;
+      if (isEmptyImport(plan.counts)) {
+        return notify('Nothing new to import', 'Everything in this file is already in your list.');
+      }
+      confirmAction({
+        title: 'Import from CSV?',
+        message: describeImportPlan(plan.counts),
+        confirmLabel: 'Import',
+        onConfirm: () => void applyImport(plan),
+      });
+    } catch {
+      setImportError('Could not import that file. Please try again.');
+    }
+  };
 
   const deleteEverything = async () => {
     setDeleting(true);
@@ -69,6 +126,20 @@ export default function SettingsScreen() {
         <ThemedText type="small" themeColor="textSecondary">
           Your stores, items, list and trip history are stored only on this device.
         </ThemedText>
+        <View style={styles.row}>
+          <Button
+            label="Import from CSV"
+            variant="secondary"
+            disabled={importing}
+            accessibilityHint="Choose a CSV file of stores, items and departments to add"
+            onPress={() => void handleImport()}
+          />
+        </View>
+        <ThemedText type="small" themeColor="textSecondary">
+          Columns: Store, Item name, Department, Brand (optional). A header row is fine. New stores and
+          departments are added, and items already in your list are skipped.
+        </ThemedText>
+        {importError ? <ErrorText message={importError} /> : null}
         <View style={styles.row}>
           <Button
             label="Delete all data"
