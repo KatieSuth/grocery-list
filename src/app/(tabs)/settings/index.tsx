@@ -1,5 +1,5 @@
 import { use, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { ChoiceChips } from '@/components/choice-chips';
@@ -22,6 +22,7 @@ import {
   type ImportPlan,
 } from '@/domain/csv-import';
 import { ColorSchemeChoiceContext } from '@/hooks/color-scheme-choice';
+import { useTheme } from '@/hooks/use-theme';
 import { confirmAction, confirmDestructive } from '@/utils/confirm';
 import { notify } from '@/utils/notify';
 import { pickCsvFile } from '@/utils/pick-csv-file';
@@ -34,48 +35,64 @@ export default function SettingsScreen() {
   const colorScheme = use(ColorSchemeChoiceContext);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string>();
-  const [importing, setImporting] = useState(false);
+  /** What the import is doing, while it's working: shown with a spinner. */
+  const [importStatus, setImportStatus] = useState<'checking' | 'saving'>();
   const [importError, setImportError] = useState<string>();
+  const theme = useTheme();
 
   const applyImport = async (plan: ImportPlan) => {
-    setImporting(true);
+    setImportStatus('saving');
     try {
       await applyImportPlan(db, plan);
       notify('Imported', describeImportResult(plan.counts));
     } catch {
       setImportError('Could not finish the import. Some of it may have been saved; check your stores and items.');
     } finally {
-      setImporting(false);
+      setImportStatus(undefined);
     }
   };
 
-  // Pick → read → check every row → ask → write. Nothing is written unless the whole file is valid.
-  const handleImport = async () => {
-    setImportError(undefined);
-    try {
-      const picked = await pickCsvFile();
-      if (picked.status === 'canceled') return;
-      if (picked.status === 'error') return notify(CANT_IMPORT, picked.message);
+  /**
+   * Pick → read → check every row; returns what to show next (an error, or the question before
+   * importing). Nothing is written unless the whole file is valid.
+   */
+  const checkFile = async (): Promise<(() => void) | undefined> => {
+    // The spinner starts once a file is chosen: the browser never says if its chooser is canceled.
+    const picked = await pickCsvFile(() => setImportStatus('checking'));
+    if (picked.status === 'canceled') return undefined;
+    if (picked.status === 'error') return () => notify(CANT_IMPORT, picked.message);
 
-      const parsed = parseImportCsv(picked.text);
-      if (!parsed.ok) return notify(CANT_IMPORT, describeImportErrors(parsed.errors));
-      const { stores, items } = await loadImportContext(db);
-      const planned = planImport(parsed.rows, stores, items);
-      if (!planned.ok) return notify(CANT_IMPORT, describeImportErrors(planned.errors));
+    const parsed = parseImportCsv(picked.text);
+    if (!parsed.ok) return () => notify(CANT_IMPORT, describeImportErrors(parsed.errors));
+    const { stores, items } = await loadImportContext(db);
+    const planned = planImport(parsed.rows, stores, items);
+    if (!planned.ok) return () => notify(CANT_IMPORT, describeImportErrors(planned.errors));
 
-      const { plan } = planned;
-      if (isEmptyImport(plan.counts)) {
-        return notify('Nothing new to import', 'Everything in this file is already in your list.');
-      }
+    const { plan } = planned;
+    if (isEmptyImport(plan.counts)) {
+      return () => notify('Nothing new to import', 'Everything in this file is already in your list.');
+    }
+    return () =>
       confirmAction({
         title: 'Import from CSV?',
         message: describeImportPlan(plan.counts),
         confirmLabel: 'Import',
         onConfirm: () => void applyImport(plan),
       });
+  };
+
+  const handleImport = async () => {
+    setImportError(undefined);
+    let next: (() => void) | undefined;
+    try {
+      next = await checkFile();
     } catch {
       setImportError('Could not import that file. Please try again.');
+    } finally {
+      // Stop the spinner before showing the result.
+      setImportStatus(undefined);
     }
+    next?.();
   };
 
   const deleteEverything = async () => {
@@ -130,7 +147,7 @@ export default function SettingsScreen() {
           <Button
             label="Import from CSV"
             variant="secondary"
-            disabled={importing}
+            disabled={importStatus !== undefined}
             accessibilityHint="Choose a CSV file of stores, items and departments to add"
             onPress={() => void handleImport()}
           />
@@ -139,12 +156,20 @@ export default function SettingsScreen() {
           Columns: Store, Item name, Department, Brand (optional). A header row is fine. New stores and
           departments are added, and items already in your list are skipped.
         </ThemedText>
+        {importStatus ? (
+          <View style={styles.status} accessibilityLiveRegion="polite">
+            <ActivityIndicator color={theme.textSecondary} />
+            <ThemedText type="small" themeColor="textSecondary">
+              {importStatus === 'checking' ? 'Checking the file…' : 'Importing…'}
+            </ThemedText>
+          </View>
+        ) : null}
         {importError ? <ErrorText message={importError} /> : null}
         <View style={styles.row}>
           <Button
             label="Delete all data"
             variant="danger"
-            disabled={deleting}
+            disabled={deleting || importStatus !== undefined}
             accessibilityHint="Asks first, then deletes your stores, items, list and trip history and starts setup again"
             onPress={handleDelete}
           />
@@ -158,4 +183,5 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   section: { gap: Spacing.two },
   row: { flexDirection: 'row' },
+  status: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
 });

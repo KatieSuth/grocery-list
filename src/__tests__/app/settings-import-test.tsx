@@ -156,3 +156,58 @@ test('if picking or saving fails, the settings screen says so', async () => {
   ).toBeOnTheScreen();
   expect(settings().getByRole('button', { name: 'Import from CSV' })).toBeEnabled();
 });
+
+/** A promise the test settles itself. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => (resolve = r));
+  return { promise, resolve };
+}
+
+test('a spinner shows while the file is checked and while it’s imported', async () => {
+  alerts('Import');
+  // The user picks a file, and reading it takes a moment.
+  const reading = deferred<Awaited<ReturnType<typeof pickCsvFile>>>();
+  jest.mocked(pickCsvFile).mockImplementation((onPicked) => {
+    onPicked?.();
+    return reading.promise;
+  });
+  const db = await renderApp({ seed });
+  await importFile();
+
+  expect(settings().getByText('Checking the file…')).toBeOnTheScreen();
+  expect(settings().getByRole('button', { name: 'Import from CSV' })).toBeDisabled();
+  expect(settings().getByRole('button', { name: 'Delete all data' })).toBeDisabled();
+
+  // Saving takes a moment too.
+  const saving = deferred<void>();
+  const realBulkInsert = db.items.bulkInsert.bind(db.items);
+  jest.spyOn(db.items, 'bulkInsert').mockImplementation(async (docs) => {
+    await saving.promise;
+    return realBulkInsert(docs);
+  });
+  await act(async () => reading.resolve({ status: 'picked', text: 'Kroger,Bread,Bakery' }));
+  expect(await settings().findByText('Importing…')).toBeOnTheScreen();
+  expect(settings().queryByText('Checking the file…')).toBeNull();
+  expect(settings().getByRole('button', { name: 'Import from CSV' })).toBeDisabled();
+
+  await act(async () => saving.resolve());
+  await eventually(async () => expect(settings().queryByText('Importing…')).toBeNull());
+  expect(settings().getByRole('button', { name: 'Import from CSV' })).toBeEnabled();
+  expect(settings().getByRole('button', { name: 'Delete all data' })).toBeEnabled();
+});
+
+test('the spinner stops before a problem with the file is shown', async () => {
+  const spinnerWhenAlerted: boolean[] = [];
+  jest.spyOn(Alert, 'alert').mockImplementation(() => {
+    spinnerWhenAlerted.push(settings().queryByText('Checking the file…') !== null);
+  });
+  jest.mocked(pickCsvFile).mockImplementation(async (onPicked) => {
+    onPicked?.();
+    return { status: 'picked', text: ',Eggs,Dairy' };
+  });
+  await renderApp({ seed });
+  await importFile();
+  expect(spinnerWhenAlerted).toEqual([false]);
+  expect(settings().queryByText('Checking the file…')).toBeNull();
+});

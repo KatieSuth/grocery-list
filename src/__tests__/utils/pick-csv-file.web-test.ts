@@ -19,7 +19,9 @@ const fileWith = (text: () => Promise<string>, size = 20) =>
 
 test('on web, the browser’s File is read directly; nothing is uploaded', async () => {
   pickerReturns(fileWith(() => Promise.resolve('Kroger,Milk,Dairy')));
-  expect(await pickCsvFile()).toEqual({ status: 'picked', text: 'Kroger,Milk,Dairy' });
+  const onPicked = jest.fn();
+  expect(await pickCsvFile(onPicked)).toEqual({ status: 'picked', text: 'Kroger,Milk,Dairy' });
+  expect(onPicked).toHaveBeenCalledTimes(1);
   expect(DocumentPicker.getDocumentAsync).toHaveBeenCalledWith({
     type: [...CSV_MIME_TYPES, '.csv'],
     multiple: false,
@@ -29,7 +31,9 @@ test('on web, the browser’s File is read directly; nothing is uploaded', async
 
 test('on web, canceling, a missing file, a big file or a bad read are handled', async () => {
   pickerReturns(null);
-  expect(await pickCsvFile()).toEqual({ status: 'canceled' });
+  const onPicked = jest.fn();
+  expect(await pickCsvFile(onPicked)).toEqual({ status: 'canceled' });
+  expect(onPicked).not.toHaveBeenCalled();
 
   pickerReturns(undefined);
   expect(await pickCsvFile()).toEqual({ status: 'error', message: 'That file couldn’t be opened.' });

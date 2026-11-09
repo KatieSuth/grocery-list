@@ -372,6 +372,7 @@ With no stores: "No stores yet."
 **Import from CSV** adds stores, departments and items from a CSV file (see "Importing a CSV file" in Data rules).
 - Under the button: "Columns: Store, Item name, Department, Brand (optional). A header row is fine. New stores and departments are added, and items already in your list are skipped."
 - Tapping it opens the system file picker (the browser's file chooser on the web), limited to one CSV or text file.
+- Once a file is chosen, a spinner shows "Checking the file…" while it's read and checked, and "Importing…" while it's saved. Import from CSV and Delete all data are disabled meanwhile. The spinner stops before any message appears.
 - If the file can't be used, an alert titled "Can’t import this file" says why and ends "Nothing was imported." Problems in rows are listed as "Row 3: Department is empty.", up to five, then "…and N more problems."
 - If the file is fine, the app asks first, e.g. "Import from CSV?" / "This adds 3 new items, 1 new store and 2 new departments. 1 row is already in your list and will be skipped." with **Cancel** and **Import**. Afterwards: "Imported" / "Added 3 new items, 1 new store and 2 new departments."
 - If everything in the file is already in the app: "Nothing new to import" / "Everything in this file is already in your list."

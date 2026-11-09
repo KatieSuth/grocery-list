@@ -22,13 +22,15 @@ import {
  * - iOS: the picker copies the file into the app's cache, which is the only way to read it
  *   straight away; that copy is deleted once it's read.
  */
-export async function pickCsvFile(): Promise<PickCsvResult> {
+/** `onPicked` runs once the user has chosen a file, before it's read. */
+export async function pickCsvFile(onPicked?: () => void): Promise<PickCsvResult> {
   const result = await DocumentPicker.getDocumentAsync({
     type: CSV_MIME_TYPES,
     multiple: false,
     copyToCacheDirectory: Platform.OS !== 'android',
   });
   if (result.canceled) return { status: 'canceled' };
+  onPicked?.();
 
   const file = new File(result.assets[0].uri);
   try {

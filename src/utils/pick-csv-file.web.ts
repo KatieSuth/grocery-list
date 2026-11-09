@@ -7,13 +7,15 @@ import { CSV_MIME_TYPES, FILE_NOT_OPENED, FILE_NOT_READ, FILE_TOO_BIG, type Pick
  * Web version: the browser's file chooser hands back a File, read here directly (expo-file-system
  * isn't available on web). The file stays in the browser; nothing is uploaded.
  */
-export async function pickCsvFile(): Promise<PickCsvResult> {
+/** `onPicked` runs once the user has chosen a file, before it's read. */
+export async function pickCsvFile(onPicked?: () => void): Promise<PickCsvResult> {
   const result = await DocumentPicker.getDocumentAsync({
     type: [...CSV_MIME_TYPES, '.csv'],
     multiple: false,
     base64: false,
   });
   if (result.canceled) return { status: 'canceled' };
+  onPicked?.();
 
   const file = result.assets[0].file;
   if (!file) return { status: 'error', message: FILE_NOT_OPENED };

@@ -30,7 +30,10 @@ beforeEach(() => {
 
 test('picking a CSV reads it as text, then deletes any cached copy', async () => {
   pickerReturns(`${CACHE}DocumentPicker/list.csv`);
-  expect(await pickCsvFile()).toEqual({ status: 'picked', text: 'Kroger,Milk,Dairy' });
+  const onPicked = jest.fn(() => expect(mockFile.text).not.toHaveBeenCalled());
+  expect(await pickCsvFile(onPicked)).toEqual({ status: 'picked', text: 'Kroger,Milk,Dairy' });
+  // The caller hears once a file is chosen, before it's read (to show that it's working).
+  expect(onPicked).toHaveBeenCalledTimes(1);
   // One file, CSV-ish types only. Android reads the picked file through its content:// link
   // (Expo Go can't read the picker's cached copy); iOS needs the copy to read it at all.
   expect(DocumentPicker.getDocumentAsync).toHaveBeenCalledWith({
@@ -50,7 +53,9 @@ test('an empty file, or one whose size is unknown, is refused without being read
 
 test('canceling the picker does nothing', async () => {
   pickerReturns(null);
-  expect(await pickCsvFile()).toEqual({ status: 'canceled' });
+  const onPicked = jest.fn();
+  expect(await pickCsvFile(onPicked)).toEqual({ status: 'canceled' });
+  expect(onPicked).not.toHaveBeenCalled();
 });
 
 test('a file that is too big is refused without being read', async () => {
