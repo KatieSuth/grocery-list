@@ -3,6 +3,7 @@ import { map, type Observable } from 'rxjs';
 import type { AppDatabase } from '@/db/database';
 import { SETTINGS_ID, type SettingsDoc } from '@/db/schema';
 import { DEFAULT_COLOR_SCHEME, type ColorSchemeChoice } from '@/domain/appearance';
+import { DEFAULT_SORT_CHOICE, ITEM_SORTS, SORT_DIRECTIONS, type ItemSortChoice } from '@/domain/item-sort';
 
 export function observeSetupComplete(db: AppDatabase): Observable<boolean> {
   return db.settings.findOne(SETTINGS_ID).$.pipe(map((doc) => doc?.setupComplete ?? false));
@@ -42,6 +43,23 @@ export function observeColorSchemeChoice(db: AppDatabase): Observable<ColorSchem
 
 export async function setColorSchemeChoice(db: AppDatabase, colorScheme: ColorSchemeChoice): Promise<void> {
   await patchSettings(db, { colorScheme });
+}
+
+/** How the master list is sorted when it opens. Unknown saved values fall back to the default. */
+export function observeItemSortChoice(db: AppDatabase): Observable<ItemSortChoice> {
+  return db.settings.findOne(SETTINGS_ID).$.pipe(
+    map((doc) => ({
+      sort: doc?.itemSort && ITEM_SORTS.includes(doc.itemSort) ? doc.itemSort : DEFAULT_SORT_CHOICE.sort,
+      direction:
+        doc?.itemSortDirection && SORT_DIRECTIONS.includes(doc.itemSortDirection)
+          ? doc.itemSortDirection
+          : DEFAULT_SORT_CHOICE.direction,
+    })),
+  );
+}
+
+export async function setItemSortChoice(db: AppDatabase, { sort, direction }: ItemSortChoice): Promise<void> {
+  await patchSettings(db, { itemSort: sort, itemSortDirection: direction });
 }
 
 /** Changes some settings, keeping the rest. */

@@ -461,3 +461,28 @@ test('settings: a CSV file adds stores, departments and items; a bad file change
 
   expect(problems).toEqual([]);
 });
+
+test('settings: the items list’s default sort is remembered across reloads', async ({ page }) => {
+  const problems = watchConsole(page);
+  await setUpOneStoreAndItem(page);
+  const sortButton = page.getByRole('button', { name: /^Sort, by/ });
+  await expect(sortButton).toHaveAttribute('aria-label', 'Sort, by name, A to Z');
+
+  await page.getByRole('tab', { name: 'Settings' }).click();
+  await page.getByRole('radio', { name: 'Default sort: last bought' }).click();
+  await page.getByRole('radio', { name: 'Default order: Oldest first' }).click();
+  await expect(page.getByRole('radio', { name: 'Default order: Oldest first' })).toHaveAttribute('aria-checked', 'true');
+
+  await page.getByRole('tab', { name: 'Items' }).click();
+  await expect(sortButton).toHaveAttribute('aria-label', 'Sort, by last bought, Oldest first');
+
+  await page.waitForTimeout(500);
+  await page.reload();
+  await expect(page.getByRole('button', { name: /^Sort, by/ })).toHaveAttribute(
+    'aria-label',
+    'Sort, by last bought, Oldest first',
+    { timeout: 60_000 }
+  );
+
+  expect(problems).toEqual([]);
+});

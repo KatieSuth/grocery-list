@@ -4,12 +4,13 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Button } from '@/components/button';
 import { ChoiceChips } from '@/components/choice-chips';
 import { Screen } from '@/components/screen';
+import { SortChoices } from '@/components/sort-choices';
 import { ErrorText } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { deleteAllData } from '@/data/erase-repo';
 import { applyImportPlan, loadImportContext } from '@/data/import-repo';
-import { setColorSchemeChoice } from '@/data/settings-repo';
+import { setColorSchemeChoice, setItemSortChoice } from '@/data/settings-repo';
 import { useDatabase } from '@/db/database-provider';
 import { COLOR_SCHEME_CHOICES, COLOR_SCHEME_LABELS, COLOR_SCHEME_SPOKEN } from '@/domain/appearance';
 import {
@@ -22,6 +23,7 @@ import {
   type ImportPlan,
 } from '@/domain/csv-import';
 import { ColorSchemeChoiceContext } from '@/hooks/color-scheme-choice';
+import { useItemSortChoice } from '@/hooks/use-data';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmAction, confirmDestructive } from '@/utils/confirm';
 import { notify } from '@/utils/notify';
@@ -29,10 +31,11 @@ import { pickCsvFile } from '@/utils/pick-csv-file';
 
 const CANT_IMPORT = 'Can’t import this file';
 
-/** Light/dark appearance, importing from a CSV file, and deleting everything to start over. */
+/** Light/dark appearance, the items' default sort, importing from a CSV file, and deleting everything to start over. */
 export default function SettingsScreen() {
   const db = useDatabase();
   const colorScheme = use(ColorSchemeChoiceContext);
+  const sortChoice = useItemSortChoice();
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string>();
   /** What the import is doing, while it's working: shown with a spinner. */
@@ -136,6 +139,24 @@ export default function SettingsScreen() {
         </ThemedText>
       </View>
 
+      {sortChoice ? (
+        <View style={styles.section}>
+          <ThemedText type="smallBold" accessibilityRole="header">
+            Items list
+          </ThemedText>
+          <SortChoices
+            asDefault
+            sort={sortChoice.sort}
+            direction={sortChoice.direction}
+            onChangeSort={(sort) => void setItemSortChoice(db, { ...sortChoice, sort })}
+            onChangeDirection={(direction) => void setItemSortChoice(db, { ...sortChoice, direction })}
+          />
+          <ThemedText type="small" themeColor="textSecondary">
+            How the Items tab is sorted when it opens. Sorting there changes it only until you leave the app.
+          </ThemedText>
+        </View>
+      ) : null}
+
       <View style={styles.section}>
         <ThemedText type="smallBold" accessibilityRole="header">
           Your data
@@ -153,8 +174,8 @@ export default function SettingsScreen() {
           />
         </View>
         <ThemedText type="small" themeColor="textSecondary">
-          Columns: Store, Item name, Department, Brand (optional). A header row is fine. New stores and
-          departments are added, and items already in your list are skipped.
+          Columns: Store, Item name, Department, Brand (optional). A header row is fine. New stores and departments are
+          added, and items already in your list are skipped.
         </ThemedText>
         {importStatus ? (
           <View style={styles.status} accessibilityLiveRegion="polite">

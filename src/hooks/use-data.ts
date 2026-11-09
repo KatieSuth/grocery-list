@@ -2,7 +2,12 @@ import { useMemo } from 'react';
 
 import { observeItems } from '@/data/items-repo';
 import { observeListEntries } from '@/data/list-repo';
-import { observeColorSchemeChoice, observeSetupComplete, observeTripSettings } from '@/data/settings-repo';
+import {
+  observeColorSchemeChoice,
+  observeItemSortChoice,
+  observeSetupComplete,
+  observeTripSettings,
+} from '@/data/settings-repo';
 import { observeStores } from '@/data/stores-repo';
 import { useDatabase } from '@/db/database-provider';
 
@@ -42,4 +47,10 @@ export function useTripSettings() {
 export function useColorSchemeChoice() {
   const db = useDatabase();
   return useObservable(useMemo(() => observeColorSchemeChoice(db), [db]));
+}
+
+/** How the master list is sorted when it opens (chosen in Settings); undefined while loading. */
+export function useItemSortChoice() {
+  const db = useDatabase();
+  return useObservable(useMemo(() => observeItemSortChoice(db), [db]));
 }

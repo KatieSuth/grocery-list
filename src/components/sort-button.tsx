@@ -2,27 +2,22 @@ import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet } from 'react-native';
 
 import { pressOpacity } from '@/components/press-feedback';
-import {
-  DEFAULT_DIRECTION,
-  DEFAULT_SORT,
-  directionSpoken,
-  SORT_LABELS,
-  type ItemSort,
-  type SortDirection,
-} from '@/domain/item-sort';
+import { directionSpoken, SORT_LABELS, type ItemSort, type ItemSortChoice, type SortDirection } from '@/domain/item-sort';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
   sort: ItemSort;
   direction: SortDirection;
+  /** The default sort chosen in Settings. */
+  defaultChoice: ItemSortChoice;
   expanded: boolean;
   onPress: () => void;
 };
 
 /** The sort icon next to the filter button. Tinted when the list isn't in the default order. */
-export function SortButton({ sort, direction, expanded, onPress }: Props) {
+export function SortButton({ sort, direction, defaultChoice, expanded, onPress }: Props) {
   const theme = useTheme();
-  const changed = sort !== DEFAULT_SORT || direction !== DEFAULT_DIRECTION;
+  const changed = sort !== defaultChoice.sort || direction !== defaultChoice.direction;
   const color = changed || expanded ? theme.tint : theme.text;
   return (
     <Pressable

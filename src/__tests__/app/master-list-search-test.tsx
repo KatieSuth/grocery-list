@@ -310,3 +310,29 @@ test('an item in two departments is listed under both, and both copies share che
   await screen.findAllByLabelText('Quantity for Pizza');
   expect(quantities().map((q) => q.props.value)).toEqual(['', '']);
 });
+
+// The default sort is chosen in Settings; sorting on the list itself lasts only while the app is open.
+test('the list opens with the default sort from Settings, and follows a new default', async () => {
+  const db = await renderApp({
+    seed: async (d) => {
+      await seed(d);
+      await d.settings.findOne('app').patch({ itemSort: 'department', itemSortDirection: 'desc' });
+    },
+  });
+  await openItems();
+  const sortButton = () => screen.getByRole('button', { name: /^Sort, by/ });
+  expect(sortButton()).toHaveProp('accessibilityLabel', 'Sort, by department, Z to A');
+  expect(listRows()).toEqual(['# Produce', 'Apples', '# Frozen', 'Peas', '# Deli', 'Milk', 'Ham']);
+
+  // Sorting here doesn't change the default.
+  await fireEvent.press(sortButton());
+  await fireEvent.press(radio('Sort by name'));
+  expect(listRows()).toEqual(['Peas', 'Milk', 'Ham', 'Apples']);
+  await act(async () => {});
+  expect((await db.settings.findOne('app').exec())?.itemSort).toBe('department');
+
+  // Choosing a new default in Settings shows the list that way.
+  await act(() => db.settings.findOne('app').patch({ itemSort: 'name', itemSortDirection: 'asc' }));
+  await eventually(async () => expect(sortButton()).toHaveProp('accessibilityLabel', 'Sort, by name, A to Z'));
+  expect(listRows()).toEqual(['Apples', 'Ham', 'Milk', 'Peas']);
+});

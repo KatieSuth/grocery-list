@@ -284,7 +284,7 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
 
 **Content**
 - At the top: a **search box** with a **filter button** and a **sort button** to its right (§ Search and filters, § Sorting below), then an **Add an item** button, which opens the Item form (§4.4).
-- Every item, alphabetical by default (§ Sorting). Each row shows:
+- Every item, in the default sort chosen in Settings (by name, A–Z, unless changed; § Sorting). Each row shows:
   - a **checkbox** on the left,
   - the item name, brand (if any), and where to find it ("Corner Market · Deli", or "No store selected"),
   - "Last bought today", "yesterday", "3 days ago" (under a week), or a date ("Nov 3"; "Dec 25, 2025" if not this year), once the item has been in a finished trip,
@@ -313,8 +313,9 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
 
 **Sorting**
 - The **sort button** (an up/down arrows icon) opens and closes a sort panel. Opening it closes the filter panel, and the other way round. It has two sets of choices:
-  - **Sort by:** **Name** (the default), **Department** or **Last bought**.
-  - **Order:** **A–Z** (the default) or **Z–A**. For Last bought these read **Newest first** (the default) and **Oldest first**.
+  - **Sort by:** **Name**, **Department** or **Last bought**.
+  - **Order:** **A–Z** or **Z–A**. For Last bought these read **Newest first** and **Oldest first**.
+  - The list opens with the **default sort** chosen in Settings (§4.5.4), which is Name, A–Z unless changed.
 - **Name:** one list of items by name, ignoring case.
 - **Department:** items are grouped under department headings, with items by name inside each group.
   - A–Z or Z–A applies to both the headings and the items within them.
@@ -330,8 +331,8 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
   - Checking or unchecking any copy checks or unchecks them all.
   - A quantity typed in any copy appears in every other copy as it's typed, and is saved once for the item.
   - "Showing X of Y items" counts items, not rows.
-- Sorting works together with search and filters. The button is highlighted while not in the default order (Name, A–Z), and announces the current choice ("Sort, by department, Z to A").
-- The choices aren't saved; the list returns to Name, A–Z when the app restarts.
+- Sorting works together with search and filters. The button is highlighted while the list isn't in the default sort from Settings, and announces the current choice ("Sort, by department, Z to A").
+- Choices made here aren't saved: the list returns to the default sort when the app restarts. Choosing a new default in Settings shows the list that way straight away.
 
 **Checking items**
 - Tap the checkbox to check or uncheck the item. The change saves immediately.
@@ -367,6 +368,11 @@ With no stores: "No stores yet."
 - A line under the choices explains the current one: "Follows your device’s light or dark setting." or "Always dark, whatever your device is set to."
 - The choice applies immediately and is remembered between launches.
 
+**Items list:** the **default sort** for the Items tab: **Default sort** (Name, Department or Last bought) and **Default order** (A–Z or Z–A; Newest first or Oldest first for Last bought). These are the same choices as the Items tab's sort panel (§4.5.2).
+- Spoken as "Default sort: name", "Default order: A to Z" and so on.
+- Under them: "How the Items tab is sorted when it opens. Sorting there changes it only until you leave the app."
+- The default is Name, A–Z. A choice applies immediately, including to the Items tab if it's already open, and is remembered between launches.
+
 **Your data:** "Your stores, items, list and trip history are stored only on this device.", an **Import from CSV** button, and a **Delete all data** button.
 
 **Import from CSV** adds stores, departments and items from a CSV file (see "Importing a CSV file" in Data rules).
@@ -380,7 +386,7 @@ With no stores: "No stores yet."
 
 - It asks first: "Delete all data?" / "This permanently deletes your stores, items, shopping list and trip history from this device, then starts setup again. It can’t be undone." with **Cancel** and **Delete everything** (destructive). The web shows the browser's OK/Cancel dialog.
 - On confirming, every store, item, check, quantity, last-bought date and logged trip is deleted, the trip tab's store and order are forgotten, and the app returns to the first setup screen ("No stores yet").
-- The appearance choice is kept.
+- The appearance choice and the items' default sort are kept.
 - If deleting fails: "Could not delete all of your data. Please try again." Setup is only restarted once everything is gone, so trying again finishes the job.
 
 ### 4.6 Not-found and error states
@@ -493,6 +499,7 @@ The original request left these open. They are easy to revisit.
 | 31 | CSV import checks the whole file and imports nothing if any row has a problem, and asks before saving. (Chosen with the user.) | A partial import of a messy file is harder to fix than a rejected one. The summary lets the user catch a wrong file before it changes anything. |
 | 32 | CSV import treats the file as untrusted: size, row, length and count limits; no hidden, control or direction-changing characters; values are only ever text (never numbers, formulas or code); ids always come from the app; on Android the chosen file is read in place (nothing is copied), and on iOS the picker's copy is deleted after reading. | The file comes from outside the app. The limits keep storage and screens (like the drag-to-reorder list) usable, and hidden characters could make two names look the same. Formula characters (`=`, `+`, `-`, `@`) are allowed because the app never writes spreadsheets; a future export must escape them. |
 | 33 | An item that's in a different department at a store than the CSV says blocks the import instead of moving the item. (Chosen with the user.) | Moving items without asking could quietly change the shopping order. |
+| 34 | The items' default sort is set in Settings; sorting on the Items tab stays temporary. Delete all data keeps the default. (Requested by the user.) | A quick re-sort while shopping shouldn't change how the list usually opens. Like the appearance choice, the default is a preference, not shopping data. |
 
 ---
 

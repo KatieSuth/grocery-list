@@ -6,7 +6,8 @@ import { SETTINGS_ID } from '@/db/schema';
 
 /**
  * Deletes every store, item, checked item and logged trip, and resets settings so the app starts
- * setup again. The light/dark choice is kept: it's how the app looks, not data about shopping.
+ * setup again. The light/dark choice and the items' default sort are kept: they're how the app
+ * looks and behaves, not data about shopping.
  * Deleted documents are then purged from storage rather than left as tombstones.
  */
 export async function deleteAllData(db: AppDatabase): Promise<void> {
@@ -17,10 +18,12 @@ export async function deleteAllData(db: AppDatabase): Promise<void> {
 
   // Last: this sends the app back to setup, which should open on an empty database.
   const settings = await db.settings.findOne(SETTINGS_ID).exec();
-  await settings?.incrementalModify(({ colorScheme }) => ({
+  await settings?.incrementalModify(({ colorScheme, itemSort, itemSortDirection }) => ({
     id: SETTINGS_ID,
     setupComplete: false,
     ...(colorScheme ? { colorScheme } : {}),
+    ...(itemSort ? { itemSort } : {}),
+    ...(itemSortDirection ? { itemSortDirection } : {}),
   }));
 
   await Promise.all([db.trips, db.listEntries, db.items, db.stores].map((c) => c.cleanup(0)));

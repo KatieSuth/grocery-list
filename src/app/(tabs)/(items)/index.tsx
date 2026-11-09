@@ -25,9 +25,9 @@ import {
   hasSearchOrFilters,
   pruneFilter,
 } from '@/domain/item-filter';
-import { DEFAULT_DIRECTION, DEFAULT_SORT, sortItems, type ItemSort, type SortDirection } from '@/domain/item-sort';
+import { sortItems, type ItemSortChoice } from '@/domain/item-sort';
 import type { Item } from '@/domain/types';
-import { useItems, useListEntries, useStores } from '@/hooks/use-data';
+import { useItemSortChoice, useItems, useListEntries, useStores } from '@/hooks/use-data';
 
 /** A department heading or an item, when the list is grouped by department. */
 type Row = { type: 'heading'; key: string; title: string } | { type: 'item'; key: string; item: Item };
@@ -45,8 +45,12 @@ export default function MasterListScreen() {
   const stores = useStores();
   const entries = useListEntries();
   const [rawFilter, setFilter] = useState(EMPTY_FILTER);
-  const [sort, setSort] = useState<ItemSort>(DEFAULT_SORT);
-  const [direction, setDirection] = useState<SortDirection>(DEFAULT_DIRECTION);
+  const defaultSort = useItemSortChoice();
+  /**
+   * A sort chosen here, and the default it replaced. It only applies while that's still the
+   * default: choosing a new default in Settings shows the list that way.
+   */
+  const [chosenSort, setChosenSort] = useState<ItemSortChoice & { over: ItemSortChoice }>();
   /**
    * Quantity text as typed, by item id. Every row for an item (it can appear under several
    * departments) shows this, so the copies stay in step keystroke by keystroke. The saved value
@@ -58,7 +62,14 @@ export default function MasterListScreen() {
   // For "Last bought today": refreshed whenever the tab is shown, so it stays right across days.
   const [now, setNow] = useState(Date.now);
   useFocusEffect(useCallback(() => setNow(Date.now()), []));
-  if (!items || !stores || !entries) return null;
+  if (!items || !stores || !entries || !defaultSort) return null;
+
+  const { sort, direction } =
+    chosenSort?.over.sort === defaultSort.sort && chosenSort.over.direction === defaultSort.direction
+      ? chosenSort
+      : defaultSort;
+  const chooseSort = (choice: Partial<ItemSortChoice>) =>
+    setChosenSort({ sort, direction, ...choice, over: defaultSort });
 
   const options = getFilterOptions(items, stores);
   // Ignore selections for stores, departments or brands that have since been deleted.
@@ -105,12 +116,23 @@ export default function MasterListScreen() {
                 onChangeText={(query) => setFilter({ ...filter, query })}
               />
               <FilterButton count={filterCount} expanded={openPanel === 'filters'} onPress={() => toggle('filters')} />
-              <SortButton sort={sort} direction={direction} expanded={openPanel === 'sort'} onPress={() => toggle('sort')} />
+              <SortButton
+                sort={sort}
+                direction={direction}
+                defaultChoice={defaultSort}
+                expanded={openPanel === 'sort'}
+                onPress={() => toggle('sort')}
+              />
             </View>
 
             {openPanel === 'filters' ? <FilterPanel options={options} filter={filter} onChange={setFilter} /> : null}
             {openPanel === 'sort' ? (
-              <SortPanel sort={sort} direction={direction} onChangeSort={setSort} onChangeDirection={setDirection} />
+              <SortPanel
+                sort={sort}
+                direction={direction}
+                onChangeSort={(next) => chooseSort({ sort: next })}
+                onChangeDirection={(next) => chooseSort({ direction: next })}
+              />
             ) : null}
 
             {filterCount > 0 ? (

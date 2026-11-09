@@ -97,7 +97,7 @@ src/
       trip/index.tsx      "/trip"    Shopping trip: store dropdown, cart, Finish
       stores/index.tsx    "/stores"  Store configuration
       stores/form.tsx     "/stores/form"  → StoreFormScreen
-      settings/index.tsx  "/settings"  Light/dark/system appearance, Import from CSV, Delete all data
+      settings/index.tsx  "/settings"  Appearance, items' default sort, Import from CSV, Delete all data
   screens/                Screens used by more than one route
     store-form-screen.tsx Add / edit store (?id=), takes backTo
     item-form-screen.tsx  Add / edit item (?id=), takes backTo
@@ -118,7 +118,7 @@ src/
     stores-repo.ts        observe / save / delete stores (+ prune items)
     items-repo.ts         observe / save / delete items
     list-repo.ts          check / uncheck items, set quantity, cart marks
-    settings-repo.ts      setupComplete flag, trip store + reverse order, appearance
+    settings-repo.ts      setupComplete flag, trip store + reverse order, appearance, items' default sort
     trips-repo.ts         finishTrip(): log, set last bought, uncheck
     erase-repo.ts         deleteAllData(): delete and purge everything, back to setup
     import-repo.ts        applyImportPlan(): write a checked CSV import (add-only)
@@ -210,7 +210,7 @@ Five RxDB collections:
 | `stores` | 0 | `{ id, name, location?, departments: [{ id, name }], createdAt }` | Departments are embedded and ordered. Indexed on `createdAt`. |
 | `items` | 1 | `{ id, name, brand?, locations: [{ storeId, departmentId }], createdAt, lastBoughtAt? }` | Locations reference store and department ids. `lastBoughtAt` is set when a trip that included the item is finished, so the master list never reads the trip log. |
 | `listEntries` | 1 | `{ itemId, quantity?, checkedAt, inCartAt? }` | One per **checked** item; primary key is the item id. Unchecking deletes it, so a quantity never outlives its check. `inCartAt` marks it as checked off on the current trip. Deleting an item deletes its entry. |
-| `settings` | 2 | `{ id: 'app', setupComplete, tripStoreId?, tripReversed?, colorScheme? }` | Single document. Only change it through `settings-repo.ts`, which patches it. An `upsert` would wipe the other fields. |
+| `settings` | 3 | `{ id: 'app', setupComplete, tripStoreId?, tripReversed?, colorScheme?, itemSort?, itemSortDirection? }` | Single document. Only change it through `settings-repo.ts`, which patches it. An `upsert` would wipe the other fields. |
 | `trips` | 1 | `{ id, storeId, storeName, finishedAt, items: [{ itemId, name, brand?, quantity?, department }], pending? }` | The trip log: one document per finished trip. Names are copied so the record survives renames and deletions. `pending` is set only while a trip is being finished. Indexed on `finishedAt`. |
 
 IDs come from RxDB's `randomToken(16)`. Timestamps are epoch milliseconds.

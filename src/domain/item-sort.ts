@@ -14,8 +14,15 @@ export const ITEM_SORTS: readonly ItemSort[] = ['name', 'department', 'lastBough
  */
 export type SortDirection = 'asc' | 'desc';
 
+export const SORT_DIRECTIONS: readonly SortDirection[] = ['asc', 'desc'];
+
 export const DEFAULT_SORT: ItemSort = 'name';
 export const DEFAULT_DIRECTION: SortDirection = 'asc';
+
+/** How the master list is ordered when it opens: chosen in Settings. */
+export type ItemSortChoice = { sort: ItemSort; direction: SortDirection };
+
+export const DEFAULT_SORT_CHOICE: ItemSortChoice = { sort: DEFAULT_SORT, direction: DEFAULT_DIRECTION };
 
 export const SORT_LABELS: Record<ItemSort, string> = {
   name: 'Name',

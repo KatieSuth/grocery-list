@@ -1,6 +1,7 @@
 import type { RxJsonSchema } from 'rxdb';
 
 import { COLOR_SCHEME_CHOICES, type ColorSchemeChoice } from '@/domain/appearance';
+import { ITEM_SORTS, SORT_DIRECTIONS, type ItemSort, type SortDirection } from '@/domain/item-sort';
 import type { Item, ListEntry, Store, TripRecord } from '@/domain/types';
 
 export type SettingsDoc = {
@@ -12,6 +13,10 @@ export type SettingsDoc = {
   tripReversed?: boolean;
   /** Light, dark, or following the device. Absent means following the device. */
   colorScheme?: ColorSchemeChoice;
+  /** How the master list is sorted when it opens. Absent means by name. */
+  itemSort?: ItemSort;
+  /** Which way: A–Z / newest first ('asc'), or the reverse. Absent means 'asc'. */
+  itemSortDirection?: SortDirection;
 };
 
 export const SETTINGS_ID = 'app';
@@ -92,7 +97,7 @@ export const listEntrySchema: RxJsonSchema<ListEntry> = {
 
 export const settingsSchema: RxJsonSchema<SettingsDoc> = {
   title: 'settings',
-  version: 2,
+  version: 3,
   primaryKey: 'id',
   type: 'object',
   properties: {
@@ -101,6 +106,8 @@ export const settingsSchema: RxJsonSchema<SettingsDoc> = {
     tripStoreId: { type: 'string' },
     tripReversed: { type: 'boolean' },
     colorScheme: { type: 'string', enum: [...COLOR_SCHEME_CHOICES] },
+    itemSort: { type: 'string', enum: [...ITEM_SORTS] },
+    itemSortDirection: { type: 'string', enum: [...SORT_DIRECTIONS] },
   },
   required: ['id', 'setupComplete'],
 };
@@ -144,4 +151,4 @@ const unchanged = <T>(doc: T) => doc;
 export const addedOptionalFields = { 1: unchanged };
 
 /** Settings version 2 only added the optional colorScheme. */
-export const settingsMigrations = { 1: unchanged, 2: unchanged };
+export const settingsMigrations = { 1: unchanged, 2: unchanged, 3: unchanged };

@@ -147,3 +147,30 @@ test('settings from before the appearance choice are migrated, keeping the trip 
   expect((await db.settings.findOne('app').exec())?.colorScheme).toBe('dark');
   await db.close();
 });
+
+test('settings from before the default sort are migrated, keeping everything', async () => {
+  const { itemSchema, listEntrySchema, settingsSchema, storeSchema, tripSchema } = jest.requireActual('@/db/schema');
+  const { createAppDatabase } = jest.requireActual('@/db/database');
+  const storage = getRxStorageMemory();
+
+  const old = await openOldDatabase('presort', storage, {
+    stores: { schema: storeSchema },
+    items: { schema: itemSchema, migrationStrategies: { 1: keep } },
+    listEntries: { schema: listEntrySchema, migrationStrategies: { 1: keep } },
+    settings: {
+      schema: olderVersion(settingsSchema, 2, ['itemSort', 'itemSortDirection']),
+      migrationStrategies: { 1: keep, 2: keep },
+    },
+    trips: { schema: tripSchema, migrationStrategies: { 1: keep } },
+  });
+  const settings = { id: 'app', setupComplete: true, tripStoreId: 's1', tripReversed: true, colorScheme: 'dark' };
+  await old.settings.insert(settings);
+  await old.close();
+
+  const db = await createAppDatabase('presort', { storage });
+  const doc = await db.settings.findOne('app').exec();
+  expect(doc?.toJSON()).toEqual(settings);
+  await doc?.incrementalPatch({ itemSort: 'lastBought', itemSortDirection: 'desc' });
+  expect((await db.settings.findOne('app').exec())?.itemSort).toBe('lastBought');
+  await db.close();
+});

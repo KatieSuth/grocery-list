@@ -61,6 +61,11 @@ test('the settings tab offers system, light and dark appearance, following the s
     'Match system appearance',
     'Light mode',
     'Dark mode',
+    'Default sort: name',
+    'Default sort: department',
+    'Default sort: last bought',
+    'Default order: A to Z',
+    'Default order: Z to A',
   ]);
   expect(settings().getByRole('radio', { name: 'Match system appearance' })).toBeChecked();
   expect(settings().getByText('Follows your device’s light or dark setting.')).toBeOnTheScreen();
@@ -137,4 +142,51 @@ test('if deleting fails, it says so and can be tried again', async () => {
   await fireEvent.press(settings().getByRole('button', { name: 'Delete all data' }));
   expect(await screen.findByText('No stores yet')).toBeOnTheScreen();
   await purged(db);
+});
+
+test('the items list’s default sort can be chosen; it’s remembered and the Items tab opens that way', async () => {
+  const db = await renderApp({
+    seed: async (d) => {
+      await seed(d);
+      await d.items.insert({ id: 'i2', name: 'Apples', locations: [{ storeId: 's1', departmentId: 'd1' }], createdAt: 2 });
+    },
+  });
+  await openSettings();
+
+  // By name, A–Z, until changed.
+  expect(await settings().findByRole('radio', { name: 'Default sort: name' })).toBeChecked();
+  expect(settings().getByRole('radio', { name: 'Default order: A to Z' })).toBeChecked();
+  expect(settings().getByText(/How the Items tab is sorted when it opens/)).toBeOnTheScreen();
+
+  await fireEvent.press(settings().getByRole('radio', { name: 'Default sort: last bought' }));
+  await eventually(async () => expect((await db.settings.findOne('app').exec())?.itemSort).toBe('lastBought'));
+  // The order's names follow the sort.
+  expect(settings().getByRole('radio', { name: 'Default order: Newest first' })).toBeChecked();
+
+  await fireEvent.press(settings().getByRole('radio', { name: 'Default order: Oldest first' }));
+  await eventually(async () => expect((await db.settings.findOne('app').exec())?.itemSortDirection).toBe('desc'));
+  expect(settings().getByRole('radio', { name: 'Default sort: last bought' })).toBeChecked();
+
+  // The Items tab now shows last bought, oldest first.
+  await act(() => router.navigate('/'));
+  expect(await screen.findByRole('button', { name: 'Sort, by last bought, Oldest first' })).toBeOnTheScreen();
+});
+
+test('delete all data keeps the default sort', async () => {
+  answerAlertsWith('Delete everything');
+  const db = await renderApp({
+    seed: async (d) => {
+      await seed(d);
+      await d.settings.findOne('app').patch({ itemSort: 'department', itemSortDirection: 'desc' });
+    },
+  });
+  await openSettings();
+  await fireEvent.press(await settings().findByRole('button', { name: 'Delete all data' }));
+  await purged(db);
+  expect((await db.settings.findOne('app').exec())?.toJSON()).toEqual({
+    id: 'app',
+    setupComplete: false,
+    itemSort: 'department',
+    itemSortDirection: 'desc',
+  });
 });

@@ -1,16 +1,9 @@
 import { StyleSheet, View } from 'react-native';
 
-import { ChoiceChips } from '@/components/choice-chips';
+import { SortChoices } from '@/components/sort-choices';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import {
-  directionLabels,
-  directionSpoken,
-  ITEM_SORTS,
-  SORT_LABELS,
-  type ItemSort,
-  type SortDirection,
-} from '@/domain/item-sort';
+import type { ItemSort, SortDirection } from '@/domain/item-sort';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
@@ -24,25 +17,11 @@ type Props = {
 export function SortPanel({ sort, direction, onChangeSort, onChangeDirection }: Props) {
   return (
     <View style={[styles.panel, { backgroundColor: useTheme().backgroundElement }]}>
-      <ChoiceChips
-        title="Sort by"
-        choices={ITEM_SORTS.map((value) => ({
-          value,
-          label: SORT_LABELS[value],
-          spoken: `Sort by ${SORT_LABELS[value].toLowerCase()}`,
-        }))}
-        selected={sort}
-        onChange={onChangeSort}
-      />
-      <ChoiceChips
-        title="Order"
-        choices={(['asc', 'desc'] as const).map((value) => ({
-          value,
-          label: directionLabels(sort)[value],
-          spoken: directionSpoken(sort)[value],
-        }))}
-        selected={direction}
-        onChange={onChangeDirection}
+      <SortChoices
+        sort={sort}
+        direction={direction}
+        onChangeSort={onChangeSort}
+        onChangeDirection={onChangeDirection}
       />
       {sort === 'department' ? (
         <ThemedText type="small" themeColor="textSecondary">

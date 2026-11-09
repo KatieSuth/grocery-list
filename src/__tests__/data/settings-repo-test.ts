@@ -1,10 +1,12 @@
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, of } from 'rxjs';
 
 import {
   observeColorSchemeChoice,
+  observeItemSortChoice,
   observeSetupComplete,
   observeTripSettings,
   setColorSchemeChoice,
+  setItemSortChoice,
   setSetupComplete,
   setTripReversed,
   setTripStore,
@@ -45,4 +47,19 @@ test('the appearance follows the device until light or dark is chosen', async ()
   await setColorSchemeChoice(db, 'system');
   expect(await firstValueFrom(observeColorSchemeChoice(db))).toBe('system');
   expect(await firstValueFrom(observeSetupComplete(db))).toBe(false);
+});
+
+test('the items’ default sort is by name, A–Z, until chosen; it can be changed', async () => {
+  const db = await createTestDatabase();
+  expect(await firstValueFrom(observeItemSortChoice(db))).toEqual({ sort: 'name', direction: 'asc' });
+
+  await setItemSortChoice(db, { sort: 'lastBought', direction: 'desc' });
+  expect(await firstValueFrom(observeItemSortChoice(db))).toEqual({ sort: 'lastBought', direction: 'desc' });
+  expect((await db.settings.findOne('app').exec())?.toJSON()).toMatchObject({ itemSort: 'lastBought', itemSortDirection: 'desc' });
+});
+
+test('an unrecognised saved sort falls back to the default', async () => {
+  // e.g. written by a newer version of the app; production builds skip schema checks.
+  const db = { settings: { findOne: () => ({ $: of({ itemSort: 'price', itemSortDirection: 'sideways' }) }) } };
+  expect(await firstValueFrom(observeItemSortChoice(db as never))).toEqual({ sort: 'name', direction: 'asc' });
 });
