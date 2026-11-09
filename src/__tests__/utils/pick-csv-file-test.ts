@@ -1,4 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
+import { Platform } from 'react-native';
 
 import { MAX_IMPORT_BYTES } from '@/domain/csv-import';
 import { CSV_MIME_TYPES } from '@/utils/csv-file';
@@ -27,16 +28,24 @@ beforeEach(() => {
   mockFile.delete.mockReset();
 });
 
-test('picking a CSV reads it as text, then deletes the cached copy', async () => {
+test('picking a CSV reads it as text, then deletes any cached copy', async () => {
   pickerReturns(`${CACHE}DocumentPicker/list.csv`);
   expect(await pickCsvFile()).toEqual({ status: 'picked', text: 'Kroger,Milk,Dairy' });
-  // One file, CSV-ish types only, copied into the app's cache so the original isn't touched.
+  // One file, CSV-ish types only. Android reads the picked file through its content:// link
+  // (Expo Go can't read the picker's cached copy); iOS needs the copy to read it at all.
   expect(DocumentPicker.getDocumentAsync).toHaveBeenCalledWith({
     type: CSV_MIME_TYPES,
     multiple: false,
-    copyToCacheDirectory: true,
+    copyToCacheDirectory: Platform.OS !== 'android',
   });
   expect(mockFile.delete).toHaveBeenCalledTimes(1);
+});
+
+test('an empty file, or one whose size is unknown, is refused without being read', async () => {
+  pickerReturns('content://com.android.providers.downloads.documents/document/7');
+  mockFile.size = 0;
+  expect(await pickCsvFile()).toEqual({ status: 'error', message: 'That file is empty.' });
+  expect(mockFile.text).not.toHaveBeenCalled();
 });
 
 test('canceling the picker does nothing', async () => {

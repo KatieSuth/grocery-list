@@ -12,5 +12,6 @@ export const CSV_MIME_TYPES = [
 ];
 
 export const FILE_TOO_BIG = 'The file is too big. Import files of up to 1 MB.';
+export const FILE_EMPTY = 'That file is empty.';
 export const FILE_NOT_OPENED = 'That file couldn’t be opened.';
 export const FILE_NOT_READ = 'That file couldn’t be read.';
