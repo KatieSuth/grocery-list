@@ -33,6 +33,12 @@ export async function setTripStore(db: AppDatabase, storeId: string): Promise<vo
   await patchSettings(db, { tripStoreId: storeId });
 }
 
+/** Forgets the Trip tab's store, so the next trip starts by choosing one. */
+export async function clearTripStore(db: AppDatabase): Promise<void> {
+  const doc = await db.settings.findOne(SETTINGS_ID).exec();
+  await doc?.incrementalModify(({ tripStoreId: _cleared, ...rest }) => rest);
+}
+
 export async function setTripReversed(db: AppDatabase, reversed: boolean): Promise<void> {
   await patchSettings(db, { tripReversed: reversed });
 }

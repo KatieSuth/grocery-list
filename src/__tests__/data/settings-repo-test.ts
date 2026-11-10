@@ -1,6 +1,7 @@
 import { firstValueFrom, of } from 'rxjs';
 
 import {
+  clearTripStore,
   observeColorSchemeChoice,
   observeItemSortChoice,
   observeSetupComplete,
@@ -36,6 +37,20 @@ test('trip settings default to no store, usual order, and are kept separately fr
   await setTripReversed(db, true);
   await setSetupComplete(db, true);
   expect(await firstValueFrom(observeTripSettings(db))).toEqual({ storeId: 's1', reversed: true });
+  expect(await firstValueFrom(observeSetupComplete(db))).toBe(true);
+});
+
+test('clearing the trip store forgets only the store', async () => {
+  const db = await createTestDatabase();
+  // Nothing to clear before the settings document exists.
+  await clearTripStore(db);
+  expect(await firstValueFrom(observeTripSettings(db))).toEqual({ reversed: false });
+
+  await setTripStore(db, 's1');
+  await setTripReversed(db, true);
+  await setSetupComplete(db, true);
+  await clearTripStore(db);
+  expect(await firstValueFrom(observeTripSettings(db))).toEqual({ reversed: true });
   expect(await firstValueFrom(observeSetupComplete(db))).toBe(true);
 });
 

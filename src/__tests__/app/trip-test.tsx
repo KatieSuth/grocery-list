@@ -166,7 +166,11 @@ test('checking off keeps items on the list until the trip is finished and confir
   answerAlertsWith('Finish trip');
   await press('Finish trip');
   expect(await screen.findByText('Trip finished: 1 item logged as bought.')).toBeOnTheScreen();
-  await eventually(async () => expect(tripRows()).toEqual(['# Produce', 'Apples']));
+  // The trip is over, so the store is cleared and the next trip starts by choosing one.
+  expect(await screen.findByText('Where are you shopping?')).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'Choose a store' })).toBeOnTheScreen();
+  expect(screen.queryByRole('button', { name: 'Finish trip' })).toBeNull();
+  await eventually(async () => expect((await db.settings.findOne('app').exec())?.tripStoreId).toBeUndefined());
 
   const [logged] = (await db.trips.find().exec()).map((t) => t.toJSON());
   expect(logged).toMatchObject({
@@ -199,8 +203,7 @@ test('finishing with everything checked off says nothing about items left behind
     expect.any(Array),
   );
   expect(await screen.findByText('Trip finished: 2 items logged as bought.')).toBeOnTheScreen();
-  expect(await screen.findByText('Nothing to get at Corner Market')).toBeOnTheScreen();
-  expect(screen.getByText('Nothing to get here')).toBeOnTheScreen();
+  expect(await screen.findByText('Where are you shopping?')).toBeOnTheScreen();
 });
 
 test('switching stores with items checked off asks to finish first', async () => {
@@ -267,6 +270,18 @@ test('a deleted store is treated as no store chosen; several items elsewhere are
   expect(await screen.findByText('Where are you shopping?')).toBeOnTheScreen();
   await chooseStore('Big Box');
   expect(await screen.findByText("2 checked items aren't sold at Big Box.")).toBeOnTheScreen();
+});
+
+test('a store with nothing checked to get there says so', async () => {
+  await renderApp({
+    initialUrl: '/trip',
+    seed: async (db) => {
+      await seed(db, { tripStoreId: 'corner' });
+      await db.listEntries.find().remove();
+    },
+  });
+  expect(await screen.findByText('Nothing to get at Corner Market')).toBeOnTheScreen();
+  expect(screen.getByText('Nothing to get here')).toBeOnTheScreen();
 });
 
 test('if the cart empties while the confirmation is open, nothing is logged', async () => {

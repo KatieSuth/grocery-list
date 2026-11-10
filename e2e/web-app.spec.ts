@@ -360,7 +360,9 @@ test('a shopping trip: choose a store, check off, finish', async ({ page }) => {
   });
   await button(page, 'Finish trip').click();
   await expect(page.getByText('Trip finished: 1 item logged as bought.')).toBeVisible();
-  await expect(trip.getByRole('checkbox')).toHaveCount(1);
+  // The store is cleared for the next trip.
+  await expect(page.getByText('Where are you shopping?')).toBeVisible();
+  await expect(trip.getByRole('checkbox')).toHaveCount(0);
 
   // Milk is unchecked on the master list and shows when it was bought; Apples is still checked.
   await page.getByRole('tab', { name: 'Items' }).click();

@@ -11,7 +11,7 @@ import { ToggleSwitch } from '@/components/toggle-switch';
 import { TripItemRow } from '@/components/trip-item-row';
 import { Spacing } from '@/constants/theme';
 import { clearCart, setInCart } from '@/data/list-repo';
-import { setTripReversed, setTripStore } from '@/data/settings-repo';
+import { clearTripStore, setTripReversed, setTripStore } from '@/data/settings-repo';
 import { finishTrip } from '@/data/trips-repo';
 import { useDatabase } from '@/db/database-provider';
 import { buildTripList } from '@/domain/trip';
@@ -102,7 +102,11 @@ export default function TripScreen() {
         `${countItems(inCart)} you checked off will be logged as bought and unchecked from your list.` +
         (remaining > 0 ? ` ${countItems(remaining)} you didn't check off will stay on your list.` : ''),
       confirmLabel: 'Finish trip',
-      onConfirm: () => void finish(current),
+      // The trip is over, so the next one starts by choosing a store.
+      onConfirm: () =>
+        void finish(current).then(async (ok) => {
+          if (ok) await clearTripStore(db);
+        }),
     });
   };
 

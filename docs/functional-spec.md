@@ -260,9 +260,10 @@ After setup, the app has four tabs along the bottom:
   - A trip record is added to the log: the store, the time, and each item in the cart (name, brand, quantity and department at that moment).
   - Each of those items gets its **last bought** date set to now.
   - Those items are **unchecked** on the master list (their quantities go with them).
-  - Items that weren't checked off stay checked, and stay on the trip list.
+  - Items that weren't checked off stay checked on the master list.
+  - The chosen store is **cleared**, so the tab goes back to "Where are you shopping?" and the next trip starts by choosing a store. The Reverse order choice is kept.
   - The tab shows "Trip finished: 2 items logged as bought."
-- If saving fails: "Could not finish the trip. Please try again." The items stay in the cart, so the user can press Finish trip again.
+- If saving fails: "Could not finish the trip. Please try again." The store stays chosen and the items stay in the cart, so the user can press Finish trip again.
   - Finishing saves the log record first, marked as in progress, then updates the items, then marks the record done. If it's interrupted at any point (an error, or the app being closed), the next Finish completes **that same trip**. It is never logged twice and no items are lost.
   - If there's an unfinished trip, the next Finish completes it first. Anything put in the cart since is left there for the following Finish.
   - An item that was unchecked and checked again since the interrupted attempt keeps its new check.
@@ -502,6 +503,7 @@ The original request left these open. They are easy to revisit.
 | 32 | CSV import treats the file as untrusted: size, row, length and count limits; no hidden, control or direction-changing characters; values are only ever text (never numbers, formulas or code); ids always come from the app; on Android the chosen file is read in place (nothing is copied), and on iOS the picker's copy is deleted after reading. | The file comes from outside the app. The limits keep storage and screens (like the drag-to-reorder list) usable, and hidden characters could make two names look the same. Formula characters (`=`, `+`, `-`, `@`) are allowed because the app never writes spreadsheets; a future export must escape them. |
 | 33 | An item that's in a different department at a store than the CSV says blocks the import instead of moving the item. (Chosen with the user.) | Moving items without asking could quietly change the shopping order. |
 | 34 | The items' default sort is set in Settings; sorting on the Items tab stays temporary. Delete all data keeps the default. (Requested by the user.) | A quick re-sort while shopping shouldn't change how the list usually opens. Like the appearance choice, the default is a preference, not shopping data. |
+| 35 | Finish trip clears the chosen store; Finish and switch moves to the new one. | A trip is one visit. The next visit may be to a different store, so the Trip tab shouldn't assume the last one. |
 
 ---
 
