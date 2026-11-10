@@ -294,7 +294,8 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
 **Search and filters**
 - **Search** ("Search items") narrows the list as the user types. It matches anywhere in the item **name**, ignoring case and extra spaces ("mil" finds "Whole Milk"). It doesn't search brands.
 - An **✕** in the search box clears the search.
-- The **filter button** (a filter icon) opens and closes a panel with three groups of options:
+- The **filter button** (a filter icon) opens and closes a panel with four groups of options:
+  - **Show:** **All**, **Checked** or **Unchecked** items; exactly one is picked, All by default. Checked or Unchecked counts as one filter. While Unchecked is picked, checking an item takes it off the list (and Checked, the other way round).
   - **Stores:** every store, in store order.
   - **Departments:** every department name across all stores, alphabetical. A name used by several stores (e.g. Deli) appears **once** and matches that department in every store.
   - **Brands:** every brand across all items, alphabetical, **once** each. "Acme" and "acme" count as one brand. The label is the most common spelling; on a tie, the one starting with a capital letter.
@@ -305,7 +306,7 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
   - Store and department are checked on the **same location**: Big Box + Deli shows items in the Deli *at Big Box*, not items that are at Big Box and also in some store's Deli.
 - **While filters are on:**
   - The filter button shows a badge with the number of options picked.
-  - A "N filter(s) on" line with a **Clear filters** button appears, even with the panel closed. Clear filters removes all picks but keeps the search text.
+  - A "N filter(s) on" line with a **Clear filters** button appears, even with the panel closed. Clear filters removes all picks (and sets Show back to All) but keeps the search text.
 - While searching or filtering, "Showing X of Y items" appears.
 - If nothing matches: "No matching items", with a **Clear search and filters** button.
 - Picks for a store, department or brand that has since been deleted are dropped automatically.

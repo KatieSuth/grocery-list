@@ -1,6 +1,9 @@
 import { nameKey, normalizeText } from '@/utils/text';
 
-import type { Item, Store } from './types';
+import type { Item, ListEntry, Store } from './types';
+
+/** Whether to show every item, only checked ones, or only unchecked ones. */
+export type CheckedFilter = 'all' | 'checked' | 'unchecked';
 
 /** Search and filter state for the master list. */
 export type ItemFilter = {
@@ -12,9 +15,11 @@ export type ItemFilter = {
   departments: string[];
   /** Selected brand keys (see nameKey). */
   brands: string[];
+  /** Checked state to show. */
+  checked: CheckedFilter;
 };
 
-export const EMPTY_FILTER: ItemFilter = { query: '', storeIds: [], departments: [], brands: [] };
+export const EMPTY_FILTER: ItemFilter = { query: '', storeIds: [], departments: [], brands: [], checked: 'all' };
 
 export type FilterOption = { key: string; label: string };
 
@@ -71,12 +76,15 @@ export function pruneFilter(filter: ItemFilter, options: FilterOptions): ItemFil
     storeIds: keep(filter.storeIds, options.stores),
     departments: keep(filter.departments, options.departments),
     brands: keep(filter.brands, options.brands),
+    checked: filter.checked,
   };
 }
 
-/** Number of selected filter options (not counting the search text). */
+/** Number of selected filter options (not counting the search text). Checked or unchecked counts as one. */
 export function activeFilterCount(filter: ItemFilter): number {
-  return filter.storeIds.length + filter.departments.length + filter.brands.length;
+  return (
+    filter.storeIds.length + filter.departments.length + filter.brands.length + (filter.checked === 'all' ? 0 : 1)
+  );
 }
 
 export function hasSearchOrFilters(filter: ItemFilter): boolean {
@@ -90,13 +98,19 @@ export function toggleKey(list: string[], key: string): string[] {
 
 /**
  * Items matching the search and filters.
+ * - Checked: an item is checked when it has a list entry.
  * - Search: the item name contains the query (ignoring case and spacing).
  * - Within a filter group, any selected option matches (Deli OR Bakery).
  * - Across groups, all must match (brand AND location).
  * - Store and department are checked on the same location: "Corner Market" + "Deli" means the
  *   item is in the Deli at Corner Market.
  */
-export function applyItemFilter(items: Item[], stores: Store[], filter: ItemFilter): Item[] {
+export function applyItemFilter(
+  items: Item[],
+  stores: Store[],
+  entries: Record<string, ListEntry | undefined>,
+  filter: ItemFilter,
+): Item[] {
   const query = nameKey(filter.query);
   const storeIds = new Set(filter.storeIds);
   const departments = new Set(filter.departments);
@@ -108,6 +122,7 @@ export function applyItemFilter(items: Item[], stores: Store[], filter: ItemFilt
   };
 
   return items.filter((item) => {
+    if (filter.checked !== 'all' && !!entries[item.id] !== (filter.checked === 'checked')) return false;
     if (query && !nameKey(item.name).includes(query)) return false;
     if (brands.size > 0 && !(item.brand && brands.has(nameKey(item.brand)))) return false;
     if (storeIds.size === 0 && departments.size === 0) return true;

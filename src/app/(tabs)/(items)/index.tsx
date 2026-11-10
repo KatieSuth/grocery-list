@@ -76,7 +76,7 @@ export default function MasterListScreen() {
   const filter = pruneFilter(rawFilter, options);
   const filterCount = activeFilterCount(filter);
   const narrowed = hasSearchOrFilters(filter);
-  const visible = applyItemFilter(items, stores, filter);
+  const visible = applyItemFilter(items, stores, entries, filter);
   const rows: Row[] = sortItems(visible, stores, sort, direction, filter).flatMap((group) => [
     ...(group.title === null ? [] : [{ type: 'heading' as const, key: `heading:${group.key}`, title: group.title }]),
     // An item can be in several groups, so its row key includes the group.

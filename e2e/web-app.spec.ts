@@ -223,6 +223,20 @@ test('the master list can be searched and filtered', async ({ page }) => {
   await button(page, 'Clear filters').click();
   await expect(page.getByRole('checkbox', { name: 'Milk' })).toBeVisible();
 
+  // Show only checked, then only unchecked items.
+  await page.getByRole('checkbox', { name: 'Milk' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Milk' })).toBeChecked();
+  await page.getByRole('radio', { name: 'Checked items only', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: 'Bagels' })).toHaveCount(0);
+  await expect(page.getByRole('checkbox', { name: 'Milk' })).toBeVisible();
+  await page.getByRole('radio', { name: 'Unchecked items only' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Milk' })).toHaveCount(0);
+  await expect(page.getByRole('checkbox', { name: 'Bagels' })).toBeVisible();
+  await button(page, 'Clear filters').click();
+  await expect(page.getByRole('checkbox', { name: 'Milk' })).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Milk' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Milk' })).not.toBeChecked();
+
   // Sort by department: grouped under headings, departments A–Z.
   await button(page, 'Filters').click(); // close the panel, so its chips aren't counted below
   await button(page, 'Add an item').click();

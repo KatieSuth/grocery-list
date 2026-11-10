@@ -1,8 +1,15 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { ChoiceChips } from '@/components/choice-chips';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { toggleKey, type FilterOption, type FilterOptions, type ItemFilter } from '@/domain/item-filter';
+import {
+  toggleKey,
+  type CheckedFilter,
+  type FilterOption,
+  type FilterOptions,
+  type ItemFilter,
+} from '@/domain/item-filter';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
@@ -11,11 +18,23 @@ type Props = {
   onChange: (filter: ItemFilter) => void;
 };
 
-/** Store, department and brand options for narrowing the master list. */
+const CHECKED_CHOICES: { value: CheckedFilter; label: string; spoken: string }[] = [
+  { value: 'all', label: 'All', spoken: 'All items' },
+  { value: 'checked', label: 'Checked', spoken: 'Checked items only' },
+  { value: 'unchecked', label: 'Unchecked', spoken: 'Unchecked items only' },
+];
+
+/** Checked state, store, department and brand options for narrowing the master list. */
 export function FilterPanel({ options, filter, onChange }: Props) {
   const theme = useTheme();
   return (
     <View style={[styles.panel, { backgroundColor: theme.backgroundElement }]}>
+      <ChoiceChips
+        title="Show"
+        choices={CHECKED_CHOICES}
+        selected={filter.checked}
+        onChange={(checked) => onChange({ ...filter, checked })}
+      />
       <FilterGroup
         title="Stores"
         empty="No stores yet."

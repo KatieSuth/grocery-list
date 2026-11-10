@@ -8,7 +8,7 @@ import {
   toggleKey,
   type ItemFilter,
 } from '@/domain/item-filter';
-import type { Item, Store } from '@/domain/types';
+import type { Item, ListEntry, Store } from '@/domain/types';
 
 const stores: Store[] = [
   {
@@ -50,8 +50,13 @@ const items = [
   item('bread', 'Bread', undefined, []),
 ];
 
+const entries: Record<string, ListEntry> = {
+  milk: { itemId: 'milk', checkedAt: 1 },
+  peas: { itemId: 'peas', quantity: '2', checkedAt: 2 },
+};
+
 const ids = (filter: Partial<ItemFilter>) =>
-  applyItemFilter(items, stores, { ...EMPTY_FILTER, ...filter }).map((i) => i.id);
+  applyItemFilter(items, stores, entries, { ...EMPTY_FILTER, ...filter }).map((i) => i.id);
 
 describe('getFilterOptions', () => {
   test('lists every store, and each department and brand once', () => {
@@ -120,7 +125,18 @@ describe('applyItemFilter', () => {
 
   test('locations pointing at a missing department do not match a department filter', () => {
     const orphan = [item('x', 'X', undefined, [['corner', 'gone']])];
-    expect(applyItemFilter(orphan, stores, { ...EMPTY_FILTER, departments: ['deli'] })).toEqual([]);
+    expect(applyItemFilter(orphan, stores, {}, { ...EMPTY_FILTER, departments: ['deli'] })).toEqual([]);
+  });
+
+  test('checked shows only checked items, unchecked only the rest', () => {
+    expect(ids({ checked: 'checked' })).toEqual(['milk', 'peas']);
+    expect(ids({ checked: 'unchecked' })).toEqual(['ham', 'apples', 'bread']);
+    expect(ids({ checked: 'all' })).toEqual(['milk', 'ham', 'peas', 'apples', 'bread']);
+  });
+
+  test('checked state is combined with the other filters with AND', () => {
+    expect(ids({ checked: 'checked', storeIds: ['bigbox'] })).toEqual(['peas']);
+    expect(ids({ checked: 'unchecked', brands: ['acme'] })).toEqual(['ham']);
   });
 });
 
@@ -128,19 +144,30 @@ test('pruneFilter drops selections that no longer exist, keeping the search', ()
   const options = getFilterOptions(items, stores);
   expect(
     pruneFilter(
-      { query: 'x', storeIds: ['corner', 'gone'], departments: ['deli', 'bakery'], brands: ['acme', 'old brand'] },
+      {
+        query: 'x',
+        storeIds: ['corner', 'gone'],
+        departments: ['deli', 'bakery'],
+        brands: ['acme', 'old brand'],
+        checked: 'unchecked',
+      },
       options,
     ),
-  ).toEqual({ query: 'x', storeIds: ['corner'], departments: ['deli'], brands: ['acme'] });
+  ).toEqual({ query: 'x', storeIds: ['corner'], departments: ['deli'], brands: ['acme'], checked: 'unchecked' });
 });
 
 test('activeFilterCount and hasSearchOrFilters', () => {
   expect(activeFilterCount(EMPTY_FILTER)).toBe(0);
-  expect(activeFilterCount({ query: 'x', storeIds: ['a'], departments: ['b', 'c'], brands: ['d'] })).toBe(4);
+  expect(
+    activeFilterCount({ query: 'x', storeIds: ['a'], departments: ['b', 'c'], brands: ['d'], checked: 'all' }),
+  ).toBe(4);
+  expect(activeFilterCount({ ...EMPTY_FILTER, checked: 'checked' })).toBe(1);
+  expect(activeFilterCount({ ...EMPTY_FILTER, checked: 'unchecked', brands: ['d'] })).toBe(2);
   expect(hasSearchOrFilters(EMPTY_FILTER)).toBe(false);
   expect(hasSearchOrFilters({ ...EMPTY_FILTER, query: '  ' })).toBe(false);
   expect(hasSearchOrFilters({ ...EMPTY_FILTER, query: 'a' })).toBe(true);
   expect(hasSearchOrFilters({ ...EMPTY_FILTER, brands: ['a'] })).toBe(true);
+  expect(hasSearchOrFilters({ ...EMPTY_FILTER, checked: 'unchecked' })).toBe(true);
 });
 
 test('toggleKey adds and removes', () => {

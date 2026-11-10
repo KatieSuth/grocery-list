@@ -160,6 +160,46 @@ test('filters on deleted stores stop applying', async () => {
   expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
 });
 
+test('Show: checked or unchecked items only, or all; it counts as a filter', async () => {
+  await renderApp({ seed });
+  await openItems();
+  await fireEvent.press(screen.getByRole('checkbox', { name: 'Milk' }));
+  await fireEvent.press(screen.getByRole('checkbox', { name: 'Peas' }));
+  await eventually(async () => expect(screen.getByRole('checkbox', { name: 'Peas' })).toBeChecked());
+
+  await press('Filters');
+  expect(screen.getByRole('radio', { name: 'All items' })).toBeChecked();
+
+  await fireEvent.press(screen.getByRole('radio', { name: 'Checked items only' }));
+  expect(screen.getByRole('radio', { name: 'Checked items only' })).toBeChecked();
+  expect(visibleItems()).toEqual(['Milk', 'Peas']);
+  expect(screen.getByText('1 filter on')).toBeOnTheScreen();
+  expect(screen.getByText('Showing 2 of 4 items')).toBeOnTheScreen();
+
+  // Combines with other filters.
+  await fireEvent.press(screen.getByRole('checkbox', { name: 'Stores: Big Box' }));
+  expect(visibleItems()).toEqual(['Peas']);
+  expect(screen.getByText('2 filters on')).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('checkbox', { name: 'Stores: Big Box' }));
+
+  await fireEvent.press(screen.getByRole('radio', { name: 'Unchecked items only' }));
+  expect(visibleItems()).toEqual(['Apples', 'Ham']);
+
+  // Checking an item while showing unchecked items takes it off the list.
+  await fireEvent.press(screen.getByRole('checkbox', { name: 'Ham' }));
+  await eventually(async () => expect(visibleItems()).toEqual(['Apples']));
+
+  await fireEvent.press(screen.getByRole('radio', { name: 'All items' }));
+  expect(visibleItems()).toEqual(['Apples', 'Ham', 'Milk', 'Peas']);
+  expect(screen.queryByText(/filters? on$/)).toBeNull();
+
+  // Clear filters goes back to All.
+  await fireEvent.press(screen.getByRole('radio', { name: 'Checked items only' }));
+  await press('Clear filters');
+  expect(screen.getByRole('radio', { name: 'All items' })).toBeChecked();
+  expect(visibleItems()).toEqual(['Apples', 'Ham', 'Milk', 'Peas']);
+});
+
 test('the filter panel explains when there is nothing to filter by', async () => {
   await renderApp({
     seed: async (db) => {

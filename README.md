@@ -108,7 +108,7 @@ src/
     item-draft.ts         Item form state + validation, location pruning
     describe.ts           "Store · Dept" display text
     quantity.ts           Free-text quantity cleanup
-    item-filter.ts        Master-list search + store/department/brand filters
+    item-filter.ts        Master-list search + checked/store/department/brand filters
     item-sort.ts          Master-list sort: by name, department or last bought; either direction
     trip.ts               Trip list: checked items at a store, by department in walking order
     last-bought.ts        "Last bought yesterday" text
