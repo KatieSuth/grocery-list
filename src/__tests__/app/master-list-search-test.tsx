@@ -49,6 +49,12 @@ const openItems = async () => {
   await screen.findByRole('checkbox', { name: 'Milk' });
 };
 
+/** Opens the filter panel with the store, department and brand groups expanded. */
+const openFilters = async () => {
+  await press('Filters');
+  for (const group of ['Stores', 'Departments', 'Brands']) await press(group);
+};
+
 /** Names of the item rows shown (filter chips are checkboxes too, labelled "Group: option"). */
 const visibleItems = () =>
   screen
@@ -92,7 +98,7 @@ test('the filter panel lists each store, department and brand once', async () =>
   await openItems();
   expect(screen.queryByText('Departments')).toBeNull();
 
-  await press('Filters');
+  await openFilters();
   expect(screen.getByRole('button', { name: 'Filters' })).toBeExpanded();
 
   const options = (group: string) =>
@@ -110,10 +116,44 @@ test('the filter panel lists each store, department and brand once', async () =>
   expect(screen.getByRole('button', { name: 'Filters' })).not.toBeExpanded();
 });
 
-test('filters narrow the list and combine; Clear filters resets them but keeps the search', async () => {
+test('the store, department and brand groups collapse, and open by themselves when they have picks', async () => {
   await renderApp({ seed });
   await openItems();
   await press('Filters');
+
+  // Collapsed at first; Show is always open.
+  for (const group of ['Stores', 'Departments', 'Brands']) {
+    expect(screen.getByRole('button', { name: group })).not.toBeExpanded();
+  }
+  expect(screen.queryByRole('checkbox', { name: /: / })).toBeNull();
+  expect(screen.getByRole('radio', { name: 'All items' })).toBeOnTheScreen();
+
+  await press('Departments');
+  expect(screen.getByRole('button', { name: 'Departments' })).toBeExpanded();
+  expect(screen.getByRole('checkbox', { name: 'Departments: Deli' })).toBeOnTheScreen();
+  expect(screen.queryByRole('checkbox', { name: /^Stores: / })).toBeNull();
+
+  // Collapsing keeps the picks, and says how many there are.
+  await fireEvent.press(screen.getByRole('checkbox', { name: 'Departments: Deli' }));
+  await fireEvent.press(screen.getByRole('checkbox', { name: 'Departments: Frozen' }));
+  await press('Departments, 2 on');
+  expect(screen.getByRole('button', { name: 'Departments, 2 on' })).not.toBeExpanded();
+  expect(screen.queryByRole('checkbox', { name: /^Departments: / })).toBeNull();
+  expect(screen.getByText('2 on')).toBeOnTheScreen();
+  expect(visibleItems()).toEqual(['Ham', 'Milk', 'Peas']);
+
+  // Reopening the panel shows groups with picks expanded, and the rest collapsed.
+  await press('Filters, 2 on');
+  await press('Filters, 2 on');
+  expect(screen.getByRole('button', { name: 'Departments, 2 on' })).toBeExpanded();
+  expect(screen.getByRole('checkbox', { name: 'Departments: Deli' })).toBeChecked();
+  expect(screen.getByRole('button', { name: 'Stores' })).not.toBeExpanded();
+});
+
+test('filters narrow the list and combine; Clear filters resets them but keeps the search', async () => {
+  await renderApp({ seed });
+  await openItems();
+  await openFilters();
 
   // A department across all stores.
   await fireEvent.press(screen.getByRole('checkbox', { name: 'Departments: Deli' }));
@@ -149,7 +189,7 @@ test('filters narrow the list and combine; Clear filters resets them but keeps t
 test('filters on deleted stores stop applying', async () => {
   const db = await renderApp({ seed });
   await openItems();
-  await press('Filters');
+  await openFilters();
   await fireEvent.press(screen.getByRole('checkbox', { name: 'Stores: Corner Market' }));
   expect(visibleItems()).toEqual(['Apples', 'Milk']);
 
@@ -167,7 +207,7 @@ test('Show: checked or unchecked items only, or all; it counts as a filter', asy
   await fireEvent.press(screen.getByRole('checkbox', { name: 'Peas' }));
   await eventually(async () => expect(screen.getByRole('checkbox', { name: 'Peas' })).toBeChecked());
 
-  await press('Filters');
+  await openFilters();
   expect(screen.getByRole('radio', { name: 'All items' })).toBeChecked();
 
   await fireEvent.press(screen.getByRole('radio', { name: 'Checked items only' }));
@@ -207,7 +247,7 @@ test('the filter panel explains when there is nothing to filter by', async () =>
     },
   });
   await act(() => router.navigate('/'));
-  await press('Filters');
+  await openFilters();
   expect(screen.getByText('No stores yet.')).toBeOnTheScreen();
   expect(screen.getByText('No departments yet.')).toBeOnTheScreen();
   expect(screen.getByText('No items have a brand yet.')).toBeOnTheScreen();
@@ -232,7 +272,7 @@ test('the sort button switches between name and department, A–Z or Z–A', asy
   expect(screen.queryByText('Sort by')).toBeNull();
 
   // Opening sort closes filters, and the other way round.
-  await press('Filters');
+  await openFilters();
   expect(screen.getByRole('checkbox', { name: 'Stores: Big Box' })).toBeOnTheScreen();
   await fireEvent.press(sortButton());
   expect(screen.queryByRole('checkbox', { name: 'Stores: Big Box' })).toBeNull();

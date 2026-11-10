@@ -299,6 +299,7 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
   - **Stores:** every store, in store order.
   - **Departments:** every department name across all stores, alphabetical. A name used by several stores (e.g. Deli) appears **once** and matches that department in every store.
   - **Brands:** every brand across all items, alphabetical, **once** each. "Acme" and "acme" count as one brand. The label is the most common spelling; on a tie, the one starting with a capital letter.
+  - Show is always open. Stores, Departments and Brands are **collapsible**: tap a group's heading to show or hide its options. They start collapsed each time the panel opens, except a group with options picked, which starts open. A collapsed group with picks says how many ("2 on"). Collapsing a group keeps its picks.
   - A group with nothing in it says so ("No stores yet.", "No departments yet.", "No items have a brand yet.").
 - **Combining:**
   - Options picked within a group widen the list: Deli *or* Bakery.

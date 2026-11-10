@@ -216,6 +216,8 @@ test('the master list can be searched and filtered', async ({ page }) => {
 
   // Filter by department, then clear.
   await button(page, 'Filters').click();
+  await expect(page.getByRole('checkbox', { name: 'Departments: Bakery' })).toHaveCount(0);
+  await button(page, 'Departments').click();
   await page.getByRole('checkbox', { name: 'Departments: Bakery' }).click();
   await expect(page.getByRole('checkbox', { name: 'Milk' })).toHaveCount(0);
   await expect(page.getByRole('checkbox', { name: 'Bagels' })).toBeVisible();

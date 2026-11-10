@@ -1,6 +1,9 @@
+import { SymbolView } from 'expo-symbols';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ChoiceChips } from '@/components/choice-chips';
+import { pressOpacity } from '@/components/press-feedback';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import {
@@ -24,7 +27,10 @@ const CHECKED_CHOICES: { value: CheckedFilter; label: string; spoken: string }[]
   { value: 'unchecked', label: 'Unchecked', spoken: 'Unchecked items only' },
 ];
 
-/** Checked state, store, department and brand options for narrowing the master list. */
+/**
+ * Checked state, store, department and brand options for narrowing the master list. The store,
+ * department and brand groups can be collapsed.
+ */
 export function FilterPanel({ options, filter, onChange }: Props) {
   const theme = useTheme();
   return (
@@ -68,17 +74,46 @@ type GroupProps = {
   onToggle: (key: string) => void;
 };
 
+/**
+ * A collapsible group of options. It starts collapsed unless something in it is picked, so
+ * reopening the panel shows the current picks.
+ */
 function FilterGroup({ title, empty, options, selected, onToggle }: GroupProps) {
   const theme = useTheme();
+  const [expanded, setExpanded] = useState(selected.length > 0);
+  const count = selected.length;
   return (
-    <View style={styles.group} accessibilityLabel={`Filter by ${title.toLowerCase()}`}>
-      <ThemedText type="smallBold">{title}</ThemedText>
-      {options.length === 0 ? (
+    <View style={styles.group}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={count > 0 ? `${title}, ${count} on` : title}
+        aria-expanded={expanded}
+        onPress={() => setExpanded(!expanded)}
+        style={({ pressed }) => [styles.header, { opacity: pressOpacity(pressed) }]}>
+        <ThemedText type="smallBold" style={styles.title}>
+          {title}
+        </ThemedText>
+        {count > 0 ? (
+          <ThemedText type="small" style={{ color: theme.tint }}>
+            {count} on
+          </ThemedText>
+        ) : null}
+        <SymbolView
+          name={{
+            ios: expanded ? 'chevron.up' : 'chevron.down',
+            android: expanded ? 'expand_less' : 'expand_more',
+            web: expanded ? 'expand_less' : 'expand_more',
+          }}
+          tintColor={theme.text}
+          size={20}
+        />
+      </Pressable>
+      {!expanded ? null : options.length === 0 ? (
         <ThemedText type="small" themeColor="textSecondary">
           {empty}
         </ThemedText>
       ) : (
-        <View style={styles.chips}>
+        <View style={styles.chips} accessibilityLabel={`Filter by ${title.toLowerCase()}`}>
           {options.map((option) => {
             const on = selected.includes(option.key);
             return (
@@ -107,6 +142,8 @@ function FilterGroup({ title, empty, options, selected, onToggle }: GroupProps) 
 const styles = StyleSheet.create({
   panel: { borderRadius: 12, padding: Spacing.three, gap: Spacing.three },
   group: { gap: Spacing.two },
+  header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, minHeight: 44 },
+  title: { flex: 1 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   chip: {
     minHeight: 36,
