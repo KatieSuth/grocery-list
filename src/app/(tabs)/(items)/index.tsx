@@ -8,8 +8,6 @@ import { FilterButton } from '@/components/filter-button';
 import { FilterPanel } from '@/components/filter-panel';
 import { MasterItemRow } from '@/components/master-item-row';
 import { SearchField } from '@/components/search-field';
-import { SortButton } from '@/components/sort-button';
-import { SortPanel } from '@/components/sort-panel';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -31,9 +29,6 @@ import { useItemSortChoice, useItems, useListEntries, useStores } from '@/hooks/
 
 /** A department heading or an item, when the list is grouped by department. */
 type Row = { type: 'heading'; key: string; title: string } | { type: 'item'; key: string; item: Item };
-
-/** Which panel under the search row is open, if any. */
-type OpenPanel = 'filters' | 'sort' | null;
 
 /**
  * The master list: every item, searchable, filterable and sortable, with a checkbox and
@@ -57,8 +52,7 @@ export default function MasterListScreen() {
    * is tidied up (trimmed), so it can't drive the field directly while typing.
    */
   const [typedQuantities, setTypedQuantities] = useState<Record<string, string>>({});
-  const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
-  const toggle = (panel: Exclude<OpenPanel, null>) => setOpenPanel(openPanel === panel ? null : panel);
+  const [panelOpen, setPanelOpen] = useState(false);
   // For "Last bought today": refreshed whenever the tab is shown, so it stays right across days.
   const [now, setNow] = useState(Date.now);
   useFocusEffect(useCallback(() => setNow(Date.now()), []));
@@ -115,19 +109,21 @@ export default function MasterListScreen() {
                 value={filter.query}
                 onChangeText={(query) => setFilter({ ...filter, query })}
               />
-              <FilterButton count={filterCount} expanded={openPanel === 'filters'} onPress={() => toggle('filters')} />
-              <SortButton
+              <FilterButton
+                count={filterCount}
                 sort={sort}
                 direction={direction}
                 defaultChoice={defaultSort}
-                expanded={openPanel === 'sort'}
-                onPress={() => toggle('sort')}
+                expanded={panelOpen}
+                onPress={() => setPanelOpen(!panelOpen)}
               />
             </View>
 
-            {openPanel === 'filters' ? <FilterPanel options={options} filter={filter} onChange={setFilter} /> : null}
-            {openPanel === 'sort' ? (
-              <SortPanel
+            {panelOpen ? (
+              <FilterPanel
+                options={options}
+                filter={filter}
+                onChange={setFilter}
                 sort={sort}
                 direction={direction}
                 onChangeSort={(next) => chooseSort({ sort: next })}

@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ChoiceChips } from '@/components/choice-chips';
 import { pressOpacity } from '@/components/press-feedback';
+import { SortChoices } from '@/components/sort-choices';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import {
@@ -13,12 +14,17 @@ import {
   type FilterOptions,
   type ItemFilter,
 } from '@/domain/item-filter';
+import type { ItemSort, SortDirection } from '@/domain/item-sort';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
   options: FilterOptions;
   filter: ItemFilter;
   onChange: (filter: ItemFilter) => void;
+  sort: ItemSort;
+  direction: SortDirection;
+  onChangeSort: (sort: ItemSort) => void;
+  onChangeDirection: (direction: SortDirection) => void;
 };
 
 const CHECKED_CHOICES: { value: CheckedFilter; label: string; spoken: string }[] = [
@@ -28,13 +34,19 @@ const CHECKED_CHOICES: { value: CheckedFilter; label: string; spoken: string }[]
 ];
 
 /**
- * Checked state, store, department and brand options for narrowing the master list. The store,
- * department and brand groups can be collapsed.
+ * How the master list is sorted, then the checked state, store, department and brand options for
+ * narrowing it. The store, department and brand groups can be collapsed.
  */
-export function FilterPanel({ options, filter, onChange }: Props) {
+export function FilterPanel({ options, filter, onChange, sort, direction, onChangeSort, onChangeDirection }: Props) {
   const theme = useTheme();
   return (
     <View style={[styles.panel, { backgroundColor: theme.backgroundElement }]}>
+      <SortChoices sort={sort} direction={direction} onChangeSort={onChangeSort} onChangeDirection={onChangeDirection} />
+      {sort === 'department' ? (
+        <ThemedText type="small" themeColor="textSecondary">
+          Items in more than one department are listed under each. Checking one checks them all.
+        </ThemedText>
+      ) : null}
       <ChoiceChips
         title="Show"
         choices={CHECKED_CHOICES}

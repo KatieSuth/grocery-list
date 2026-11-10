@@ -169,7 +169,7 @@ test('the items list’s default sort can be chosen; it’s remembered and the I
 
   // The Items tab now shows last bought, oldest first.
   await act(() => router.navigate('/'));
-  expect(await screen.findByRole('button', { name: 'Sort, by last bought, Oldest first' })).toBeOnTheScreen();
+  expect(await screen.findByRole('button', { name: 'Sort and filter, by last bought, Oldest first' })).toBeOnTheScreen();
 });
 
 test('delete all data keeps the default sort', async () => {

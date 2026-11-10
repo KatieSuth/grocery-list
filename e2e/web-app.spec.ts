@@ -215,7 +215,7 @@ test('the master list can be searched and filtered', async ({ page }) => {
   await expect(page.getByRole('checkbox', { name: 'Bagels' })).toBeVisible();
 
   // Filter by department, then clear.
-  await button(page, 'Filters').click();
+  await button(page, 'Sort and filter, by name, A to Z').click();
   await expect(page.getByRole('checkbox', { name: 'Departments: Bakery' })).toHaveCount(0);
   await button(page, 'Departments').click();
   await page.getByRole('checkbox', { name: 'Departments: Bakery' }).click();
@@ -240,7 +240,7 @@ test('the master list can be searched and filtered', async ({ page }) => {
   await expect(page.getByRole('checkbox', { name: 'Milk' })).not.toBeChecked();
 
   // Sort by department: grouped under headings, departments A–Z.
-  await button(page, 'Filters').click(); // close the panel, so its chips aren't counted below
+  await button(page, 'Sort and filter, by name, A to Z').click(); // close the panel, so its chips aren't counted below
   await button(page, 'Add an item').click();
   await page.getByLabel('Item name').fill('Apples');
   await page.getByRole('checkbox', { name: 'Corner Market' }).click();
@@ -250,12 +250,12 @@ test('the master list can be searched and filtered', async ({ page }) => {
     expect.poll(() => page.getByRole('checkbox').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))));
   await itemOrder().toEqual(['Apples', 'Bagels', 'Milk']);
 
-  await button(page, 'Sort, by name, A to Z').click();
+  await button(page, 'Sort and filter, by name, A to Z').click();
   await page.getByRole('radio', { name: 'Z to A' }).click();
   await itemOrder().toEqual(['Milk', 'Bagels', 'Apples']);
   await page.getByRole('radio', { name: 'A to Z' }).click();
   await page.getByRole('radio', { name: 'Sort by department' }).click();
-  await expect(button(page, 'Sort, by department, A to Z')).toBeVisible();
+  await expect(button(page, 'Sort and filter, by department, A to Z')).toBeVisible();
   // The first heading is the screen title.
   await expect(page.getByRole('heading')).toHaveText(['Items', 'Bakery', 'Deli', 'Produce']);
   await itemOrder().toEqual(['Bagels', 'Milk', 'Apples']);
@@ -280,7 +280,7 @@ test('an item in two departments shows under both, sharing its check and quantit
   await page.getByRole('radio', { name: 'Frozen in Big Box' }).click();
   await button(page, 'Save').click();
 
-  await button(page, 'Sort, by name, A to Z').click();
+  await button(page, 'Sort and filter, by name, A to Z').click();
   await page.getByRole('radio', { name: 'Sort by department' }).click();
   await expect(page.getByRole('heading')).toHaveText(['Items', 'Deli', 'Frozen']);
   const boxes = page.getByRole('checkbox', { name: 'Milk' });
@@ -300,7 +300,7 @@ test('an item in two departments shows under both, sharing its check and quantit
 
   // It's saved: still there after a reload.
   await page.reload();
-  await button(page, 'Sort, by name, A to Z').click();
+  await button(page, 'Sort and filter, by name, A to Z').click();
   await page.getByRole('radio', { name: 'Sort by department' }).click();
   await expect(page.getByLabel('Quantity for Milk')).toHaveCount(2);
   await expect(page.getByLabel('Quantity for Milk').nth(1)).toHaveValue('1 gallon');
@@ -370,7 +370,7 @@ test('a shopping trip: choose a store, check off, finish', async ({ page }) => {
   await expect(items.getByRole('checkbox', { name: 'Apples' })).toHaveAttribute('aria-checked', 'true');
 
   // Sorting by last bought puts Milk first, and Apples under "Never bought".
-  await page.getByRole('button', { name: /^Sort, by/ }).click();
+  await page.getByRole('button', { name: /^Sort and filter, / }).click();
   await page.getByRole('radio', { name: 'Sort by last bought' }).click();
   await expect(page.getByRole('radio', { name: 'Newest first' })).toHaveAttribute('aria-checked', 'true');
   await expect(items.getByRole('heading', { name: 'Never bought' })).toBeVisible();
@@ -481,8 +481,8 @@ test('settings: a CSV file adds stores, departments and items; a bad file change
 test('settings: the items list’s default sort is remembered across reloads', async ({ page }) => {
   const problems = watchConsole(page);
   await setUpOneStoreAndItem(page);
-  const sortButton = page.getByRole('button', { name: /^Sort, by/ });
-  await expect(sortButton).toHaveAttribute('aria-label', 'Sort, by name, A to Z');
+  const sortButton = page.getByRole('button', { name: /^Sort and filter, / });
+  await expect(sortButton).toHaveAttribute('aria-label', 'Sort and filter, by name, A to Z');
 
   await page.getByRole('tab', { name: 'Settings' }).click();
   await page.getByRole('radio', { name: 'Default sort: last bought' }).click();
@@ -490,13 +490,13 @@ test('settings: the items list’s default sort is remembered across reloads', a
   await expect(page.getByRole('radio', { name: 'Default order: Oldest first' })).toHaveAttribute('aria-checked', 'true');
 
   await page.getByRole('tab', { name: 'Items' }).click();
-  await expect(sortButton).toHaveAttribute('aria-label', 'Sort, by last bought, Oldest first');
+  await expect(sortButton).toHaveAttribute('aria-label', 'Sort and filter, by last bought, Oldest first');
 
   await page.waitForTimeout(500);
   await page.reload();
-  await expect(page.getByRole('button', { name: /^Sort, by/ })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: /^Sort and filter, / })).toHaveAttribute(
     'aria-label',
-    'Sort, by last bought, Oldest first',
+    'Sort and filter, by last bought, Oldest first',
     { timeout: 60_000 }
   );
 

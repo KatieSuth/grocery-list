@@ -49,9 +49,9 @@ const openItems = async () => {
   await screen.findByRole('checkbox', { name: 'Milk' });
 };
 
-/** Opens the filter panel with the store, department and brand groups expanded. */
+/** Opens the sort and filter panel with the store, department and brand groups expanded. */
 const openFilters = async () => {
-  await press('Filters');
+  await press(/^Sort and filter/);
   for (const group of ['Stores', 'Departments', 'Brands']) await press(group);
 };
 
@@ -99,7 +99,7 @@ test('the filter panel lists each store, department and brand once', async () =>
   expect(screen.queryByText('Departments')).toBeNull();
 
   await openFilters();
-  expect(screen.getByRole('button', { name: 'Filters' })).toBeExpanded();
+  expect(screen.getByRole('button', { name: 'Sort and filter, by name, A to Z' })).toBeExpanded();
 
   const options = (group: string) =>
     screen
@@ -111,15 +111,15 @@ test('the filter panel lists each store, department and brand once', async () =>
   // "Acme" and "acme" are one brand.
   expect(options('Brands')).toEqual(['Acme', 'Green Giant']);
 
-  await press('Filters');
+  await press(/^Sort and filter/);
   expect(screen.queryByText('Departments')).toBeNull();
-  expect(screen.getByRole('button', { name: 'Filters' })).not.toBeExpanded();
+  expect(screen.getByRole('button', { name: 'Sort and filter, by name, A to Z' })).not.toBeExpanded();
 });
 
 test('the store, department and brand groups collapse, and open by themselves when they have picks', async () => {
   await renderApp({ seed });
   await openItems();
-  await press('Filters');
+  await press(/^Sort and filter/);
 
   // Collapsed at first; Show is always open.
   for (const group of ['Stores', 'Departments', 'Brands']) {
@@ -143,8 +143,8 @@ test('the store, department and brand groups collapse, and open by themselves wh
   expect(visibleItems()).toEqual(['Ham', 'Milk', 'Peas']);
 
   // Reopening the panel shows groups with picks expanded, and the rest collapsed.
-  await press('Filters, 2 on');
-  await press('Filters, 2 on');
+  await press('Sort and filter, by name, A to Z, 2 filters on');
+  await press('Sort and filter, by name, A to Z, 2 filters on');
   expect(screen.getByRole('button', { name: 'Departments, 2 on' })).toBeExpanded();
   expect(screen.getByRole('checkbox', { name: 'Departments: Deli' })).toBeChecked();
   expect(screen.getByRole('button', { name: 'Stores' })).not.toBeExpanded();
@@ -160,7 +160,7 @@ test('filters narrow the list and combine; Clear filters resets them but keeps t
   expect(screen.getByRole('checkbox', { name: 'Departments: Deli' })).toBeChecked();
   expect(visibleItems()).toEqual(['Ham', 'Milk']);
   expect(screen.getByText('1 filter on')).toBeOnTheScreen();
-  expect(screen.getByRole('button', { name: 'Filters, 1 on' })).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'Sort and filter, by name, A to Z, 1 filter on' })).toBeOnTheScreen();
 
   // ...at one store: the Deli at Big Box.
   await fireEvent.press(screen.getByRole('checkbox', { name: 'Stores: Big Box' }));
@@ -178,11 +178,11 @@ test('filters narrow the list and combine; Clear filters resets them but keeps t
   expect(visibleItems()).toEqual(['Peas']);
 
   // Clear filters is available even with the panel closed.
-  await press('Filters, 2 on');
+  await press('Sort and filter, by name, A to Z, 2 filters on');
   await press('Clear filters');
   expect(screen.getByLabelText('Search items')).toHaveDisplayValue('pe');
   expect(visibleItems()).toEqual(['Peas']);
-  expect(screen.getByRole('button', { name: 'Filters' })).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'Sort and filter, by name, A to Z' })).toBeOnTheScreen();
   expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
 });
 
@@ -267,27 +267,29 @@ const radio = (name: string) => screen.getByRole('radio', { name });
 test('the sort button switches between name and department, A–Z or Z–A', async () => {
   await renderApp({ seed });
   await openItems();
-  const sortButton = () => screen.getByRole('button', { name: /^Sort, by/ });
-  expect(sortButton()).toHaveProp('accessibilityLabel', 'Sort, by name, A to Z');
+  const sortButton = () => screen.getByRole('button', { name: /^Sort and filter, / });
+  expect(sortButton()).toHaveProp('accessibilityLabel', 'Sort and filter, by name, A to Z');
   expect(screen.queryByText('Sort by')).toBeNull();
 
-  // Opening sort closes filters, and the other way round.
-  await openFilters();
-  expect(screen.getByRole('checkbox', { name: 'Stores: Big Box' })).toBeOnTheScreen();
+  // Sorting and filtering share one panel: sort and order first, then Show and the filter groups.
   await fireEvent.press(sortButton());
-  expect(screen.queryByRole('checkbox', { name: 'Stores: Big Box' })).toBeNull();
   expect(sortButton()).toBeExpanded();
+  const headings = ['Sort by', 'Order', 'Show', 'Stores', 'Departments', 'Brands'];
+  const shown = screen
+    .queryAllByText(new RegExp(`^(${headings.join('|')})$`))
+    .map((el) => el.props.children as string);
+  expect(shown).toEqual(headings);
   expect(radio('Sort by name')).toBeChecked();
   expect(radio('A to Z')).toBeChecked();
 
   await fireEvent.press(radio('Z to A'));
   expect(radio('Z to A')).toBeChecked();
-  expect(sortButton()).toHaveProp('accessibilityLabel', 'Sort, by name, Z to A');
+  expect(sortButton()).toHaveProp('accessibilityLabel', 'Sort and filter, by name, Z to A');
   expect(listRows()).toEqual(['Peas', 'Milk', 'Ham', 'Apples']);
 
   await fireEvent.press(radio('Sort by department'));
   expect(radio('Sort by department')).toBeChecked();
-  expect(sortButton()).toHaveProp('accessibilityLabel', 'Sort, by department, Z to A');
+  expect(sortButton()).toHaveProp('accessibilityLabel', 'Sort and filter, by department, Z to A');
   expect(screen.getByText(/listed under each/)).toBeOnTheScreen();
   expect(listRows()).toEqual(['# Produce', 'Apples', '# Frozen', 'Peas', '# Deli', 'Milk', 'Ham']);
 
@@ -320,7 +322,7 @@ test('sorting by last bought: newest first, then never-bought items A–Z', asyn
     },
   });
   await openItems();
-  const sortButton = () => screen.getByRole('button', { name: /^Sort, by/ });
+  const sortButton = () => screen.getByRole('button', { name: /^Sort and filter, / });
   await fireEvent.press(sortButton());
 
   await fireEvent.press(radio('Sort by last bought'));
@@ -328,11 +330,11 @@ test('sorting by last bought: newest first, then never-bought items A–Z', asyn
   // The order choices are about dates now.
   expect(radio('Newest first')).toBeChecked();
   expect(screen.queryByRole('radio', { name: 'A to Z' })).toBeNull();
-  expect(sortButton()).toHaveProp('accessibilityLabel', 'Sort, by last bought, Newest first');
+  expect(sortButton()).toHaveProp('accessibilityLabel', 'Sort and filter, by last bought, Newest first');
   expect(listRows()).toEqual(['Milk', 'Peas', 'Ham', '# Never bought', 'Apples']);
 
   await fireEvent.press(radio('Oldest first'));
-  expect(sortButton()).toHaveProp('accessibilityLabel', 'Sort, by last bought, Oldest first');
+  expect(sortButton()).toHaveProp('accessibilityLabel', 'Sort and filter, by last bought, Oldest first');
   // Same-trip items stay A–Z, and never-bought items stay last.
   expect(listRows()).toEqual(['Ham', 'Milk', 'Peas', '# Never bought', 'Apples']);
 
@@ -359,7 +361,7 @@ test('an item in two departments is listed under both, and both copies share che
     },
   });
   await openItems();
-  await press('Sort, by name, A to Z');
+  await press('Sort and filter, by name, A to Z');
   await fireEvent.press(radio('Sort by department'));
   expect(listRows()).toEqual(['# Deli', 'Ham', 'Milk', 'Pizza', '# Frozen', 'Peas', 'Pizza', '# Produce', 'Apples']);
 
@@ -400,8 +402,8 @@ test('the list opens with the default sort from Settings, and follows a new defa
     },
   });
   await openItems();
-  const sortButton = () => screen.getByRole('button', { name: /^Sort, by/ });
-  expect(sortButton()).toHaveProp('accessibilityLabel', 'Sort, by department, Z to A');
+  const sortButton = () => screen.getByRole('button', { name: /^Sort and filter, / });
+  expect(sortButton()).toHaveProp('accessibilityLabel', 'Sort and filter, by department, Z to A');
   expect(listRows()).toEqual(['# Produce', 'Apples', '# Frozen', 'Peas', '# Deli', 'Milk', 'Ham']);
 
   // Sorting here doesn't change the default.
@@ -413,6 +415,6 @@ test('the list opens with the default sort from Settings, and follows a new defa
 
   // Choosing a new default in Settings shows the list that way.
   await act(() => db.settings.findOne('app').patch({ itemSort: 'name', itemSortDirection: 'asc' }));
-  await eventually(async () => expect(sortButton()).toHaveProp('accessibilityLabel', 'Sort, by name, A to Z'));
+  await eventually(async () => expect(sortButton()).toHaveProp('accessibilityLabel', 'Sort and filter, by name, A to Z'));
   expect(listRows()).toEqual(['Apples', 'Ham', 'Milk', 'Peas']);
 });

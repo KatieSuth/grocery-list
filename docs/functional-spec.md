@@ -283,7 +283,7 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
 #### 4.5.2 Items tab: the master list ("Items")
 
 **Content**
-- At the top: a **search box** with a **filter button** and a **sort button** to its right (§ Search and filters, § Sorting below), then an **Add an item** button, which opens the Item form (§4.4).
+- At the top: a **search box** with a **sort and filter button** to its right (§ Search and filters, § Sorting below), then an **Add an item** button, which opens the Item form (§4.4).
 - Every item, in the default sort chosen in Settings (by name, A–Z, unless changed; § Sorting). Each row shows:
   - a **checkbox** on the left,
   - the item name, brand (if any), and where to find it ("Corner Market · Deli", or "No store selected"),
@@ -294,7 +294,7 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
 **Search and filters**
 - **Search** ("Search items") narrows the list as the user types. It matches anywhere in the item **name**, ignoring case and extra spaces ("mil" finds "Whole Milk"). It doesn't search brands.
 - An **✕** in the search box clears the search.
-- The **filter button** (a filter icon) opens and closes a panel with four groups of options:
+- The **sort and filter button** (a filter icon) opens and closes one panel. From the top, it has the sort choices (**Sort by** and **Order**, § Sorting), then four groups of filter options:
   - **Show:** **All**, **Checked** or **Unchecked** items; exactly one is picked, All by default. Checked or Unchecked counts as one filter. While Unchecked is picked, checking an item takes it off the list (and Checked, the other way round).
   - **Stores:** every store, in store order.
   - **Departments:** every department name across all stores, alphabetical. A name used by several stores (e.g. Deli) appears **once** and matches that department in every store.
@@ -306,7 +306,7 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
   - Picks in different groups, and the search, narrow it: an Acme item *and* in the Deli.
   - Store and department are checked on the **same location**: Big Box + Deli shows items in the Deli *at Big Box*, not items that are at Big Box and also in some store's Deli.
 - **While filters are on:**
-  - The filter button shows a badge with the number of options picked.
+  - The sort and filter button shows a badge with the number of options picked.
   - A "N filter(s) on" line with a **Clear filters** button appears, even with the panel closed. Clear filters removes all picks (and sets Show back to All) but keeps the search text.
 - While searching or filtering, "Showing X of Y items" appears.
 - If nothing matches: "No matching items", with a **Clear search and filters** button.
@@ -314,7 +314,7 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
 - Search and filters are not saved; they reset when the app restarts.
 
 **Sorting**
-- The **sort button** (an up/down arrows icon) opens and closes a sort panel. Opening it closes the filter panel, and the other way round. It has two sets of choices:
+- The sort choices are at the top of the sort and filter panel, above Show. There are two sets:
   - **Sort by:** **Name**, **Department** or **Last bought**.
   - **Order:** **A–Z** or **Z–A**. For Last bought these read **Newest first** and **Oldest first**.
   - The list opens with the **default sort** chosen in Settings (§4.5.4), which is Name, A–Z unless changed.
@@ -333,7 +333,7 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
   - Checking or unchecking any copy checks or unchecks them all.
   - A quantity typed in any copy appears in every other copy as it's typed, and is saved once for the item.
   - "Showing X of Y items" counts items, not rows.
-- Sorting works together with search and filters. The button is highlighted while the list isn't in the default sort from Settings, and announces the current choice ("Sort, by department, Z to A").
+- Sorting works together with search and filters. The sort and filter button is highlighted while the list isn't in the default sort from Settings, and announces the current choice and filter count ("Sort and filter, by department, Z to A, 2 filters on"). Clear filters doesn't change the sort.
 - Choices made here aren't saved: the list returns to the default sort when the app restarts. Choosing a new default in Settings shows the list that way straight away.
 
 **Checking items**
@@ -370,7 +370,7 @@ With no stores: "No stores yet."
 - A line under the choices explains the current one: "Follows your device’s light or dark setting." or "Always dark, whatever your device is set to."
 - The choice applies immediately and is remembered between launches.
 
-**Items list:** the **default sort** for the Items tab: **Default sort** (Name, Department or Last bought) and **Default order** (A–Z or Z–A; Newest first or Oldest first for Last bought). These are the same choices as the Items tab's sort panel (§4.5.2).
+**Items list:** the **default sort** for the Items tab: **Default sort** (Name, Department or Last bought) and **Default order** (A–Z or Z–A; Newest first or Oldest first for Last bought). These are the same choices as the sort section of the Items tab's sort and filter panel (§4.5.2).
 - Spoken as "Default sort: name", "Default order: A to Z" and so on.
 - Under them: "How the Items tab is sorted when it opens. Sorting there changes it only until you leave the app."
 - The default is Name, A–Z. A choice applies immediately, including to the Items tab if it's already open, and is remembered between launches.
