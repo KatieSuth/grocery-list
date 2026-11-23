@@ -23,3 +23,8 @@ export function describeLocationsSpoken(item: Item, stores: Store[]): string {
   });
   return places.length > 0 ? places.join(', ') : 'No store selected';
 }
+
+/** A store's name with its location, if it has one: "Kroger, Main St". */
+export function storeLabel(store: Pick<Store, 'name' | 'location'>): string {
+  return store.location ? `${store.name}, ${store.location}` : store.name;
+}

@@ -1,6 +1,6 @@
 # Grocery List: Functional Specification
 
-**Status:** Setup flow, all four main tabs (including Settings), the shopping trip and the trip history are built.
+**Status:** Setup flow, all four main tabs (including Settings), the shopping trip, the trip history and copying stores are built.
 **Last updated:** 2026-11-23
 
 This document describes what the app does from the user's point of view: screens, fields, rules, and behavior. For how it's built, see the [README](../README.md).
@@ -103,7 +103,7 @@ The first screen on a new install.
 | Next | Goes to the Items screen. |
 | Skip for now | Marks setup complete and opens the main app. (Items need a store, so skipping stores skips item setup too.) |
 
-### 4.2 Store form ("Add a store" / "Edit store")
+### 4.2 Store form ("Add a store" / "Edit store" / "Copy store")
 
 **Fields**
 | Field | Required | Notes |
@@ -156,6 +156,18 @@ Two stores can share a name as long as their locations differ (e.g. two Krogers 
 **Edit mode only**
 - The form opens with the store's current values.
 - A **Delete store** button asks for confirmation: "Delete <name>?" / "2 items will no longer be listed under this store." (or "No items are listed under this store.") The options are Cancel and Delete. Delete removes the store and returns to the Stores screen. (In a web browser, this is the browser's own OK/Cancel dialog. The same applies to deleting items.)
+
+**Copy mode** (Copy store, from the Stores tab's long-press menu)
+- The title is "Copy store", with a note at the top: "Copying Kroger, Main St. Give the new store its own name or location."
+- **Store name** and **Location** start blank.
+- **Departments** start as copies of the source store's departments, in its order. They're new departments belonging to the new store, and can be moved, renamed, removed and added to as usual.
+- **Copy items from Kroger, Main St** (an on/off switch, **on** to start), below Departments: "The 3 items listed under Kroger will also be listed under this store, in the same departments. Items aren’t duplicated, and items in departments you remove aren’t copied." ("Kroger has no items yet." if it has none.)
+  - Items aren't copied: the same items are also listed under the new store, each in the copy of its department at the source store.
+  - A department removed before saving takes its items with it: they aren't listed under the new store.
+  - A department removed and then **added back before Save** with the same name (ignoring case and extra spaces) gets its items, as if it had never been removed. (Unlike editing a store, where a department added back starts empty.)
+  - A renamed department keeps its items.
+- The name and location can't match an existing store's (including the store being copied). The message (see **Validation**) appears as soon as a typed name and location match, not only after Save, and Save refuses until they differ.
+- There's no Delete store button. If the source store no longer exists, the form shows "Store not found". If it's deleted while the form is open, the copy can still be saved, without items.
 
 ### 4.3 Items ("Your items")
 
@@ -396,7 +408,15 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
 The same store configuration as setup:
 - an **Add a store** button at the top,
 - the list of stores with their department order,
-- tap a store to edit or delete it (§4.2).
+- tap a store to edit or delete it (§4.2),
+- **long-press** a store for a small menu of options, shown just under it (or above it, near the bottom of the screen). The list dims a little behind it. Setup's store list has no menu.
+  | Option | Result |
+  | --- | --- |
+  | Edit | The same as tapping the store: opens its Store form. |
+  | Copy store | Opens the Store form in copy mode (§4.2, **Copy mode**). |
+  | Delete store (in red) | Asks first, exactly as the form's Delete store button does, then deletes the store and stays on the Stores tab. |
+
+  Tapping outside the menu, Back, Escape (web) or the screen reader's escape gesture closes it without doing anything.
 
 With no stores: "No stores yet."
 
@@ -513,6 +533,8 @@ With no stores: "No stores yet."
 - Text meets 4.5:1 contrast in both themes. The outlines of fields, chips, the store dropdown and the filter button meet 3:1 against the background and element fills, so it's clear they're controls. Secondary buttons and picker options are outlined the same way (the current choice in a picker has a thicker tinted outline). Dividers keep a lighter color. A test checks the theme colors.
 - Text grows with the system text size. The filter-count badge grows too, up to 1.5×, so it doesn't cover the filter icon; department position numbers widen for "10" and up; the ✓ in checkboxes stays sized to its box.
 - Trip history: the clock icon is a 48-point "Trip history" button ("Shows your past shopping trips"). Each trip card is one button that says everything it shows with nothing abbreviated: "Corner Market, Main St. Sunday, November 23, 2026 at 4:12 PM." ("Shows the items bought on this trip"). The filter button says the dates and how many filters are on: "Filter trips, last 90 days, 1 filter on". Date choices are radio buttons; the custom From and To fields announce their day ("From, August 25, 2026", "Opens a calendar to choose the day") and use the platform's own accessible calendar. The trip count ("2 trips, last 90 days") is read aloud when it changes.
+- Stores tab: each store says "Edit this store. Long-press for more options." TalkBack's actions menu and VoiceOver's actions rotor also offer **More options**, **Copy store** and **Delete store** on each store, so no long-press gesture is needed. The long-press menu is announced as "Options for Kroger, Main St"; the screen reader moves to its first option, and each option names the store: "Edit Kroger, Main St", "Copy Kroger, Main St", "Delete Kroger, Main St". Options are 48 points tall, and their icons aren't read. Closing the menu returns the screen reader to the store.
+- On Copy store, "Copy items from Kroger, Main St" is one switch, announced with its state and description. The duplicate name and location message is read aloud as soon as it appears.
 - A past trip's summary (store, location, date, number of items) is a heading, as are the Sort by / Order sections and the department headings. Each item is read as one line: "Ham, Acme, 1 lb, Deli".
 - Follows the system light/dark setting unless Light or Dark is chosen in Settings.
 - Appearance choices are radio buttons and report which is selected.

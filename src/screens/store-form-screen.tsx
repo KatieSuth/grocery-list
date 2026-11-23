@@ -6,10 +6,13 @@ import { Button } from '@/components/button';
 import { DepartmentEditor } from '@/components/department-editor';
 import { EmptyState } from '@/components/empty-state';
 import { Screen } from '@/components/screen';
+import { SwitchRow } from '@/components/switch-row';
 import { ErrorText, TextField } from '@/components/text-field';
-import { deleteStore, saveStore } from '@/data/stores-repo';
+import { ThemedText } from '@/components/themed-text';
+import { copyStore, saveStore } from '@/data/stores-repo';
 import { useDatabase } from '@/db/database-provider';
 import {
+  copyStoreDraft,
   countItemsAtStore,
   emptyStoreDraft,
   hasErrors,
@@ -18,13 +21,14 @@ import {
   storeToDraft,
   validateStoreDraft,
 } from '@/domain/store-draft';
+import { storeLabel } from '@/domain/describe';
 import { MAX_NAME_LENGTH } from '@/domain/names';
 import type { Item, Store } from '@/domain/types';
 import { useItems, useStores } from '@/hooks/use-data';
+import { useDeleteStore } from '@/hooks/use-delete-store';
 import { useUnsavedChangesWarning } from '@/hooks/use-unsaved-changes-warning';
 import { confirmDestructive } from '@/utils/confirm';
 import { goBack } from '@/utils/navigation';
-import { runWrite } from '@/utils/run-write';
 import { normalizeText, sameName } from '@/utils/text';
 
 type Props = {
@@ -32,15 +36,22 @@ type Props = {
   backTo: Href;
 };
 
-/** Add (no `id` param) or edit (`?id=`) a store. Shared by setup and the main app. */
+/**
+ * Add (no params), edit (`?id=`) or copy (`?copyFrom=`) a store. Shared by setup and the main app;
+ * stores are copied from the Stores tab's long-press menu.
+ */
 export function StoreFormScreen({ backTo }: Props) {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, copyFrom } = useLocalSearchParams<{ id?: string; copyFrom?: string }>();
   const stores = useStores();
   const items = useItems();
+  // Keep copying the same store even if it's deleted while the form is open (then no items are copied).
+  const [copySource, setCopySource] = useState<Store>();
+  const found = copyFrom ? stores?.find((s) => s.id === copyFrom) : undefined;
+  if (found && !copySource) setCopySource(found);
   if (!stores || !items) return null;
 
-  if (!id) return <StoreForm stores={stores} items={items} backTo={backTo} />;
-  const store = stores.find((s) => s.id === id);
+  if (!id && !copyFrom) return <StoreForm stores={stores} items={items} backTo={backTo} />;
+  const store = id ? stores.find((s) => s.id === id) : copySource;
   if (!store) {
     return (
       <Screen footer={<Button variant="secondary" label="Back" onPress={() => goBack(backTo)} />}>
@@ -48,15 +59,31 @@ export function StoreFormScreen({ backTo }: Props) {
       </Screen>
     );
   }
+  if (!id) return <StoreForm key={store.id} copySource={store} stores={stores} items={items} backTo={backTo} />;
   return <StoreForm key={store.id} store={store} stores={stores} items={items} backTo={backTo} />;
 }
 
 const countItems = (n: number) => (n === 1 ? '1 item' : `${n} items`);
 
-function StoreForm({ store, stores, items, backTo }: Props & { store?: Store; stores: Store[]; items: Item[] }) {
+type FormProps = Props & {
+  /** The store being edited; absent when adding or copying. */
+  store?: Store;
+  /** The store being copied. */
+  copySource?: Store;
+  stores: Store[];
+  items: Item[];
+};
+
+function StoreForm({ store, copySource, stores, items, backTo }: FormProps) {
   const db = useDatabase();
-  const [initial] = useState(() => (store ? storeToDraft(store) : emptyStoreDraft()));
+  const [start] = useState(() =>
+    copySource
+      ? copyStoreDraft(copySource)
+      : { draft: store ? storeToDraft(store) : emptyStoreDraft(), departmentSources: {} },
+  );
+  const initial = start.draft;
   const [draft, setDraft] = useState(initial);
+  const [copyItems, setCopyItems] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>();
@@ -64,16 +91,32 @@ function StoreForm({ store, stores, items, backTo }: Props & { store?: Store; st
   const leave = useUnsavedChangesWarning(storeDraftChanged(draft, initial), 'store');
 
   const otherStores = stores.filter((s) => s.id !== store?.id);
-  const errors = submitted ? validateStoreDraft(draft, otherStores) : {};
+  const deleteWithConfirm = useDeleteStore(items);
+  const allErrors = validateStoreDraft(draft, otherStores);
+  // When copying, say straight away if the name and location are already taken (the copy starts
+  // out like its source, so this is easy to miss); other problems wait until Save, as usual.
+  const errors = submitted
+    ? allErrors
+    : copySource && normalizeText(draft.name)
+      ? { name: allErrors.name, location: allErrors.location }
+      : {};
 
   const save = async () => {
     setSaving(true);
     setSaveError(undefined);
     try {
-      await saveStore(db, draft, store?.id);
+      if (copySource) {
+        await copyStore(db, draft, {
+          sourceStoreId: copySource.id,
+          departmentSources: start.departmentSources,
+          copyItems,
+        });
+      } else {
+        await saveStore(db, draft, store?.id);
+      }
       leave(backTo);
     } catch {
-      setSaveError('Could not save this store. Please try again.');
+      setSaveError(`Could not ${copySource ? 'copy' : 'save'} this store. Please try again.`);
       setSaving(false);
     }
   };
@@ -99,22 +142,6 @@ function StoreForm({ store, stores, items, backTo }: Props & { store?: Store; st
     });
   };
 
-  const handleDelete = (target: Store) => {
-    const count = countItemsAtStore(target.id, items);
-    confirmDestructive({
-      title: `Delete ${target.name}?`,
-      message:
-        count > 0
-          ? `${countItems(count)} will no longer be listed under this store.`
-          : 'No items are listed under this store.',
-      confirmLabel: 'Delete',
-      onConfirm: () => {
-        leave(backTo);
-        runWrite(() => deleteStore(db, target.id), `Could not delete ${target.name}. Please try again.`);
-      },
-    });
-  };
-
   return (
     <Screen
       scrollRef={scrollRef}
@@ -124,6 +151,11 @@ function StoreForm({ store, stores, items, backTo }: Props & { store?: Store; st
           <Button label="Save" disabled={saving} onPress={handleSave} />
         </>
       }>
+      {copySource ? (
+        <ThemedText themeColor="textSecondary">
+          Copying {storeLabel(copySource)}. Give the new store its own name or location.
+        </ThemedText>
+      ) : null}
       <TextField
         label="Store name"
         placeholder="e.g. Corner Market"
@@ -151,8 +183,38 @@ function StoreForm({ store, stores, items, backTo }: Props & { store?: Store; st
         currentStoreId={store?.id}
         scrollableRef={scrollRef}
       />
+      {copySource ? <CopyItemsSwitch source={copySource} items={items} value={copyItems} onChange={setCopyItems} /> : null}
       {saveError ? <ErrorText message={saveError} /> : null}
-      {store ? <Button variant="danger" label="Delete store" onPress={() => handleDelete(store)} /> : null}
+      {store ? (
+        <Button variant="danger" label="Delete store" onPress={() => deleteWithConfirm(store, () => leave(backTo))} />
+      ) : null}
     </Screen>
+  );
+}
+
+/** Whether a copied store also lists the source store's items (on to start). */
+function CopyItemsSwitch({
+  source,
+  items,
+  value,
+  onChange,
+}: {
+  source: Store;
+  items: Item[];
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  const count = countItemsAtStore(source.id, items);
+  return (
+    <SwitchRow
+      label={`Copy items from ${storeLabel(source)}`}
+      description={
+        count > 0
+          ? `The ${countItems(count)} listed under ${source.name} will also be listed under this store, in the same departments. Items aren’t duplicated, and items in departments you remove aren’t copied.`
+          : `${source.name} has no items yet.`
+      }
+      value={value}
+      onValueChange={onChange}
+    />
   );
 }

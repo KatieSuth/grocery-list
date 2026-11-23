@@ -3,7 +3,7 @@ import { map, type Observable } from 'rxjs';
 import type { AppDatabase } from '@/db/database';
 import { addDepartment } from '@/domain/departments';
 import { pruneLocations } from '@/domain/item-draft';
-import type { StoreDraft } from '@/domain/store-draft';
+import { copiedLocations, type DepartmentSources, type StoreDraft } from '@/domain/store-draft';
 import { compareStores } from '@/domain/store-sort';
 import type { Department, Store } from '@/domain/types';
 import { createId } from '@/utils/id';
@@ -51,6 +51,41 @@ export async function saveStore(db: AppDatabase, draft: StoreDraft, id?: string)
   });
   await pruneItemLocations(db);
   return doc.toMutableJSON();
+}
+
+export type CopyStoreOptions = {
+  /** The store being copied. */
+  sourceStoreId: string;
+  /** Which source department each of the draft's departments was copied from. */
+  departmentSources: DepartmentSources;
+  /** Also list the source store's items under the new store, in the matching departments. */
+  copyItems: boolean;
+};
+
+/**
+ * Saves `draft` as a new store copied from another. With `copyItems`, the source store's items
+ * are listed under the new store too (see copiedLocations): the same items, not duplicates.
+ * Items are matched against the source store as it is now; if it's been deleted, none are.
+ */
+export async function copyStore(
+  db: AppDatabase,
+  draft: StoreDraft,
+  { sourceStoreId, departmentSources, copyItems }: CopyStoreOptions,
+): Promise<Store> {
+  const store = await saveStore(db, draft);
+  if (!copyItems) return store;
+  const source = await db.stores.findOne(sourceStoreId).exec();
+  if (!source) return store;
+  const docs = await db.items.find().exec();
+  const items = docs.map((doc) => doc.toMutableJSON());
+  const locations = copiedLocations(items, source.toMutableJSON(), store.id, draft, departmentSources);
+  for (const doc of docs) {
+    const location = locations.get(doc.id);
+    if (!location) continue;
+    // The store is new, so no item is listed under it yet.
+    await doc.incrementalModify((old) => ({ ...old, locations: [...old.locations, location] }));
+  }
+  return store;
 }
 
 export async function deleteStore(db: AppDatabase, id: string): Promise<void> {

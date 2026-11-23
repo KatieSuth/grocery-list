@@ -4,7 +4,7 @@ An Expo app for iOS and Android that keeps your grocery items organized by store
 
 Built so far:
 - the first-run **setup flow**: add stores and departments, then the items you usually buy and where to find them;
-- the **main app**, with four tabs: Items (the master list and home screen, with checkboxes, free-text quantities, search, filters, sorting and "last bought"), Trip (the shopping trip: pick a store, check items into the cart in department order, finish to log them as bought; a history icon opens past trips, searchable by item or brand and filterable by dates and store), Stores (store configuration), and Settings (light/dark mode, the Items tab's default sort, Import from CSV, Delete all data).
+- the **main app**, with four tabs: Items (the master list and home screen, with checkboxes, free-text quantities, search, filters, sorting and "last bought"), Trip (the shopping trip: pick a store, check items into the cart in department order, finish to log them as bought; a history icon opens past trips, searchable by item or brand and filterable by dates and store), Stores (store configuration; long-press a store to edit, copy or delete it, and a copy can also list the source store's items), and Settings (light/dark mode, the Items tab's default sort, Import from CSV, Delete all data).
 
 See the [functional specification](docs/functional-spec.md) for screen-by-screen behavior.
 
@@ -96,18 +96,18 @@ src/
       trip/index.tsx      "/trip"    Shopping trip: store dropdown, cart, Finish; history icon
       trip/history/index.tsx "/trip/history"  Trip log: search, date range + store filters
       trip/history/[id].tsx  "/trip/history/:id"  One past trip's items, by name or department
-      stores/index.tsx    "/stores"  Store configuration
+      stores/index.tsx    "/stores"  Store configuration; long-press menu: Edit, Copy store, Delete store
       settings/index.tsx  "/settings"  Appearance, items' default sort, Import from CSV, Delete all data
   screens/                Screens used by more than one route
-    store-form-screen.tsx Add / edit store (?id=), takes backTo
+    store-form-screen.tsx Add / edit (?id=) / copy (?copyFrom=) a store, takes backTo
     item-form-screen.tsx  Add / edit item (?id=), takes backTo
   domain/                 Pure logic: no React, no database
     types.ts              Store, Department, Item, ItemLocation, ListEntry, TripRecord
     departments.ts        Add/remove/move/copy, suggestions from other stores
-    store-draft.ts        Store form state + validation (incl. same name and location), changes, removed departments in use
+    store-draft.ts        Store form state + validation (incl. same name and location), changes, removed departments in use, copying a store (copyStoreDraft, copiedLocations)
     item-draft.ts         Item form state + validation, changes, duplicate items, location pruning
     store-sort.ts         Store order everywhere: A–Z by name, then location
-    describe.ts           "Store · Dept" display text, and its spoken form ("Dept at Store")
+    describe.ts           "Store · Dept" display text, and its spoken form ("Dept at Store"); storeLabel ("Kroger, Main St")
     quantity.ts           Free-text quantity cleanup
     item-filter.ts        Master-list search + checked/store/department/brand filters
     item-sort.ts          Master-list sort: by name, department or last bought; either direction
@@ -118,7 +118,7 @@ src/
     csv-import.ts         CSV import: parse + validate the file (papaparse), plan the changes, messages
     names.ts              The name rules (length, forbidden characters) shared by the forms and the import
   data/                   Repositories: the only code that touches collections
-    stores-repo.ts        observe (A–Z) / save / delete stores (+ prune items), add a department from the item form
+    stores-repo.ts        observe (A–Z) / save / copy / delete stores (+ prune items), add a department from the item form
     items-repo.ts         observe / save / delete items
     list-repo.ts          check / uncheck items, set quantity, cart marks
     settings-repo.ts      setupComplete flag, trip store + reverse order, appearance, items' default sort
@@ -135,6 +135,7 @@ src/
     database-provider.tsx <DatabaseProvider>, useDatabase()
   hooks/
     use-data.ts           useStores(), useItems(), useListEntries(), useSetupComplete(), useTripSettings(), useColorSchemeChoice(), useItemSortChoice(), useTrips()
+    use-delete-store.ts   Delete a store after asking (store form and the Stores tab's menu)
     use-unsaved-changes-warning.ts  Asks before a form with changes is closed (usePreventRemove)
     use-delayed-quantity-save.ts    Saves quantities once typing pauses (and on close / backgrounding)
     use-announcement.ts   Reads a message aloud on iOS (Android uses live regions)
@@ -147,7 +148,9 @@ src/
     notify.ts             Message with OK (Alert; .web.ts: window.alert)
     confirm.ts            Cancel / confirm question (Alert; .web.ts: window.confirm)
     run-write.ts          runWrite(): a database write that tells the user if it fails
-  components/             Shared UI (Button, TextField, Screen, Card, SwitchRow, StatusText, editors…)
+    accessibility-focus.ts  Move the screen reader to a view (.web.ts: DOM focus)
+    menu-position.ts      Where a dropdown menu goes: under its row, or above it
+  components/             Shared UI (Button, TextField, Screen, Card, SwitchRow, StatusText, StoreActionsMenu, editors…)
   constants/theme.ts      Colors (light/dark, with contrast checked by a test), spacing, chip tap area
   test-utils/             Test helpers (not shipped)
   __tests__/              All tests, mirroring src/

@@ -1,8 +1,9 @@
-import { nameKey, normalizeText } from '@/utils/text';
+import { createId } from '@/utils/id';
+import { nameKey, normalizeText, sameName } from '@/utils/text';
 
 import { checkName } from './names';
 
-import type { Department, Item, Store } from './types';
+import type { Department, Item, ItemLocation, Store } from './types';
 
 export type StoreDraft = {
   name: string;
@@ -103,4 +104,61 @@ export function removedDepartmentsInUse(store: Store, draft: StoreDraft, items: 
 /** How many items are listed under the store. */
 export function countItemsAtStore(storeId: string, items: Item[]): number {
   return items.filter((item) => item.locations.some((l) => l.storeId === storeId)).length;
+}
+
+/** Which source department each copied department came from: new department id → source department id. */
+export type DepartmentSources = Record<string, string>;
+
+/**
+ * The starting draft for copying `source`: no name or location yet (the user gives the new
+ * store's), and a copy of each of its departments, in order, under new ids.
+ */
+export function copyStoreDraft(source: Store): { draft: StoreDraft; departmentSources: DepartmentSources } {
+  const departmentSources: DepartmentSources = {};
+  const departments = source.departments.map((d) => {
+    const id = createId();
+    departmentSources[id] = d.id;
+    return { id, name: d.name };
+  });
+  return { draft: { name: '', location: '', departments }, departmentSources };
+}
+
+/**
+ * Where to list `source`'s items in the copy (`draft`, saved as `newStoreId`): each item at the
+ * source store goes in the copy of its department there. A source department's copy is:
+ * - the department copied from it, if still in the draft (it may have been renamed or moved);
+ * - else a draft department with the same name (ignoring case and spacing) that isn't the copy
+ *   of another department, e.g. one removed and added back before saving;
+ * - else there is none, and its items are left out.
+ */
+export function copiedLocations(
+  items: Item[],
+  source: Store,
+  newStoreId: string,
+  draft: StoreDraft,
+  departmentSources: DepartmentSources,
+): Map<string, ItemLocation> {
+  const draftIds = new Set(draft.departments.map((d) => d.id));
+  const copyOf = new Map<string, string>();
+  for (const [copyId, sourceId] of Object.entries(departmentSources)) {
+    if (draftIds.has(copyId)) copyOf.set(sourceId, copyId);
+  }
+  // Draft departments still copied from a source department can't be claimed by name as well.
+  const claimed = new Set(copyOf.values());
+  for (const dept of source.departments) {
+    if (copyOf.has(dept.id)) continue;
+    const match = draft.departments.find((d) => !claimed.has(d.id) && sameName(d.name, dept.name));
+    if (match) {
+      copyOf.set(dept.id, match.id);
+      claimed.add(match.id);
+    }
+  }
+
+  const locations = new Map<string, ItemLocation>();
+  for (const item of items) {
+    const loc = item.locations.find((l) => l.storeId === source.id);
+    const departmentId = loc && copyOf.get(loc.departmentId);
+    if (departmentId) locations.set(item.id, { storeId: newStoreId, departmentId });
+  }
+  return locations;
 }

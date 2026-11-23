@@ -1,6 +1,7 @@
 import { firstValueFrom } from 'rxjs';
 
-import { addStoreDepartment, deleteStore, observeStores, saveStore } from '@/data/stores-repo';
+import { addStoreDepartment, copyStore, deleteStore, observeStores, saveStore } from '@/data/stores-repo';
+import { copyStoreDraft } from '@/domain/store-draft';
 import { closeTestDatabases, createTestDatabase } from '@/test-utils/db';
 
 afterEach(closeTestDatabases);
@@ -121,4 +122,51 @@ test('addStoreDepartment checks again against the saved store, in case it change
   jest.restoreAllMocks();
   const names = (await db.stores.findOne('s1').exec())?.departments.map((d) => d.name);
   expect(names).toEqual(['Produce', 'Deli', 'Bakery']);
+});
+
+describe('copyStore', () => {
+  const setUp = async () => {
+    const db = await createTestDatabase();
+    const source = await saveStore(db, draft);
+    await db.items.insert({ id: 'kale', name: 'Kale', locations: [{ storeId: source.id, departmentId: 'd1' }], createdAt: 1 });
+    await db.items.insert({ id: 'ham', name: 'Ham', locations: [{ storeId: source.id, departmentId: 'd2' }], createdAt: 2 });
+    await db.items.insert({ id: 'soap', name: 'Soap', locations: [], createdAt: 3 });
+    const copy = copyStoreDraft(source);
+    // Produce kept, Deli removed.
+    const copyDraft = { name: 'Corner Market', location: 'Elm St', departments: [copy.draft.departments[0]] };
+    return { db, source, copy, copyDraft };
+  };
+  const locationsOf = async (db: Awaited<ReturnType<typeof createTestDatabase>>, id: string) =>
+    (await db.items.findOne(id).exec())?.toJSON().locations;
+
+  test("lists the source's items under the new store, without duplicating them", async () => {
+    const { db, source, copy, copyDraft } = await setUp();
+    const store = await copyStore(db, copyDraft, {
+      sourceStoreId: source.id,
+      departmentSources: copy.departmentSources,
+      copyItems: true,
+    });
+    expect(store).toMatchObject({ name: 'Corner Market', location: 'Elm St', departments: copyDraft.departments });
+    expect(await locationsOf(db, 'kale')).toEqual([
+      { storeId: source.id, departmentId: 'd1' },
+      { storeId: store.id, departmentId: copyDraft.departments[0].id },
+    ]);
+    // Deli was removed from the copy, so Ham stays at the source store only.
+    expect(await locationsOf(db, 'ham')).toEqual([{ storeId: source.id, departmentId: 'd2' }]);
+    expect(await locationsOf(db, 'soap')).toEqual([]);
+    expect(await db.items.count().exec()).toBe(3);
+  });
+
+  test('copies no items when asked not to, or when the source store is gone', async () => {
+    const { db, source, copy, copyDraft } = await setUp();
+    await copyStore(db, copyDraft, { sourceStoreId: source.id, departmentSources: copy.departmentSources, copyItems: false });
+    await deleteStore(db, source.id);
+    await copyStore(db, { ...copyDraft, location: 'Oak Ave' }, {
+      sourceStoreId: source.id,
+      departmentSources: copy.departmentSources,
+      copyItems: true,
+    });
+    expect(await locationsOf(db, 'kale')).toEqual([]);
+    expect((await firstValueFrom(observeStores(db))).map((s) => s.location)).toEqual(['Elm St', 'Oak Ave']);
+  });
 });

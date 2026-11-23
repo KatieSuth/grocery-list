@@ -201,6 +201,44 @@ test('a store can copy all departments from another store', async ({ page }) => 
   expect(problems).toEqual([]);
 });
 
+test('a store can be copied with its items from the long-press menu', async ({ page }) => {
+  const problems = watchConsole(page);
+  await setUpOneStoreAndItem(page);
+
+  await page.getByRole('tab', { name: 'Stores' }).click();
+  // Long-press the store: hold the mouse down on it.
+  const card = page.getByRole('button', { name: /^Corner Market\./ });
+  await card.hover();
+  await page.mouse.down();
+  await page.waitForTimeout(800);
+  await page.mouse.up();
+  const menu = page.getByLabel('Options for Corner Market');
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem')).toContainText(['Edit', 'Copy store', 'Delete store']);
+  // The screen reader (and keyboard) starts on the first option.
+  await expect(menu.getByRole('menuitem', { name: 'Edit Corner Market' })).toBeFocused();
+  await menu.getByRole('menuitem', { name: 'Copy Corner Market' }).click();
+
+  await expect(page.getByText('Copying Corner Market.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('switch', { name: 'Copy items from Corner Market' })).toHaveAttribute('aria-checked', 'true');
+  // The same name with no location is the store being copied: refused until it differs.
+  await page.getByLabel('Store name').fill('Corner Market');
+  await expect(page.getByText('You already have a store called Corner Market. Add a location to tell them apart.')).toBeVisible();
+  await page.getByLabel('Location').fill('Elm St');
+  await expect(page.getByText(/You already have/)).toHaveCount(0);
+  await button(page, 'Save').click();
+  await expect(page.getByText('Elm St')).toBeVisible();
+
+  // Milk is now listed under the copy as well, in its Deli.
+  await page.getByRole('tab', { name: 'Items' }).click();
+  await button(page, 'Sort and filter, by name, A to Z').click();
+  await button(page, 'Stores').click();
+  await page.getByRole('checkbox', { name: 'Stores: Corner Market, Elm St' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Milk' })).toBeVisible();
+
+  expect(problems).toEqual([]);
+});
+
 test('the master list can be searched and filtered', async ({ page }) => {
   const problems = watchConsole(page);
   await setUpOneStoreAndItem(page);

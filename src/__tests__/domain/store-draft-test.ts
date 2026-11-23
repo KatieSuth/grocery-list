@@ -1,4 +1,6 @@
 import {
+  copiedLocations,
+  copyStoreDraft,
   countItemsAtStore,
   emptyStoreDraft,
   hasErrors,
@@ -100,5 +102,86 @@ test('a store can share a name with another only if their locations differ', () 
   // A blank name isn't also reported as a duplicate.
   expect(validateStoreDraft({ name: '', location: '', departments }, [{ ...plain, name: '' }])).toEqual({
     name: 'Store name is required.',
+  });
+});
+
+describe('copying a store', () => {
+  const source: Store = {
+    id: 'src',
+    name: 'Kroger',
+    location: 'Main St',
+    departments: [
+      { id: 'prod', name: 'Produce' },
+      { id: 'deli', name: 'Deli' },
+      { id: 'froz', name: 'Frozen  Foods' },
+      { id: 'bake', name: 'Bakery' },
+    ],
+    createdAt: 1,
+  };
+  const at = (id: string, ...locations: [string, string][]): Item => ({
+    id,
+    name: id,
+    locations: locations.map(([storeId, departmentId]) => ({ storeId, departmentId })),
+    createdAt: 1,
+  });
+  const items = [
+    at('apples', ['src', 'prod'], ['other', 'x']),
+    at('ham', ['src', 'deli']),
+    at('peas', ['src', 'froz']),
+    at('bread', ['src', 'bake']),
+    at('soap', ['other', 'y']),
+  ];
+
+  test('starts with no name or location, and the departments in order under new ids', () => {
+    const { draft, departmentSources } = copyStoreDraft(source);
+    expect(draft.name).toBe('');
+    expect(draft.location).toBe('');
+    expect(draft.departments.map((d) => d.name)).toEqual(['Produce', 'Deli', 'Frozen  Foods', 'Bakery']);
+    const ids = draft.departments.map((d) => d.id);
+    expect(ids.some((id) => source.departments.some((d) => d.id === id))).toBe(false);
+    expect(new Set(ids).size).toBe(4);
+    expect(ids.map((id) => departmentSources[id])).toEqual(['prod', 'deli', 'froz', 'bake']);
+  });
+
+  test("items go in the copy of their department, even renamed or moved; others aren't copied", () => {
+    const { draft, departmentSources } = copyStoreDraft(source);
+    const [prod, deli, froz, bake] = draft.departments;
+    const edited = { ...draft, departments: [{ ...deli, name: 'Deli counter' }, prod, froz, bake] };
+    const locations = copiedLocations(items, source, 'new', edited, departmentSources);
+    expect(Object.fromEntries(locations)).toEqual({
+      apples: { storeId: 'new', departmentId: prod.id },
+      ham: { storeId: 'new', departmentId: deli.id },
+      peas: { storeId: 'new', departmentId: froz.id },
+      bread: { storeId: 'new', departmentId: bake.id },
+    });
+  });
+
+  test("a removed department's items are left out, unless it's added back with the same name", () => {
+    const { draft, departmentSources } = copyStoreDraft(source);
+    const [prod, , , bake] = draft.departments;
+    // Deli and Frozen Foods removed; Frozen Foods added back, spelled a little differently.
+    const readded = { id: 'readded', name: ' frozen foods ' };
+    const edited = { ...draft, departments: [prod, bake, readded] };
+    expect(Object.fromEntries(copiedLocations(items, source, 'new', edited, departmentSources))).toEqual({
+      apples: { storeId: 'new', departmentId: prod.id },
+      peas: { storeId: 'new', departmentId: 'readded' },
+      bread: { storeId: 'new', departmentId: bake.id },
+    });
+  });
+
+  test("a department renamed to another's name keeps its own items, not the other's", () => {
+    const { draft, departmentSources } = copyStoreDraft(source);
+    const [, deli] = draft.departments;
+    // Produce removed; Deli renamed "Produce". Produce's items have nowhere to go.
+    const edited = { ...draft, departments: [{ ...deli, name: 'Produce' }] };
+    expect(Object.fromEntries(copiedLocations(items, source, 'new', edited, departmentSources))).toEqual({
+      ham: { storeId: 'new', departmentId: deli.id },
+    });
+  });
+
+  test('a different name gets no items', () => {
+    const { draft, departmentSources } = copyStoreDraft(source);
+    const edited = { ...draft, departments: [{ id: 'n', name: 'Delicatessen' }] };
+    expect(copiedLocations(items, source, 'new', edited, departmentSources).size).toBe(0);
   });
 });

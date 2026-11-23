@@ -1,4 +1,4 @@
-import { describeLocations, describeLocationsSpoken } from '@/domain/describe';
+import { describeLocations, describeLocationsSpoken, storeLabel } from '@/domain/describe';
 import type { Store } from '@/domain/types';
 
 const stores: Store[] = [
@@ -37,4 +37,9 @@ test('the spoken form says which department at which store, without symbols', ()
   };
   expect(describeLocationsSpoken(item, stores)).toBe('Produce at Corner, Frozen at Big Box');
   expect(describeLocationsSpoken({ ...item, locations: [] }, stores)).toBe('No store selected');
+});
+
+test('storeLabel adds the location when there is one', () => {
+  expect(storeLabel({ name: 'Kroger', location: 'Main St' })).toBe('Kroger, Main St');
+  expect(storeLabel({ name: 'Kroger' })).toBe('Kroger');
 });
