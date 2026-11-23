@@ -190,6 +190,7 @@ Two stores can share a name as long as their locations differ (e.g. two Krogers 
 | --- | --- | --- |
 | Item name | Yes | Placeholder "e.g. Milk". |
 | Brand/Distinguisher | No | Placeholder "e.g. 'Organic Valley,' '3-pack,' etc." |
+| Needed | — | New items only. A switch, **on** by default: "Check it on your list when it’s saved." When on, saving also checks the item on the master list (no quantity), as if its checkbox were tapped. The choice is kept across **Add more**. If the item saves but can't be checked: "Bread was saved, but couldn’t be checked on your list. Check it on the Items tab." |
 | Where to find it | At least one store, each with a department | See below. |
 
 **Where to find it**

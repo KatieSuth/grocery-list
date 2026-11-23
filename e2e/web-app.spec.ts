@@ -50,6 +50,20 @@ async function addDepartment(page: Page, name: string) {
   await expect(button(page, `Remove ${name}`)).toBeVisible();
 }
 
+/**
+ * Adds an item at Corner Market from the current screen's "Add an item" button, and saves it.
+ * Needed is turned off, so the item starts unchecked: these tests check items themselves.
+ */
+async function addItem(page: Page, { name, department, brand }: { name: string; department: string; brand?: string }) {
+  await button(page, 'Add an item').click();
+  await page.getByLabel('Item name').fill(name);
+  if (brand) await page.getByLabel('Brand').fill(brand);
+  await page.getByRole('switch', { name: 'Needed' }).click();
+  await page.getByRole('checkbox', { name: 'Corner Market' }).click();
+  await page.getByRole('radio', { name: `${department} in Corner Market` }).click();
+  await button(page, 'Continue').click();
+}
+
 async function setUpOneStoreAndItem(page: Page) {
   await page.goto('/');
   await expect(page.getByText('No stores yet')).toBeVisible({ timeout: 90_000 });
@@ -69,11 +83,7 @@ async function setUpOneStoreAndItem(page: Page) {
 
   await button(page, 'Next').click();
   await expect(page.getByText('No items yet')).toBeVisible();
-  await button(page, 'Add an item').click();
-  await page.getByLabel('Item name').fill('Milk');
-  await page.getByRole('checkbox', { name: 'Corner Market' }).click();
-  await page.getByRole('radio', { name: 'Deli in Corner Market' }).click();
-  await button(page, 'Continue').click();
+  await addItem(page, { name: 'Milk', department: 'Deli' });
   await expect(page.getByText('Corner Market · Deli')).toBeVisible();
 
   await button(page, 'Finish').click();
@@ -197,12 +207,7 @@ test('the master list can be searched and filtered', async ({ page }) => {
 
   // A second item in another department.
   await page.getByRole('tab', { name: 'Items' }).click();
-  await button(page, 'Add an item').click();
-  await page.getByLabel('Item name').fill('Bagels');
-  await page.getByLabel('Brand').fill('Acme');
-  await page.getByRole('checkbox', { name: 'Corner Market' }).click();
-  await page.getByRole('radio', { name: 'Bakery in Corner Market' }).click();
-  await button(page, 'Continue').click();
+  await addItem(page, { name: 'Bagels', department: 'Bakery', brand: 'Acme' });
   await expect(page.getByRole('checkbox', { name: 'Bagels' })).toBeVisible();
 
   // Search by name, then clear with ✕.
@@ -241,11 +246,7 @@ test('the master list can be searched and filtered', async ({ page }) => {
 
   // Sort by department: grouped under headings, departments A–Z.
   await button(page, 'Sort and filter, by name, A to Z').click(); // close the panel, so its chips aren't counted below
-  await button(page, 'Add an item').click();
-  await page.getByLabel('Item name').fill('Apples');
-  await page.getByRole('checkbox', { name: 'Corner Market' }).click();
-  await page.getByRole('radio', { name: 'Produce in Corner Market' }).click();
-  await button(page, 'Continue').click();
+  await addItem(page, { name: 'Apples', department: 'Produce' });
   const itemOrder = () =>
     expect.poll(() => page.getByRole('checkbox').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))));
   await itemOrder().toEqual(['Apples', 'Bagels', 'Milk']);
@@ -321,11 +322,7 @@ test('a shopping trip: choose a store, check off, finish', async ({ page }) => {
   await button(page, 'Save').click();
   await expect(page.getByText('Big Box')).toBeVisible();
   await page.getByRole('tab', { name: 'Items' }).click();
-  await button(page, 'Add an item').click();
-  await page.getByLabel('Item name').fill('Apples');
-  await page.getByRole('checkbox', { name: 'Corner Market' }).click();
-  await page.getByRole('radio', { name: 'Produce in Corner Market' }).click();
-  await button(page, 'Continue').click();
+  await addItem(page, { name: 'Apples', department: 'Produce' });
 
   // Check both on the master list, with a quantity for Milk.
   await page.getByRole('checkbox', { name: 'Milk' }).click();

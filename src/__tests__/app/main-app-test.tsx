@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { act, cleanup, fireEvent, screen } from 'expo-router/testing-library';
-import { Alert, AppState, type AlertButton } from 'react-native';
+import { Alert, AppState, Platform, type AlertButton } from 'react-native';
 
 import * as listRepo from '@/data/list-repo';
 import type { AppDatabase } from '@/db/database';
@@ -46,6 +46,9 @@ async function seed(db: AppDatabase) {
     createdAt: 2,
   });
 }
+
+/** The prop holding a native switch's on/off state. */
+const switchProp = Platform.OS === 'android' ? 'on' : 'value';
 
 /** The native tab bar isn't rendered in Jest, so switch tabs the way a tab press does. */
 const openTab = (path: '/' | '/trip' | '/stores') => act(() => router.navigate(path));
@@ -219,7 +222,95 @@ test('adding an item from the master list returns to it', async () => {
 
   expect(await screen.findByText('Bread')).toBeOnTheScreen();
   expect(screen).toHavePathname('/');
+  // "Needed" is on by default, so the new item is checked on the list.
+  expect(await screen.findByRole('checkbox', { name: 'Bread', checked: true })).toBeOnTheScreen();
+});
+
+test('a new item can be saved without being checked, and Add more keeps that choice', async () => {
+  const db = await renderApp({ seed });
+  await openTab('/');
+  await press('Add an item');
+  expect(screen.getByLabelText('Needed')).toHaveProp(switchProp, true);
+  await fireEvent(screen.getByLabelText('Needed'), 'valueChange', false);
+
+  const addBread = async (name: string) => {
+    await type('Item name', name);
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Corner Market' }));
+    await fireEvent.press(screen.getByRole('radio', { name: 'Deli in Corner Market' }));
+  };
+  await addBread('Bread');
+  await press('Add more');
+  expect(await screen.findByText('Saved “Bread”. Add another, or tap Continue.')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Needed')).toHaveProp(switchProp, false);
+  await addBread('Rolls');
+  await press('Continue');
+
+  expect(await screen.findByRole('checkbox', { name: 'Rolls' })).not.toBeChecked();
   expect(screen.getByRole('checkbox', { name: 'Bread' })).not.toBeChecked();
+  expect(await db.listEntries.count().exec()).toBe(0);
+});
+
+test('Needed applies to each item as it’s saved: on, off, then on again with Add more', async () => {
+  const db = await renderApp({ seed });
+  await openTab('/');
+  await press('Add an item');
+  const fillIn = async (name: string) => {
+    await type('Item name', name);
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Corner Market' }));
+    await fireEvent.press(screen.getByRole('radio', { name: 'Deli in Corner Market' }));
+  };
+
+  // A: left on.
+  await fillIn('Apples');
+  await press('Add more');
+  expect(await screen.findByText('Saved “Apples”. Add another, or tap Continue.')).toBeOnTheScreen();
+  // B: turned off.
+  await fireEvent(screen.getByLabelText('Needed'), 'valueChange', false);
+  await fillIn('Bagels');
+  await press('Add more');
+  expect(await screen.findByText('Saved “Bagels”. Add another, or tap Continue.')).toBeOnTheScreen();
+  // C: turned back on.
+  await fireEvent(screen.getByLabelText('Needed'), 'valueChange', true);
+  await fillIn('Cheese');
+  await press('Continue');
+
+  expect(await screen.findByRole('checkbox', { name: 'Cheese', checked: true })).toBeOnTheScreen();
+  expect(screen.getByRole('checkbox', { name: 'Apples' })).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: 'Bagels' })).not.toBeChecked();
+  const names = async () => {
+    const entries = await db.listEntries.find().exec();
+    const items = await db.items.findByIds(entries.map((e) => e.itemId)).exec();
+    return [...items.values()].map((i) => i.name).sort();
+  };
+  await eventually(async () => expect(await names()).toEqual(['Apples', 'Cheese']));
+});
+
+test('editing an item has no Needed switch', async () => {
+  await renderApp({ seed });
+  await openTab('/');
+  await press('Soup, Acme');
+  expect(await screen.findByLabelText('Item name')).toHaveDisplayValue('Soup');
+  expect(screen.queryByLabelText('Needed')).toBeNull();
+});
+
+test('a new item that saves but can’t be checked says so', async () => {
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  const db = await renderApp({ seed });
+  await openTab('/');
+  jest.spyOn(db.listEntries, 'upsert').mockRejectedValue(new Error('nope'));
+  await press('Add an item');
+  await type('Item name', 'Bread');
+  await fireEvent.press(screen.getByRole('checkbox', { name: 'Corner Market' }));
+  await fireEvent.press(screen.getByRole('radio', { name: 'Deli in Corner Market' }));
+  await press('Continue');
+
+  expect(await screen.findByText('Bread')).toBeOnTheScreen();
+  await eventually(async () =>
+    expect(alert).toHaveBeenCalledWith(
+      WRITE_FAILED_TITLE,
+      'Bread was saved, but couldn’t be checked on your list. Check it on the Items tab.',
+    ),
+  );
 });
 
 test('tapping an item opens it for editing; deleting it also unchecks it', async () => {

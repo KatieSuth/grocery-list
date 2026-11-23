@@ -1,5 +1,6 @@
 import { useLocalSearchParams, type Href } from "expo-router";
 import { useState } from "react";
+import { StyleSheet, View } from "react-native";
 
 import { Button } from "@/components/button";
 import { EmptyState } from "@/components/empty-state";
@@ -10,7 +11,10 @@ import {
 } from "@/components/store-location-picker";
 import { ErrorText, TextField } from "@/components/text-field";
 import { ThemedText } from "@/components/themed-text";
+import { ToggleSwitch } from "@/components/toggle-switch";
+import { Spacing } from "@/constants/theme";
 import { deleteItem, saveItem } from "@/data/items-repo";
+import { setChecked } from "@/data/list-repo";
 import { addStoreDepartment } from "@/data/stores-repo";
 import { useDatabase } from "@/db/database-provider";
 import {
@@ -109,6 +113,11 @@ function ItemForm({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string>();
   const [saveError, setSaveError] = useState<string>();
+  /**
+   * New items only: also check the item on the list when it's saved, since an item is often
+   * added because it's needed right now. Kept as chosen across "Add more".
+   */
+  const [needed, setNeeded] = useState(true);
   const leave = useUnsavedChangesWarning(
     itemDraftChanged(draft, initial),
     "item",
@@ -127,7 +136,7 @@ function ItemForm({
     setSaving(true);
     setSaveError(undefined);
     try {
-      return await saveItem(
+      const saved = await saveItem(
         db,
         {
           name: draft.name,
@@ -136,6 +145,13 @@ function ItemForm({
         },
         item?.id,
       );
+      if (!item && needed) {
+        runWrite(
+          () => setChecked(db, saved.id, true),
+          `${saved.name} was saved, but couldn’t be checked on your list. Check it on the Items tab.`,
+        );
+      }
+      return saved;
     } catch {
       setSaveError("Could not save this item. Please try again.");
       return null;
@@ -267,6 +283,22 @@ function ItemForm({
         error={errors.brand}
         maxLength={MAX_NAME_LENGTH}
       />
+      {item ? null : (
+        <View style={styles.needed}>
+          <View style={styles.neededText}>
+            <ThemedText type="smallBold">Needed</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              Check it on your list when it’s saved.
+            </ThemedText>
+          </View>
+          <ToggleSwitch
+            accessibilityLabel="Needed"
+            accessibilityHint="When on, the item is checked on your list as soon as it’s saved"
+            value={needed}
+            onValueChange={setNeeded}
+          />
+        </View>
+      )}
       {stores.length > 0 ? (
         <StoreLocationPicker
           stores={stores}
@@ -296,3 +328,8 @@ function ItemForm({
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  needed: { flexDirection: "row", alignItems: "center", gap: Spacing.three },
+  neededText: { flex: 1, gap: Spacing.half },
+});
