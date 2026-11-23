@@ -334,7 +334,7 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
 - An **✕** in the search box clears the search.
 - The **sort and filter button** (a filter icon) opens and closes one panel. From the top, it has the sort choices (**Sort by** and **Order**, § Sorting), then four groups of filter options:
   - **Show:** **All**, **Checked** or **Unchecked** items; exactly one is picked, All by default. Checked or Unchecked counts as one filter. While Unchecked is picked, checking an item takes it off the list (and Checked, the other way round).
-  - **Stores:** every store, in store order.
+  - **Stores:** every store, in store order, with its location when it has one ("Kroger, Main St"), so stores with the same name can be told apart.
   - **Departments:** every department name across all stores, alphabetical. A name used by several stores (e.g. Deli) appears **once** and matches that department in every store.
   - **Brands:** every brand across all items, alphabetical, **once** each. "Acme" and "acme" count as one brand. The label is the most common spelling; on a tie, the one starting with a capital letter.
   - Show is always open. Stores, Departments and Brands are **collapsible**: tap a group's heading to show or hide its options. They start collapsed each time the panel opens, except a group with options picked, which starts open. A collapsed group with picks says how many ("2 on"). Collapsing a group keeps its picks.

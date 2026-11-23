@@ -55,13 +55,14 @@ function distinct(labels: string[]): FilterOption[] {
 }
 
 /**
- * What the user can filter by: every store (in store order), every department name across all
+ * What the user can filter by: every store (in store order, labelled with its location so
+ * stores with the same name can be told apart), every department name across all
  * stores, and every brand across all items. Departments and brands appear once each, however
  * many stores or items share them (ignoring case and spacing).
  */
 export function getFilterOptions(items: Item[], stores: Store[]): FilterOptions {
   return {
-    stores: stores.map((s) => ({ key: s.id, label: s.name })),
+    stores: stores.map((s) => ({ key: s.id, label: s.location ? `${s.name}, ${s.location}` : s.name })),
     departments: distinct(stores.flatMap((s) => s.departments.map((d) => d.name))),
     brands: distinct(items.flatMap((i) => (i.brand ? [i.brand] : []))),
   };

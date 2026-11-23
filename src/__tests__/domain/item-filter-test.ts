@@ -23,6 +23,7 @@ const stores: Store[] = [
   {
     id: 'bigbox',
     name: 'Big Box',
+    location: 'Main St',
     departments: [
       { id: 'b-deli', name: 'deli ' },
       { id: 'b-frozen', name: 'Frozen' },
@@ -59,11 +60,11 @@ const ids = (filter: Partial<ItemFilter>) =>
   applyItemFilter(items, stores, entries, { ...EMPTY_FILTER, ...filter }).map((i) => i.id);
 
 describe('getFilterOptions', () => {
-  test('lists every store, and each department and brand once', () => {
+  test('lists every store with its location, and each department and brand once', () => {
     expect(getFilterOptions(items, stores)).toEqual({
       stores: [
         { key: 'corner', label: 'Corner Market' },
-        { key: 'bigbox', label: 'Big Box' },
+        { key: 'bigbox', label: 'Big Box, Main St' },
       ],
       // "Deli" and "deli " are the same department name.
       departments: [
