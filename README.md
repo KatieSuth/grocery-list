@@ -4,7 +4,7 @@ An Expo app for iOS and Android that keeps your grocery items organized by store
 
 Built so far:
 - the first-run **setup flow**: add stores and departments, then the items you usually buy and where to find them;
-- the **main app**, with four tabs: Trip (the shopping trip: pick a store, check items into the cart in department order, finish to log them as bought), Items (the master list, with checkboxes, free-text quantities, search, filters, sorting and "last bought"), Stores (store configuration), and Settings (light/dark mode, delete all data).
+- the **main app**, with four tabs: Items (the master list and home screen, with checkboxes, free-text quantities, search, filters, sorting and "last bought"), Trip (the shopping trip: pick a store, check items into the cart in department order, finish to log them as bought), Stores (store configuration), and Settings (light/dark mode, the Items tab's default sort, Import from CSV, Delete all data).
 
 See the [functional specification](docs/functional-spec.md) for screen-by-screen behavior.
 
@@ -17,35 +17,25 @@ See the [functional specification](docs/functional-spec.md) for screen-by-screen
 ### Prerequisites
 - Node.js 20 or newer
 - pnpm (`corepack enable` or `npm i -g pnpm`)
-- A desktop browser, for the quickest way to run it (below).
-- Optionally, the **Expo Go** app on an iPhone or Android phone. No custom build is needed: every native module used here ships in Expo Go.
-
-### Run in a browser (recommended for day-to-day debugging)
-
-```bash
-pnpm install
-npx expo start --web
-```
-
-Open **http://localhost:8081** in any browser. From WSL2, a browser on Windows works too, because WSL forwards `localhost`. Use the browser's device toolbar (F12 → toggle device, e.g. Pixel 7) for a phone-sized view, and its DevTools for console errors.
-
-- Data lives in the browser's `localStorage`.
-- **To see the first-run screens again,** clear site data: DevTools → Application → Storage → Clear site data. Or open a private window.
-- On web, delete confirmations use the browser's own confirm dialog, and the tab bar is drawn by the app (see [Main app tabs](#main-app-tabs)).
+- The **Expo Go** app on an Android phone or iPhone. No custom build is needed: every native module used here ships in Expo Go. This is how the app is mainly tested.
+- Optionally, a desktop browser, for quick checks and the Playwright tests. Web isn't a release target; it was used for early testing.
 
 ### Run on a phone with Expo Go
 
 ```bash
+pnpm install
 npx expo start
 ```
 
-Scan the QR code: on iPhone with the Camera app, on Android from inside Expo Go. The phone must be able to reach this computer over the network.
+Scan the QR code: on Android from inside Expo Go, on iPhone with the Camera app. The phone must be able to reach this computer over the network (from WSL2, see below).
+
+While it runs: press `r` to reload. Saved code changes appear live.
+
+**To see the first-run screens again,** use **Settings → Delete all data** in the app. This erases your stores, items and trips.
 
 #### Running from WSL2
 
-Getting a phone to load the app from WSL2 is unreliable. It didn't work on the original dev machine (see below), which is why the browser is the default.
-
-By default WSL2 uses NAT networking: `hostname -I` shows a `172.x` address that phones can't reach, so a plain `npx expo start` QR code just spins in Expo Go. There are two fixes:
+WSL2's default NAT networking gives the dev server a `172.x` address (`hostname -I`) that phones can't reach, so the QR code from a plain `npx expo start` just spins in Expo Go. Use one of these:
 
 - **Tunnel:** `npx expo start --tunnel`. This relays through ngrok (`@expo/ngrok` is a dev dependency), so the dev server is reachable at a public URL while it runs. The QR URL should end in `.exp.direct`. "Failed to download remote update" in Expo Go means the phone couldn't fetch the manifest or bundle through the tunnel; restart the tunnel, or switch to mirrored networking.
 - **Mirrored networking (more reliable, nothing public; Windows 11 22H2+):**
@@ -54,9 +44,17 @@ By default WSL2 uses NAT networking: `hostname -I` shows a `172.x` address that 
   3. Run plain `npx expo start` with the phone on the same Wi-Fi.
   4. If the phone still can't connect, allow port 8081 in an administrator PowerShell: `New-NetFirewallRule -DisplayName "Expo Metro" -Direction Inbound -LocalPort 8081 -Protocol TCP -Action Allow`.
 
-While it runs: press `r` to reload. Saved code changes appear live.
+### Run in a browser (quick checks)
 
-**To see the first-run screens again,** use **Settings → Delete all data** in the app. This erases your stores, items and trips.
+```bash
+npx expo start --web
+```
+
+Open **http://localhost:8081** in any browser. From WSL2, a browser on Windows works too, because WSL forwards `localhost`. Use the browser's device toolbar (F12 → toggle device, e.g. Pixel 7) for a phone-sized view, and its DevTools for console errors.
+
+- Data lives in the browser's `localStorage`.
+- **To see the first-run screens again,** clear site data (DevTools → Application → Storage → Clear site data), open a private window, or use Settings → Delete all data.
+- On web, confirmations use the browser's own OK/Cancel dialog, and the tab bar is drawn by the app (see [Main app tabs](#main-app-tabs)).
 
 ---
 
@@ -103,10 +101,11 @@ src/
     item-form-screen.tsx  Add / edit item (?id=), takes backTo
   domain/                 Pure logic: no React, no database
     types.ts              Store, Department, Item, ItemLocation, ListEntry, TripRecord
-    departments.ts        Add/remove/move/copy
-    store-draft.ts        Store form state + validation
-    item-draft.ts         Item form state + validation, location pruning
-    describe.ts           "Store · Dept" display text
+    departments.ts        Add/remove/move/copy, suggestions from other stores
+    store-draft.ts        Store form state + validation (incl. same name and location), changes, removed departments in use
+    item-draft.ts         Item form state + validation, changes, duplicate items, location pruning
+    store-sort.ts         Store order everywhere: A–Z by name, then location
+    describe.ts           "Store · Dept" display text, and its spoken form ("Dept at Store")
     quantity.ts           Free-text quantity cleanup
     item-filter.ts        Master-list search + checked/store/department/brand filters
     item-sort.ts          Master-list sort: by name, department or last bought; either direction
@@ -116,13 +115,13 @@ src/
     csv-import.ts         CSV import: parse + validate the file (papaparse), plan the changes, messages
     names.ts              The name rules (length, forbidden characters) shared by the forms and the import
   data/                   Repositories: the only code that touches collections
-    stores-repo.ts        observe / save / delete stores (+ prune items)
+    stores-repo.ts        observe (A–Z) / save / delete stores (+ prune items), add a department from the item form
     items-repo.ts         observe / save / delete items
     list-repo.ts          check / uncheck items, set quantity, cart marks
     settings-repo.ts      setupComplete flag, trip store + reverse order, appearance, items' default sort
     trips-repo.ts         finishTrip(): log, set last bought, uncheck
     erase-repo.ts         deleteAllData(): delete and purge everything, back to setup
-    import-repo.ts        applyImportPlan(): write a checked CSV import (add-only)
+    import-repo.ts        applyImportPlan(): write a checked CSV import (adds, and fills in missing store locations)
   db/
     schema.ts             RxDB JSON schemas
     database.ts           createAppDatabase(), getAppDatabase() singleton
@@ -132,7 +131,10 @@ src/
     change-events.ts      Clears RxDB's leftover change-event keys after Delete all data
     database-provider.tsx <DatabaseProvider>, useDatabase()
   hooks/
-    use-data.ts           useStores(), useItems(), useListEntries(), useSetupComplete(), useTripSettings(), useColorSchemeChoice()
+    use-data.ts           useStores(), useItems(), useListEntries(), useSetupComplete(), useTripSettings(), useColorSchemeChoice(), useItemSortChoice()
+    use-unsaved-changes-warning.ts  Asks before a form with changes is closed (usePreventRemove)
+    use-delayed-quantity-save.ts    Saves quantities once typing pauses (and on close / backgrounding)
+    use-announcement.ts   Reads a message aloud on iOS (Android uses live regions)
     use-color-scheme.ts   Device scheme unless overridden in Settings (.web.ts: also SSR-safe)
     color-scheme-choice.ts  Context holding the Settings choice
     use-theme.ts          Colors for the current scheme
@@ -140,8 +142,10 @@ src/
   utils/                  Small helpers; platform splits as .web.ts
     pick-csv-file.ts      Pick + read one CSV (expo-document-picker, expo-file-system; .web.ts: browser File)
     notify.ts             Message with OK (Alert; .web.ts: window.alert)
-  components/             Shared UI (Button, TextField, Screen, Card, editors…)
-  constants/theme.ts      Colors (light/dark), spacing
+    confirm.ts            Cancel / confirm question (Alert; .web.ts: window.confirm)
+    run-write.ts          runWrite(): a database write that tells the user if it fails
+  components/             Shared UI (Button, TextField, Screen, Card, SwitchRow, StatusText, editors…)
+  constants/theme.ts      Colors (light/dark, with contrast checked by a test), spacing, chip tap area
   test-utils/             Test helpers (not shipped)
   __tests__/              All tests, mirroring src/
 docs/
@@ -190,10 +194,10 @@ Departments are reordered with [`react-native-sortables`](https://github.com/Mat
 `(tabs)/_layout.tsx` renders `components/app-tabs`, which has a different file per platform:
 
 - **iOS/Android** (`app-tabs.tsx`): `NativeTabs` from `expo-router/native-tabs`, so each platform's own tab bar is used. Icons are SF Symbols on iOS and Material Symbols on Android, set with the `sf` and `md` props; both ship in Expo Go.
-- Four tabs: Trip, Items, Stores, Settings (gear: `gearshape` / `settings`).
+- Four tabs: Items (the home screen, `/`), Trip, Stores, Settings (gear: `gearshape` / `settings`).
 - **Web** (`app-tabs.web.tsx`): `NativeTabs` draws its bar at the top of the page, over the screen header. Web instead gets a bottom tab bar built from expo-router's headless `Tabs` (`expo-router/ui`), with the same Material icons drawn by `SymbolView`.
 
-Each tab is a folder with its own `Stack`, so forms push inside the tab and keep the tab bar visible. The add/edit forms live in `src/screens/` and are reused by the setup and tab routes. A `backTo` prop says where Save, Cancel, and Delete return to. The splash screen stays up until the flag has loaded, so users never see the wrong flow flash.
+Each tab is a folder with its own `Stack`. The main app's add/edit forms (`/item-form`, `/store-form`) are in the root Stack instead, so they cover the tab bar (see [Navigation gate](#navigation-gate)). The forms themselves live in `src/screens/` and are reused by the setup and main-app routes. A `backTo` prop says where Save, Cancel, and Delete return to. The splash screen stays up until the flag has loaded, so users never see the wrong flow flash.
 
 ### Light and dark mode
 
@@ -226,11 +230,11 @@ Checked state is a separate collection, not a field on `items`. Checks change co
 3. Bulk-remove the entries still in the cart. `bulkRemove` reports failures in its result instead of throwing, so the result is checked and an error is thrown.
 4. Clear `pending`.
 
-Every step can be repeated safely. If any step fails, the user sees an error. The next `finishTrip` first completes every pending record, rather than logging a new trip, so a retry never logs twice or loses items. An item that was unchecked and checked again in between keeps its new check, because only entries still in the cart are removed.
+Every step can be repeated safely. If any step fails, the user sees an error. The next `finishTrip` first completes every pending record, then logs the current cart as usual, so a retry never logs twice or loses items. While it runs, the Trip tab locks its store picker, so switching stores can't clear the cart halfway through. An item that was unchecked and checked again in between keeps its new check, because only entries still in the cart are removed.
 
-**Delete all data** (`deleteAllData` in `erase-repo.ts`) bulk-removes every trip, entry, item and store, checking each result. Only then does it reset `settings` to `{ setupComplete: false }`, keeping `colorScheme`. That sends the app back to setup only once everything is gone, so a failed attempt can simply be retried. RxDB keeps deleted documents as tombstones. The `RxDBCleanupPlugin` purges them a month after deletion, and `deleteAllData` purges them at once with `cleanup(0)`. The LocalStorage storage also keeps each collection's last change event, including the old document, for other tabs until the database closes, so `forgetChangeEvents` removes those keys too.
+**Delete all data** (`deleteAllData` in `erase-repo.ts`) bulk-removes every trip, entry, item and store, checking each result. Only then does it reset `settings` to `{ setupComplete: false }`, keeping `colorScheme`, `itemSort` and `itemSortDirection`. That sends the app back to setup only once everything is gone, so a failed attempt can simply be retried. RxDB keeps deleted documents as tombstones. The `RxDBCleanupPlugin` purges them a month after deletion, and `deleteAllData` purges them at once with `cleanup(0)`. The LocalStorage storage also keeps each collection's last change event, including the old document, for other tabs until the database closes, so `forgetChangeEvents` removes those keys too.
 
-**Migrations:** version 1 of `items`, `listEntries`, `settings` and `trips` only added optional fields, so each uses the identity strategy `addedOptionalFields` from `schema.ts`. Settings version 2 added `colorScheme` the same way (`settingsMigrations`). The `RxDBMigrationSchemaPlugin` is always registered, and `__tests__/db/database-test.ts` opens real version-0 databases to check they migrate.
+**Migrations:** version 1 of `items`, `listEntries`, `settings` and `trips` only added optional fields, so each uses the identity strategy `addedOptionalFields` from `schema.ts`. Settings versions 2 and 3 added `colorScheme`, then `itemSort` and `itemSortDirection`, the same way (`settingsMigrations`). The `RxDBMigrationSchemaPlugin` is always registered, and `__tests__/db/database-test.ts` opens real version-0 databases to check they migrate.
 
 > **Adding a collection** needs no migration: existing databases simply gain it. A test in `__tests__/db/database-test.ts` covers this.
 >
@@ -259,7 +263,8 @@ Settings → Import from CSV reads a "Store, Item name, Department, Brand, Locat
 - **Picking** uses `expo-document-picker` (the system picker; no storage permission). On **Android** the picker returns a one-time `content://` link that `expo-file-system` reads directly, with nothing copied. The picker's cache copy can't be used there, because Expo Go's file sandbox doesn't allow reading the cache folder it lands in, so the file looks missing. On **iOS** the copy is needed to read the file, and it's deleted afterwards, but only if it's in the app's cache. The size is checked before reading: an empty or unknown size is refused, and so is anything over 1 MB. On web, the browser's `File` is read instead.
 - **Parsing** uses papaparse on the string only: `header: false` (arrays, so file contents never become object keys), `dynamicTyping: false`, a fixed `,` delimiter, and no workers or downloads. Quote errors reject the file.
 - **Validation** (`domain/csv-import.ts`) checks every row before anything is written. It enforces the row, department and store limits, and checks every value with the same name rules as the forms (`domain/names.ts`: length, and no control, zero-width or bidi characters). Lookups use `Map`s, and ids always come from `createId()`.
-- **Writing** (`data/import-repo.ts`) creates stores first, then appends departments, then creates items, then appends locations. It only ever adds, so if a later step fails, nothing is left pointing at a missing department.
+- **Matching stores** is by name and location. A row without a location matches the only store with that name (several is an error); a row with a location for a same-named store that has none gives it that location.
+- **Writing** (`data/import-repo.ts`) creates stores first, then appends departments, then fills in missing store locations, then creates items, then appends item locations. It only ever adds (a store's location is set only if it still has none), so if a later step fails, nothing is left pointing at a missing department.
 
 The rules users see are in [functional spec §5](docs/functional-spec.md#5-data-rules).
 
@@ -272,7 +277,7 @@ RxDB has built-in replication (HTTP, GraphQL, CouchDB, Firestore, Supabase, …)
 ## Testing
 
 ```bash
-pnpm test          # everything, iOS + Android, coverage enforced at 100%
+pnpm test          # everything: iOS + Android (+ web-only tests), coverage enforced at 100%
 npx jest src/__tests__/domain --coverage=false   # a subset
 ```
 
@@ -295,7 +300,7 @@ Web screens can't be rendered by React Native Testing Library: it only accepts R
 | `__tests__/db` | Database creation, schema validation, production mode, storage setup, hashing, provider. |
 | `__tests__/hooks`, `components` | Hooks and small UI helpers. |
 | `__tests__/app` | **Full app** tests: the real router and screens, driven like a user (press buttons, type text) against an in-memory database. |
-| `e2e/` (Playwright) | The web build in a real browser: setup, tabs, checking and quantities surviving a reload, delete confirmations. |
+| `e2e/` (Playwright) | The web build in a real browser: setup, drag-to-reorder, tabs, search and filters, checking and quantities surviving a reload, a shopping trip, CSV import, confirmations. |
 
 ### Writing a full-app test
 
@@ -340,7 +345,10 @@ test('adds a store', async () => {
   - `react-native-keyboard-controller` (which keeps the focused field above the keyboard in `Screen`) uses its official mock.
   - In tests, reorder departments with `moveDepartment(name, 'up' | 'down')` (the screen-reader actions) or `dragDepartment(from, to)` (simulates a drop).
   - Real dragging is covered by the Playwright tests.
-- **Fire-and-forget writes** (checkbox, quantity): assert on the DB with `eventually(...)` from `test-utils/app`. It retries while advancing the fake timers.
+- **Fire-and-forget writes** (checkbox, quantity): assert on the DB with `eventually(...)` from `test-utils/app`. It retries while advancing the fake timers, which also lets the delayed quantity save run (`QUANTITY_SAVE_DELAY_MS`).
+- **Rows say everything they show,** so their spoken labels are long ("Soup, Acme. Deli at Corner Market. Last bought today."). Find them by the start: `press(/^Soup, Acme\./)`.
+- **Alerts:** `answerAlertWith('Leave')` from `test-utils/app` makes `Alert.alert` press that button.
+- **On/off rows** (`SwitchRow`) are one `switch` element: `getByRole('switch', { name: 'Needed' })`, then `toBeChecked()` and `fireEvent.press`. The inner native switch is hidden from accessibility; find it with `getByTestId('switch-row-toggle', { includeHiddenElements: true })`.
 - **Test files go in `__tests__/`** and are named `*-test.ts(x)`. Web-only tests are named `*.web-test.ts(x)`.
 
 ---
@@ -356,15 +364,21 @@ When upgrading the SDK, also check the Reanimated rules copied into `jest.resolv
 - **Navigation:** import `router`, `Link`, and `useLocalSearchParams` from `expo-router`. Use `goBack(fallback)` from `utils/navigation` so screens opened from a deep link still have somewhere to go.
 - **No `ios/` or `android/` folders.** They're generated by Expo (Continuous Native Generation). Configure native behavior in `app.json` and config plugins.
 - **New native libraries** may not be in Expo Go. Adding one means using a development build (`npx expo run:ios|android` or `eas build --profile development`).
+- **Fire-and-forget writes** from taps go through `runWrite(write, message)` from `utils/run-write`, so a failure is shown instead of silently ignored.
+- **Forms** use `useUnsavedChangesWarning(changed, 'item')` and close with the `leave` function it returns after saving or deleting, so they don't ask.
+- **Messages** that appear after something happens use `StatusText` (notes) or `ErrorText` (errors), which are read aloud on every platform.
+- **Names** (stores, items, departments, brands, locations) follow `domain/names.ts`: `checkName()` and `maxLength={MAX_NAME_LENGTH}` on the field.
+- **Store order** comes from `observeStores` (A–Z by name, then location). Don't re-sort stores elsewhere.
 - **pnpm build scripts:** `pnpm-workspace.yaml` explicitly denies `@parcel/watcher`'s install script. It's an optional file watcher, and pnpm 12 otherwise fails the install.
 
 ---
 
 ## Status and known limitations
 
-- **Verified in a browser:** the full app runs in Chromium with no console errors, and data survives reloads (Playwright, `e2e/`).
-- **Not yet run on a phone or simulator.** Loading in Expo Go on Android from WSL2 failed at the network level: the tunnel gave "Failed to download remote update", and the dev server never received a request. The iOS and Android bundles build and all Jest tests pass, but the on-device storage path (`storage.native.ts`) is only checked by tests so far.
-- Department drag-and-drop is verified in a real browser, but not yet on a phone. Known library issue: on iOS with Gesture Handler 2.x, a dragged item could get stuck after a screen was detached and re-attached (react-native-sortables issue #349). SDK 58 ships Gesture Handler 3, which fixes it, but this isn't confirmed on a phone yet. Screen readers on **web** don't get the Move up / Move down actions, because React Native Web doesn't support accessibility actions.
-- On iOS, VoiceOver doesn't automatically announce validation messages.
+- **Tested mainly on an Android phone in Expo Go.** If the dev server runs in WSL2, the phone can't reach it without a tunnel or mirrored networking (see [Running from WSL2](#running-from-wsl2)).
+- **Not yet run on an iPhone.** The iOS bundle builds and every Jest test runs as iOS. Untested on a device: drag-to-reorder departments (react-native-sortables issue #349, a dragged item sticking after a screen was detached and re-attached on iOS with Gesture Handler 2.x, should be fixed by Gesture Handler 3 in SDK 58) and VoiceOver announcements.
+- **Web** is for quick checks and the Playwright tests (`e2e/`), not a release target. The database isn't shared between browser tabs (`multiInstance: false`), so two open tabs don't see each other's changes. Screen readers on web don't get the Move up / Move down actions, because React Native Web doesn't support accessibility actions.
+- **Accessibility** was reviewed in code (spoken labels, headings, announcements, contrast, tap targets, large text), but not yet tried with TalkBack or VoiceOver.
+- **Storage** is RxDB's LocalStorage storage on SQLite-backed `localStorage`, which rewrites whole index arrays on each write. That's fine for a personal list; it would be worth measuring with thousands of items.
 - The only way back into the setup flow from the main app is Settings → Delete all data. Everything else is edited from the tabs.
 - Out of scope for now: a screen for browsing the trip log, backend sync, store addresses, and UPC scanning. See [functional spec §8](docs/functional-spec.md#8-out-of-scope-for-now).
