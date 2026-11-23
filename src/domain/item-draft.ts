@@ -1,4 +1,6 @@
-import { normalizeText } from '@/utils/text';
+import { nameKey, normalizeText } from '@/utils/text';
+
+import { checkName } from './names';
 
 import type { Item, ItemLocation, Store } from './types';
 
@@ -14,6 +16,7 @@ export type ItemDraft = {
 
 export type ItemDraftErrors = {
   name?: string;
+  brand?: string;
   stores?: string;
   /** Missing-department errors keyed by store id. */
   departments?: Record<string, string>;
@@ -60,9 +63,14 @@ function selectedStores(draft: ItemDraft, stores: Store[]): Store[] {
 
 export function validateItemDraft(draft: ItemDraft, stores: Store[]): ItemDraftErrors {
   const errors: ItemDraftErrors = {};
+  const name = checkName(draft.name, 'Item name', { required: true });
+  const brand = checkName(draft.brand, 'Brand', { required: false });
   if (!normalizeText(draft.name)) {
     errors.name = 'Item name is required.';
+  } else if (!name.ok) {
+    errors.name = name.error;
   }
+  if (!brand.ok) errors.brand = brand.error;
   const selected = selectedStores(draft, stores);
   if (selected.length === 0) {
     errors.stores = 'Choose at least one store.';
@@ -95,5 +103,30 @@ export function pruneLocations(locations: ItemLocation[], stores: Store[]): Item
     stores.some(
       (s) => s.id === loc.storeId && s.departments.some((d) => d.id === loc.departmentId),
     ),
+  );
+}
+
+/** Whether the draft differs from how the form started (`initial`). */
+export function itemDraftChanged(draft: ItemDraft, initial: ItemDraft): boolean {
+  const stores = Object.keys(draft.selections);
+  return (
+    draft.name !== initial.name ||
+    draft.brand !== initial.brand ||
+    stores.length !== Object.keys(initial.selections).length ||
+    stores.some((id) => !(id in initial.selections) || draft.selections[id] !== initial.selections[id])
+  );
+}
+
+/**
+ * Another item with the same name and brand (ignoring case and spacing; no brand matches no
+ * brand), if there is one. Not an error, since two can be meant, but worth asking about. An
+ * imported file would treat them as the same item.
+ */
+export function findDuplicateItem(draft: ItemDraft, items: Item[], editingId?: string): Item | undefined {
+  return items.find(
+    (item) =>
+      item.id !== editingId &&
+      nameKey(item.name) === nameKey(draft.name) &&
+      nameKey(item.brand ?? '') === nameKey(draft.brand),
   );
 }

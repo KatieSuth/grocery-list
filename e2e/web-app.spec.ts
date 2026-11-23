@@ -298,7 +298,8 @@ test('an item in two departments shows under both, sharing its check and quantit
   await quantities.nth(1).fill('1 gallon');
   await expect(quantities.nth(0)).toHaveValue('1 gallon');
 
-  // It's saved: still there after a reload.
+  // It's saved once typing pauses: still there after a reload.
+  await page.waitForTimeout(1_000);
   await page.reload();
   await button(page, 'Sort and filter, by name, A to Z').click();
   await page.getByRole('radio', { name: 'Sort by department' }).click();

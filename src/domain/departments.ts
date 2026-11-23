@@ -1,6 +1,8 @@
 import { createId } from '@/utils/id';
 import { nameKey, normalizeText, sameName } from '@/utils/text';
 
+import { checkName } from './names';
+
 import type { Department, Store } from './types';
 
 export type AddDepartmentResult =
@@ -8,10 +10,12 @@ export type AddDepartmentResult =
   | { ok: false; error: string };
 
 export function addDepartment(departments: Department[], rawName: string): AddDepartmentResult {
-  const name = normalizeText(rawName);
-  if (!name) {
+  if (!normalizeText(rawName)) {
     return { ok: false, error: 'Enter a department name.' };
   }
+  const checked = checkName(rawName, 'Department name', { required: true });
+  if (!checked.ok) return checked;
+  const name = checked.value;
   if (departments.some((d) => sameName(d.name, name))) {
     return { ok: false, error: `"${name}" is already in the list.` };
   }

@@ -2,7 +2,9 @@ import {
   chooseDepartment,
   draftToLocations,
   emptyItemDraft,
+  findDuplicateItem,
   isItemDraftBlank,
+  itemDraftChanged,
   itemToDraft,
   pruneLocations,
   toggleStore,
@@ -94,4 +96,38 @@ test('pruneLocations drops missing stores and departments', () => {
       stores,
     ),
   ).toEqual([{ storeId: 's1', departmentId: 'd1' }]);
+});
+
+test('an item draft is changed by any edit to its name, brand, stores or departments', () => {
+  const initial = { name: 'Milk', brand: '', selections: { s1: 'd1', s2: null } };
+  expect(itemDraftChanged({ ...initial, selections: { s2: null, s1: 'd1' } }, initial)).toBe(false);
+  expect(itemDraftChanged({ ...initial, name: 'Oat milk' }, initial)).toBe(true);
+  expect(itemDraftChanged({ ...initial, brand: 'Acme' }, initial)).toBe(true);
+  expect(itemDraftChanged({ ...initial, selections: { s1: 'd2', s2: null } }, initial)).toBe(true);
+  expect(itemDraftChanged({ ...initial, selections: { s1: 'd1' } }, initial)).toBe(true);
+  // Same number of stores, but a different one.
+  expect(itemDraftChanged({ ...initial, selections: { s1: 'd1', s3: null } }, initial)).toBe(true);
+});
+
+test('item names and brands follow the shared name rules', () => {
+  const stores: Store[] = [{ id: 's1', name: 'Shop', departments: [{ id: 'd1', name: 'Deli' }], createdAt: 1 }];
+  const draft = { name: 'Milk\u202E', brand: 'b'.repeat(101), selections: { s1: 'd1' } };
+  expect(validateItemDraft(draft, stores)).toEqual({
+    name: 'Item name contains hidden or control characters, which aren’t allowed.',
+    brand: 'Brand is longer than 100 characters.',
+  });
+});
+
+test('findDuplicateItem finds another item with the same name and brand', () => {
+  const items = [
+    { id: 'i1', name: 'Milk', brand: 'Acme', locations: [], createdAt: 1 },
+    { id: 'i2', name: 'Bread', locations: [], createdAt: 2 },
+  ];
+  const draft = (name: string, brand = '') => ({ name, brand, selections: {} });
+  expect(findDuplicateItem(draft(' milk ', 'ACME'), items)?.id).toBe('i1');
+  expect(findDuplicateItem(draft('Bread'), items)?.id).toBe('i2');
+  // A different brand (or none) is a different item; an item isn't a duplicate of itself.
+  expect(findDuplicateItem(draft('Milk'), items)).toBeUndefined();
+  expect(findDuplicateItem(draft('Bread', 'Acme'), items)).toBeUndefined();
+  expect(findDuplicateItem(draft('Milk', 'Acme'), items, 'i1')).toBeUndefined();
 });

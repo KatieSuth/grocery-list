@@ -44,10 +44,22 @@ describe('reading the file', () => {
     expect(rowsOf('  STORE , item , Department\nKroger,Milk,Dairy')).toHaveLength(1);
     expect(rowsOf('store,item name,department,BRAND,\nKroger,Milk,Dairy')).toHaveLength(1);
     // Only the first row can be a header.
-    expect(errorsOf('Kroger,Milk,Dairy\nStore,Item,Department,Brand,Extra')[0]).toEqual({
+    expect(errorsOf('Kroger,Milk,Dairy\nStore,Item,Department,Brand,Location,Extra')[0]).toEqual({
       row: 2,
-      message: 'There are more than 4 columns. Use: Store, Item name, Department, Brand.',
+      message: 'There are more than 5 columns. Use: Store, Item name, Department, Brand, Location.',
     });
+  });
+
+  test('a fifth column gives the store’s location; it’s optional and its header is matched loosely', () => {
+    expect(rowsOf('Store,Item name,Department,Brand,Store Location\nKroger,Milk,Dairy,, Main  St ')).toEqual([
+      { row: 2, store: 'Kroger', name: 'Milk', department: 'Dairy', brand: '', location: 'Main St' },
+    ]);
+    expect(rowsOf('store,item,department,brand,LOCATION\nKroger,Milk,Dairy,Acme,')).toEqual([
+      { row: 2, store: 'Kroger', name: 'Milk', department: 'Dairy', brand: 'Acme' },
+    ]);
+    expect(errorsOf(`Kroger,Milk,Dairy,,${'x'.repeat(MAX_FIELD_LENGTH + 1)}`)).toEqual([
+      { row: 1, message: `Location is longer than ${MAX_FIELD_LENGTH} characters.` },
+    ]);
   });
 
   test('quoted values can hold commas, quotes and line breaks; spacing is tidied', () => {
@@ -172,12 +184,13 @@ const milk: Item = {
 };
 
 let rowNumber = 0;
-const row = (store: string, name: string, department: string, brand = ''): ImportRow => ({
+const row = (store: string, name: string, department: string, brand = '', location = ''): ImportRow => ({
   row: ++rowNumber,
   store,
   name,
   department,
   brand,
+  ...(location ? { location } : {}),
 });
 beforeEach(() => {
   rowNumber = 0;
@@ -215,7 +228,7 @@ describe('working out what to import', () => {
       ['Pears', [{ storeId: aldi.id, departmentId: aldi.departments[0].id }]],
     ]);
     expect(plan.departmentAdds.size).toBe(0);
-    expect(plan.counts).toEqual({ newStores: 1, newDepartments: 2, newItems: 3, updatedItems: 0, skipped: 0 });
+    expect(plan.counts).toEqual({ newStores: 1, newDepartments: 2, newItems: 3, updatedItems: 0, locatedStores: 0, skipped: 0 });
   });
 
   test('ids are always made by the app, never taken from the file', () => {
@@ -255,7 +268,7 @@ describe('working out what to import', () => {
     const plan = planOf([row('kroger', 'MILK', 'Dairy', 'organic valley')]);
     expect(plan.newItems).toEqual([]);
     expect(plan.locationAdds.size).toBe(0);
-    expect(plan.counts).toEqual({ newStores: 0, newDepartments: 0, newItems: 0, updatedItems: 0, skipped: 1 });
+    expect(plan.counts).toEqual({ newStores: 0, newDepartments: 0, newItems: 0, updatedItems: 0, locatedStores: 0, skipped: 1 });
     expect(isEmptyImport(plan.counts)).toBe(true);
   });
 
@@ -340,6 +353,47 @@ describe('working out what to import', () => {
     expect(plan.counts.skipped).toBe(1);
   });
 
+  test('stores are matched by name and location', () => {
+    const krogerMain: Store = { ...kroger, id: 's3', location: 'Main St', departments: [{ id: 'd4', name: 'Dairy' }] };
+    const plan = planOf([row('Kroger', 'Eggs', 'Dairy', '', 'main st'), row('Kroger', 'Cheese', 'Dairy')], [kroger, krogerMain], []);
+    // "Main St" means that Kroger; no location means the Kroger without one.
+    expect(plan.newItems.map((i) => i.locations[0].storeId)).toEqual(['s3', 's1']);
+    expect(plan.newStores).toEqual([]);
+  });
+
+  test('a new location for a store name makes a new store, unless the existing one has no location', () => {
+    const krogerMain: Store = { ...kroger, location: 'Main St' };
+    const plan = planOf([row('Kroger', 'Eggs', 'Dairy', '', 'Elm St')], [krogerMain], []);
+    expect(plan.newStores).toEqual([
+      expect.objectContaining({ name: 'Kroger', location: 'Elm St', departments: [expect.objectContaining({ name: 'Dairy' })] }),
+    ]);
+
+    // Kroger has no location yet: it gets this one, rather than a second Kroger being made.
+    const filled = planOf([row('Kroger', 'Eggs', 'Dairy', '', 'Elm St'), row('Kroger', 'Bread', 'Dairy', '', 'elm st')]);
+    expect(filled.newStores).toEqual([]);
+    expect(filled.storeLocations).toEqual(new Map([['s1', 'Elm St']]));
+    expect(filled.newItems.map((i) => i.locations[0].storeId)).toEqual(['s1', 's1']);
+    expect(filled.counts.locatedStores).toBe(1);
+    expect(isEmptyImport({ ...filled.counts, newItems: 0 })).toBe(false);
+  });
+
+  test('a store made by the file can get its location from a later row', () => {
+    const plan = planOf([row('Aldi', 'Apples', 'Produce'), row('Aldi', 'Pears', 'Produce', '', 'Oak Ave')], [], []);
+    expect(plan.newStores).toEqual([expect.objectContaining({ name: 'Aldi', location: 'Oak Ave' })]);
+    expect(plan.storeLocations.size).toBe(0);
+    expect(plan.counts.locatedStores).toBe(0);
+  });
+
+  test('a row without a location is an error when several stores share its name', () => {
+    const main: Store = { ...kroger, id: 's3', location: 'Main St' };
+    const elm: Store = { ...kroger, id: 's4', location: 'Elm St' };
+    expect(planErrorsOf([row('kroger', 'Eggs', 'Dairy')], [main, elm], [])).toEqual([
+      { row: 1, message: 'There’s more than one store called “kroger”. Put its location in the Location column to say which.' },
+    ]);
+    // Only one Kroger: no location needed, whatever its location.
+    expect(planOf([row('kroger', 'Eggs', 'Dairy')], [main], []).newItems[0].locations[0].storeId).toBe('s3');
+  });
+
   test('the store and department limits are enforced', () => {
     const many = Array.from({ length: MAX_STORES }, (_, i) => row(`Store ${i}`, 'Milk', 'Dairy'));
     expect(planErrorsOf(many)).toEqual([{ message: `This would make more than ${MAX_STORES} stores.` }]);
@@ -372,19 +426,25 @@ describe('messages', () => {
   });
 
   test('the question before importing says what will change', () => {
-    expect(describeImportPlan({ newStores: 1, newDepartments: 2, newItems: 3, updatedItems: 1, skipped: 4 })).toBe(
+    expect(describeImportPlan({ newStores: 1, newDepartments: 2, newItems: 3, updatedItems: 1, locatedStores: 0, skipped: 4 })).toBe(
       'This adds 3 new items, 1 existing item at another store, 1 new store and 2 new departments. 4 rows are already in your list and will be skipped.'
     );
-    expect(describeImportPlan({ newStores: 0, newDepartments: 0, newItems: 1, updatedItems: 0, skipped: 1 })).toBe(
+    expect(describeImportPlan({ newStores: 0, newDepartments: 0, newItems: 1, updatedItems: 0, locatedStores: 0, skipped: 1 })).toBe(
       'This adds 1 new item. 1 row is already in your list and will be skipped.'
     );
-    expect(describeImportPlan({ newStores: 0, newDepartments: 0, newItems: 1500, updatedItems: 2, skipped: 0 })).toBe(
+    expect(describeImportPlan({ newStores: 0, newDepartments: 0, newItems: 1500, updatedItems: 2, locatedStores: 0, skipped: 0 })).toBe(
       'This adds 1,500 new items and 2 existing items at another store.'
     );
   });
 
+  test('filling in store locations is mentioned', () => {
+    expect(describeImportPlan({ newStores: 0, newDepartments: 0, newItems: 2, updatedItems: 0, locatedStores: 1, skipped: 0 })).toBe(
+      'This adds 2 new items and a location for 1 existing store.'
+    );
+  });
+
   test('the message afterwards says what changed', () => {
-    expect(describeImportResult({ newStores: 2, newDepartments: 1, newItems: 0, updatedItems: 0, skipped: 3 })).toBe(
+    expect(describeImportResult({ newStores: 2, newDepartments: 1, newItems: 0, updatedItems: 0, locatedStores: 0, skipped: 3 })).toBe(
       'Added 2 new stores and 1 new department.'
     );
   });

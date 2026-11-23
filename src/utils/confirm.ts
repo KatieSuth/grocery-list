@@ -7,6 +7,8 @@ export type ConfirmOptions = {
   /** Defaults to "Cancel". */
   cancelLabel?: string;
   onConfirm: () => void;
+  /** Called when the user cancels instead. */
+  onCancel?: () => void;
 };
 
 /** Asks before an action, with a cancel button and a confirm button. */
@@ -20,11 +22,11 @@ export function confirmDestructive(options: ConfirmOptions): void {
 }
 
 function showConfirm(
-  { title, message, confirmLabel, cancelLabel = 'Cancel', onConfirm }: ConfirmOptions,
+  { title, message, confirmLabel, cancelLabel = 'Cancel', onConfirm, onCancel }: ConfirmOptions,
   style: 'default' | 'destructive',
 ): void {
   Alert.alert(title, message, [
-    { text: cancelLabel, style: 'cancel' },
+    { text: cancelLabel, style: 'cancel', onPress: onCancel },
     { text: confirmLabel, style, onPress: onConfirm },
   ]);
 }

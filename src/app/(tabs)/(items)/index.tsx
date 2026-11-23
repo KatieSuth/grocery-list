@@ -11,7 +11,7 @@ import { SearchField } from '@/components/search-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { setChecked, setQuantity } from '@/data/list-repo';
+import { setChecked } from '@/data/list-repo';
 import { useDatabase } from '@/db/database-provider';
 import { describeLocations } from '@/domain/describe';
 import { describeLastBought } from '@/domain/last-bought';
@@ -26,6 +26,8 @@ import {
 import { sortItems, type ItemSortChoice } from '@/domain/item-sort';
 import type { Item } from '@/domain/types';
 import { useItemSortChoice, useItems, useListEntries, useStores } from '@/hooks/use-data';
+import { useDelayedQuantitySave } from '@/hooks/use-delayed-quantity-save';
+import { runWrite } from '@/utils/run-write';
 
 /** A department heading or an item, when the list is grouped by department. */
 type Row = { type: 'heading'; key: string; title: string } | { type: 'item'; key: string; item: Item };
@@ -52,6 +54,7 @@ export default function MasterListScreen() {
    * is tidied up (trimmed), so it can't drive the field directly while typing.
    */
   const [typedQuantities, setTypedQuantities] = useState<Record<string, string>>({});
+  const quantitySave = useDelayedQuantitySave(db);
   const [panelOpen, setPanelOpen] = useState(false);
   // For "Last bought today": refreshed whenever the tab is shown, so it stays right across days.
   const [now, setNow] = useState(Date.now);
@@ -80,12 +83,13 @@ export default function MasterListScreen() {
   const toggleChecked = (itemId: string) => {
     // Unchecking discards the quantity, so re-checking starts blank.
     setTypedQuantities(({ [itemId]: _discard, ...rest }) => rest);
-    void setChecked(db, itemId, !entries[itemId]);
+    quantitySave.cancel(itemId);
+    runWrite(() => setChecked(db, itemId, !entries[itemId]), 'Could not update your list. Please try again.');
   };
 
   const changeQuantity = (itemId: string, quantity: string) => {
     setTypedQuantities((typed) => ({ ...typed, [itemId]: quantity }));
-    void setQuantity(db, itemId, quantity);
+    quantitySave.schedule(itemId, quantity);
   };
 
   const clearFilters = () => setFilter({ ...EMPTY_FILTER, query: filter.query });
@@ -146,7 +150,7 @@ export default function MasterListScreen() {
               </ThemedText>
             ) : null}
 
-            <Button label="Add an item" onPress={() => router.push('/items/form')} />
+            <Button label="Add an item" onPress={() => router.push('/item-form')} />
           </View>
         }
         ListEmptyComponent={
@@ -173,7 +177,7 @@ export default function MasterListScreen() {
               quantity={typedQuantities[row.item.id] ?? entries[row.item.id]?.quantity ?? ''}
               onToggle={() => toggleChecked(row.item.id)}
               onQuantityChange={(quantity) => changeQuantity(row.item.id, quantity)}
-              onOpen={() => router.push({ pathname: '/items/form', params: { id: row.item.id } })}
+              onOpen={() => router.push({ pathname: '/item-form', params: { id: row.item.id } })}
             />
           )
         }

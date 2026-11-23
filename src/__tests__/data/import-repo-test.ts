@@ -95,7 +95,7 @@ test('importing the same file twice changes nothing the second time', async () =
   const before = await json(db);
 
   const again = await planFor(db, csv);
-  expect(again.counts).toEqual({ newStores: 0, newDepartments: 0, newItems: 0, updatedItems: 0, skipped: 3 });
+  expect(again.counts).toEqual({ newStores: 0, newDepartments: 0, newItems: 0, updatedItems: 0, locatedStores: 0, skipped: 3 });
   await applyImportPlan(db, again);
   expect(await json(db)).toEqual(before);
 });
@@ -144,4 +144,27 @@ test('a failed bulk write is reported', async () => {
   await applyImportPlan(db, plan);
   await expect(applyImportPlan(db, plan)).rejects.toThrow('Could not save 1 stores');
   await expect(applyImportPlan(db, { ...plan, newStores: [] })).rejects.toThrow('Could not save 1 items');
+});
+
+test('applying a plan fills in a store’s missing location, but keeps one typed in since', async () => {
+  const db = await createTestDatabase();
+  await seed(db);
+  const plan = await planFor(db, 'Kroger,Eggs,Dairy,,Main St\nWhole Foods,Ham,Deli,,Elm St');
+  // Whole Foods gets a location in the app after the plan was made.
+  await (await db.stores.findOne('s2').exec())?.incrementalPatch({ location: 'Downtown' });
+
+  await applyImportPlan(db, plan);
+  const { stores } = await json(db);
+  expect(stores.map((s) => [s.name, s.location])).toEqual([
+    ['Kroger', 'Main St'],
+    ['Whole Foods', 'Downtown'],
+  ]);
+});
+
+test('applying a plan stops if a store to give a location to was deleted', async () => {
+  const db = await createTestDatabase();
+  await seed(db);
+  const plan = await planFor(db, 'Kroger,Eggs,Dairy,,Main St');
+  await db.stores.findOne('s1').remove();
+  await expect(applyImportPlan(db, plan)).rejects.toThrow('A store changed during the import');
 });

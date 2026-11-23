@@ -87,3 +87,11 @@ describe('copyDepartments', () => {
     expect(result).toEqual({ departments: depts, added: [] });
   });
 });
+
+test('department names follow the shared name rules', () => {
+  expect(addDepartment([], 'Deli\u0007')).toEqual({
+    ok: false,
+    error: 'Department name contains hidden or control characters, which aren’t allowed.',
+  });
+  expect(addDepartment([], 'x'.repeat(101))).toEqual({ ok: false, error: 'Department name is longer than 100 characters.' });
+});

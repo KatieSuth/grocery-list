@@ -1,6 +1,6 @@
 import { firstValueFrom } from 'rxjs';
 
-import { deleteStore, observeStores, saveStore } from '@/data/stores-repo';
+import { addStoreDepartment, deleteStore, observeStores, saveStore } from '@/data/stores-repo';
 import { closeTestDatabases, createTestDatabase } from '@/test-utils/db';
 
 afterEach(closeTestDatabases);
@@ -82,4 +82,40 @@ test('observeStores lists stores in creation order', async () => {
   await db.stores.insert({ id: 'late', name: 'Late', departments: [], createdAt: 20 });
   await db.stores.insert({ id: 'early', name: 'Early', departments: [], createdAt: 10 });
   expect((await firstValueFrom(observeStores(db))).map((s) => s.name)).toEqual(['Early', 'Late']);
+});
+
+test('addStoreDepartment adds a tidied department at the end of the walking order', async () => {
+  const db = await createTestDatabase();
+  await saveStore(db, draft, 's1');
+
+  const result = await addStoreDepartment(db, 's1', '  Frozen   Foods ');
+  expect(result).toEqual({ ok: true, department: { id: expect.any(String), name: 'Frozen Foods' } });
+  const store = await db.stores.findOne('s1').exec();
+  expect(store?.departments.map((d) => d.name)).toEqual(['Produce', 'Deli', 'Frozen Foods']);
+  expect(result.ok && store?.departments[2].id).toBe(result.ok && result.department.id);
+});
+
+test('addStoreDepartment refuses blank and duplicate names, and missing stores, without saving', async () => {
+  const db = await createTestDatabase();
+  await saveStore(db, draft, 's1');
+  const before = (await db.stores.findOne('s1').exec())?.revision;
+
+  expect(await addStoreDepartment(db, 's1', '   ')).toEqual({ ok: false, error: 'Enter a department name.' });
+  expect(await addStoreDepartment(db, 's1', 'deli')).toEqual({ ok: false, error: '"deli" is already in the list.' });
+  expect(await addStoreDepartment(db, 'nope', 'Bakery')).toEqual({ ok: false, error: 'This store no longer exists.' });
+  expect((await db.stores.findOne('s1').exec())?.revision).toBe(before);
+});
+
+test('addStoreDepartment checks again against the saved store, in case it changed meanwhile', async () => {
+  const db = await createTestDatabase();
+  await saveStore(db, draft, 's1');
+  // Read before someone else adds Bakery: the first check passes, the second doesn't.
+  const stale = await db.stores.findOne('s1').exec();
+  await addStoreDepartment(db, 's1', 'Bakery');
+  jest.spyOn(db.stores, 'findOne').mockReturnValue({ exec: async () => stale } as never);
+
+  expect(await addStoreDepartment(db, 's1', 'bakery')).toEqual({ ok: false, error: '"bakery" is already in the list.' });
+  jest.restoreAllMocks();
+  const names = (await db.stores.findOne('s1').exec())?.departments.map((d) => d.name);
+  expect(names).toEqual(['Produce', 'Deli', 'Bakery']);
 });

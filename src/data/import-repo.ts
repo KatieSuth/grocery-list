@@ -18,7 +18,8 @@ function throwOnErrors(what: string, error: unknown[]): void {
 /**
  * Writes a checked import plan (see planImport). Stores and departments go first, so if a later
  * write fails, nothing points at a department that doesn't exist. Changes to existing stores and
- * items only ever add to them, so edits made elsewhere aren't overwritten.
+ * items only ever add to them (or fill in a store's missing location), so edits made elsewhere
+ * aren't overwritten.
  */
 export async function applyImportPlan(db: AppDatabase, plan: ImportPlan): Promise<void> {
   if (plan.newStores.length > 0) {
@@ -31,6 +32,13 @@ export async function applyImportPlan(db: AppDatabase, plan: ImportPlan): Promis
       ...old,
       departments: [...old.departments, ...departments.filter((d) => !old.departments.some((o) => o.id === d.id))],
     }));
+  }
+
+  for (const [storeId, location] of plan.storeLocations) {
+    const doc = await db.stores.findOne(storeId).exec();
+    if (!doc) throw new Error('A store changed during the import');
+    // Only fills in a missing location; one typed in since the plan was made is kept.
+    await doc.incrementalModify((old) => (old.location ? old : { ...old, location }));
   }
 
   if (plan.newItems.length > 0) {

@@ -8,20 +8,22 @@ import { createId } from '@/utils/id';
 /**
  * Ends the visit to a store. The items checked off there are logged as bought, get their
  * "last bought" date, and are unchecked from the master list. Items still on the list but not
- * checked off stay checked. Returns the log record, or null if nothing was checked off.
+ * checked off stay checked. Returns the log record, or null if nothing was logged.
  *
  * Safe to retry: the record is saved first, marked pending, and only marked complete once every
- * other step has worked. If an earlier attempt was interrupted, this completes that trip instead
- * of starting a new one, so nothing is logged twice or lost.
+ * other step has worked. If an earlier attempt was interrupted, that trip is completed first (so
+ * nothing is logged twice or lost), then this one is finished too. Items the earlier trip already
+ * logged aren't logged again. If only the earlier trip had anything, its record is returned.
  */
 export async function finishTrip(db: AppDatabase, storeId: string): Promise<TripRecord | null> {
   const unfinished = await db.trips.find({ selector: { pending: true } }).exec();
-  if (unfinished.length > 0) {
-    let completed: TripRecord | null = null;
-    for (const doc of unfinished) completed = await completeTrip(db, doc);
-    return completed;
-  }
+  let completed: TripRecord | null = null;
+  for (const doc of unfinished) completed = await completeTrip(db, doc);
+  return (await logCart(db, storeId)) ?? completed;
+}
 
+/** Logs what's in the cart at the store, then completes that trip. Null if nothing is in the cart. */
+async function logCart(db: AppDatabase, storeId: string): Promise<TripRecord | null> {
   const [store, items, entryDocs] = await Promise.all([
     db.stores.findOne(storeId).exec(),
     db.items.find().exec(),

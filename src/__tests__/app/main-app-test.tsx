@@ -1,10 +1,13 @@
 import { router } from 'expo-router';
 import { act, cleanup, fireEvent, screen } from 'expo-router/testing-library';
-import { Alert, type AlertButton } from 'react-native';
+import { Alert, AppState, type AlertButton } from 'react-native';
 
+import * as listRepo from '@/data/list-repo';
 import type { AppDatabase } from '@/db/database';
+import { QUANTITY_SAVE_DELAY_MS } from '@/hooks/use-delayed-quantity-save';
 import { addDepartments, dragDepartment, eventually, press, renderApp, type } from '@/test-utils/app';
 import { closeTestDatabases } from '@/test-utils/db';
+import { WRITE_FAILED_TITLE } from '@/utils/run-write';
 
 jest.mock('@/db/database', () => ({
   ...jest.requireActual('@/db/database'),
@@ -111,6 +114,84 @@ test('unchecking discards the quantity, so re-checking starts blank', async () =
   expect(await screen.findByLabelText('Quantity for Soup')).toHaveDisplayValue('');
 });
 
+test('a quantity is saved once typing pauses, not on every keystroke', async () => {
+  const db = await renderApp({ seed });
+  await openTab('/');
+  await fireEvent.press(await screen.findByRole('checkbox', { name: 'Soup' }));
+  await eventually(async () => expect(await entryFor(db, 'i2')).toBeDefined());
+  const setQuantity = jest.spyOn(listRepo, 'setQuantity');
+
+  await type('Quantity for Soup', '1');
+  await type('Quantity for Soup', '12');
+  await type('Quantity for Soup', '12 cans');
+  expect(screen.getByLabelText('Quantity for Soup')).toHaveDisplayValue('12 cans');
+  // Not saved yet: typing hasn't paused.
+  expect((await entryFor(db, 'i2'))?.quantity).toBeUndefined();
+
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(QUANTITY_SAVE_DELAY_MS);
+  });
+  await eventually(async () => expect((await entryFor(db, 'i2'))?.quantity).toBe('12 cans'));
+  // One save for the three changes.
+  expect(setQuantity).toHaveBeenCalledTimes(1);
+});
+
+test('unchecking drops a quantity still waiting to be saved', async () => {
+  const db = await renderApp({ seed });
+  await openTab('/');
+  await fireEvent.press(await screen.findByRole('checkbox', { name: 'Soup' }));
+  await eventually(async () => expect(await entryFor(db, 'i2')).toBeDefined());
+  const setQuantity = jest.spyOn(listRepo, 'setQuantity');
+
+  await type('Quantity for Soup', '4');
+  await fireEvent.press(screen.getByRole('checkbox', { name: 'Soup' }));
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(QUANTITY_SAVE_DELAY_MS * 2);
+  });
+  expect(setQuantity).not.toHaveBeenCalled();
+  await eventually(async () => expect(await entryFor(db, 'i2')).toBeUndefined());
+});
+
+test('a quantity still waiting to be saved is saved when the list closes', async () => {
+  const db = await renderApp({ seed });
+  await openTab('/');
+  await fireEvent.press(await screen.findByRole('checkbox', { name: 'Soup' }));
+  await eventually(async () => expect(await entryFor(db, 'i2')).toBeDefined());
+
+  await type('Quantity for Soup', '3');
+  await cleanup();
+  await eventually(async () => expect((await entryFor(db, 'i2'))?.quantity).toBe('3'));
+});
+
+test('a quantity still waiting to be saved is saved when the app goes to the background', async () => {
+  const listen = jest.spyOn(AppState, 'addEventListener');
+  const db = await renderApp({ seed });
+  await openTab('/');
+  await fireEvent.press(await screen.findByRole('checkbox', { name: 'Soup' }));
+  await eventually(async () => expect(await entryFor(db, 'i2')).toBeDefined());
+
+  await type('Quantity for Soup', '5');
+  const appStateChanged = listen.mock.calls.findLast(([event]) => event === 'change')?.[1];
+  // Coming back to the app saves nothing early; leaving it does.
+  await act(async () => appStateChanged?.('active'));
+  expect((await entryFor(db, 'i2'))?.quantity).toBeUndefined();
+  await act(async () => appStateChanged?.('background'));
+  await eventually(async () => expect((await entryFor(db, 'i2'))?.quantity).toBe('5'));
+});
+
+test('a failed check is reported instead of silently doing nothing', async () => {
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  const db = await renderApp({ seed });
+  await openTab('/');
+  jest.spyOn(db.listEntries, 'upsert').mockRejectedValue(new Error('nope'));
+
+  await fireEvent.press(await screen.findByRole('checkbox', { name: 'Soup' }));
+  await eventually(async () =>
+    expect(alert).toHaveBeenCalledWith(WRITE_FAILED_TITLE, 'Could not update your list. Please try again.'),
+  );
+  expect(screen.getByRole('checkbox', { name: 'Soup' })).not.toBeChecked();
+});
+
 test('checked items and quantities are restored from storage', async () => {
   await renderApp({
     seed: async (db) => {
@@ -130,7 +211,7 @@ test('adding an item from the master list returns to it', async () => {
   await openTab('/');
 
   await press('Add an item');
-  expect(screen).toHavePathname('/items/form');
+  expect(screen).toHavePathname('/item-form');
   await type('Item name', 'Bread');
   await fireEvent.press(screen.getByRole('checkbox', { name: 'Corner Market' }));
   await fireEvent.press(screen.getByRole('radio', { name: 'Deli in Corner Market' }));
@@ -155,7 +236,7 @@ test('tapping an item opens it for editing; deleting it also unchecks it', async
 
   await press('Soup, Acme');
   // The exact URL can carry an internal router flag after a tab switch; check the form instead.
-  expect(screen).toHavePathname('/items/form');
+  expect(screen).toHavePathname('/item-form');
   expect(screen.getByLabelText('Item name')).toHaveDisplayValue('Soup');
   await type('Item name', 'Tomato soup');
   await press('Save');
@@ -200,7 +281,7 @@ test('the stores tab lists, adds and edits stores', async () => {
   expect(await screen.findByText('Produce → Deli')).toBeOnTheScreen();
 
   await press('Add a store');
-  expect(screen).toHavePathname('/stores/form');
+  expect(screen).toHavePathname('/store-form');
   await type('Store name', 'Big Box');
   await addDepartments('Frozen');
   await press('Save');
@@ -208,7 +289,7 @@ test('the stores tab lists, adds and edits stores', async () => {
   expect(screen).toHavePathname('/stores');
 
   await press('Corner Market');
-  expect(screen).toHavePathname('/stores/form');
+  expect(screen).toHavePathname('/store-form');
   expect(screen.getByLabelText('Store name')).toHaveDisplayValue('Corner Market');
   await dragDepartment(1, 0);
   await press('Save');

@@ -3,7 +3,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { observeSetupComplete } from '@/data/settings-repo';
 import { observeStores } from '@/data/stores-repo';
-import { addDepartments, dragDepartment, moveDepartment, press, renderApp, type } from '@/test-utils/app';
+import { addDepartments, answerAlertWith, dragDepartment, moveDepartment, press, renderApp, type } from '@/test-utils/app';
 import { closeTestDatabases } from '@/test-utils/db';
 
 jest.mock('@/db/database', () => ({
@@ -70,11 +70,27 @@ test('adding a store with custom, reordered departments', async () => {
   expect(store.departments.map((d) => d.name)).toEqual(['Produce', 'Bakery', 'Frozen']);
 });
 
-test('cancel leaves the store list unchanged', async () => {
+test('cancel asks before discarding a new store, and leaves the store list unchanged', async () => {
   const db = await renderApp();
+
+  // Nothing typed yet: Cancel just closes the form.
+  await press('Add a store');
+  await press('Cancel');
+  expect(await screen.findByText('No stores yet')).toBeOnTheScreen();
 
   await press('Add a store');
   await type('Store name', 'Never saved');
+  const alert = answerAlertWith('Keep editing');
+  await press('Cancel');
+  expect(alert).toHaveBeenCalledWith(
+    'Leave without saving?',
+    'This store hasn’t been saved. If you leave now, your changes will be lost.',
+    expect.any(Array),
+  );
+  // Still editing, with what was typed.
+  expect(screen.getByLabelText('Store name')).toHaveDisplayValue('Never saved');
+
+  answerAlertWith('Leave');
   await press('Cancel');
 
   expect(await screen.findByText('No stores yet')).toBeOnTheScreen();

@@ -9,6 +9,7 @@ import { AppearanceProvider } from '@/components/appearance-provider';
 import { StartupError } from '@/components/startup-error';
 import { DatabaseProvider } from '@/db/database-provider';
 import { useSetupComplete } from '@/hooks/use-data';
+import { formTitle, ITEM_FORM_TITLES, STORE_FORM_TITLES } from '@/utils/form-title';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -52,6 +53,10 @@ function RootNavigator() {
       </Stack.Protected>
       <Stack.Protected guard={setupComplete}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        {/* Forms cover the tab bar, so they can't be left open on one tab while changing data on
+            another: leaving one means closing it (and being asked first if it has unsaved changes). */}
+        <Stack.Screen name="item-form" options={formTitle(ITEM_FORM_TITLES)} />
+        <Stack.Screen name="store-form" options={formTitle(STORE_FORM_TITLES)} />
       </Stack.Protected>
     </Stack>
   );

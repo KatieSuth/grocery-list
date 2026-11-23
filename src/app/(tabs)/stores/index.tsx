@@ -11,10 +11,10 @@ export default function StoresScreen() {
   if (!stores) return null;
   return (
     <Screen>
-      <Button label="Add a store" onPress={() => router.push('/stores/form')} />
+      <Button label="Add a store" onPress={() => router.push('/store-form')} />
       <StoreList
         stores={stores}
-        onSelect={(store) => router.push({ pathname: '/stores/form', params: { id: store.id } })}
+        onSelect={(store) => router.push({ pathname: '/store-form', params: { id: store.id } })}
       />
     </Screen>
   );

@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { setSetupComplete } from '@/data/settings-repo';
 import { useDatabase } from '@/db/database-provider';
 import { useStores } from '@/hooks/use-data';
+import { runWrite } from '@/utils/run-write';
 
 export default function StoresSetupScreen() {
   const db = useDatabase();
@@ -22,7 +23,7 @@ export default function StoresSetupScreen() {
         hasStores ? (
           <Button label="Next" onPress={() => router.push('/setup/items')} />
         ) : (
-          <Button variant="secondary" label="Skip for now" onPress={() => void setSetupComplete(db, true)} />
+          <Button variant="secondary" label="Skip for now" onPress={() => runWrite(() => setSetupComplete(db, true), 'Could not finish setup. Please try again.')} />
         )
       }>
       <ThemedText type="subtitle">Where do you shop?</ThemedText>

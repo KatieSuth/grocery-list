@@ -91,12 +91,12 @@ src/
       store-form.tsx      → StoreFormScreen (back to /setup)
       items.tsx           Items list
       item-form.tsx       → ItemFormScreen (back to /setup/items)
+    item-form.tsx         "/item-form"   → ItemFormScreen (back to /); covers the tabs
+    store-form.tsx        "/store-form"  → StoreFormScreen (back to /stores); covers the tabs
     (tabs)/               Main app (NativeTabs); each tab has its own Stack
       (items)/index.tsx   "/"        Master list (the home tab): search, filters, checkbox + quantity per item
-      (items)/items/form.tsx  "/items/form"   → ItemFormScreen
       trip/index.tsx      "/trip"    Shopping trip: store dropdown, cart, Finish
       stores/index.tsx    "/stores"  Store configuration
-      stores/form.tsx     "/stores/form"  → StoreFormScreen
       settings/index.tsx  "/settings"  Appearance, items' default sort, Import from CSV, Delete all data
   screens/                Screens used by more than one route
     store-form-screen.tsx Add / edit store (?id=), takes backTo
@@ -114,6 +114,7 @@ src/
     last-bought.ts        "Last bought yesterday" text
     appearance.ts         System / Light / Dark choice and labels
     csv-import.ts         CSV import: parse + validate the file (papaparse), plan the changes, messages
+    names.ts              The name rules (length, forbidden characters) shared by the forms and the import
   data/                   Repositories: the only code that touches collections
     stores-repo.ts        observe / save / delete stores (+ prune items)
     items-repo.ts         observe / save / delete items
@@ -170,7 +171,9 @@ screens (src/app)  ──uses──▶  hooks (useStores…)  ──▶  reposit
 
 `src/app/_layout.tsx` reads the persisted `setupComplete` flag and uses `Stack.Protected`:
 - `setup/*` is available only while `setupComplete` is false.
-- `(tabs)` (the main app) is available only while it's true.
+- `(tabs)` (the main app), `item-form` and `store-form` are available only while it's true.
+
+The main app's forms live in the root Stack, not inside a tab, so they cover the tab bar. Native tabs can't block a tab press, so this is what keeps a form from being left open (with stale data) while another tab changes things. Leaving a form with unsaved changes asks first (`useUnsavedChangesWarning`, built on `usePreventRemove`).
 
 Flipping the flag (Finish or Skip for now) switches flows and drops the old flow's history.
 
@@ -251,11 +254,11 @@ Development builds also enable RxDB dev-mode and wrap storage in **z-schema vali
 
 ### CSV import
 
-Settings → Import from CSV reads a "Store, Item name, Department, Brand" file. The file is untrusted input, so:
+Settings → Import from CSV reads a "Store, Item name, Department, Brand, Location" file (Brand and the store's Location optional). The file is untrusted input, so:
 
 - **Picking** uses `expo-document-picker` (the system picker; no storage permission). On **Android** the picker returns a one-time `content://` link that `expo-file-system` reads directly, with nothing copied. The picker's cache copy can't be used there, because Expo Go's file sandbox doesn't allow reading the cache folder it lands in, so the file looks missing. On **iOS** the copy is needed to read the file, and it's deleted afterwards, but only if it's in the app's cache. The size is checked before reading: an empty or unknown size is refused, and so is anything over 1 MB. On web, the browser's `File` is read instead.
 - **Parsing** uses papaparse on the string only: `header: false` (arrays, so file contents never become object keys), `dynamicTyping: false`, a fixed `,` delimiter, and no workers or downloads. Quote errors reject the file.
-- **Validation** (`domain/csv-import.ts`) checks every row before anything is written. It enforces the row, length, department and store limits, and rejects control, zero-width and bidi characters. Lookups use `Map`s, and ids always come from `createId()`.
+- **Validation** (`domain/csv-import.ts`) checks every row before anything is written. It enforces the row, department and store limits, and checks every value with the same name rules as the forms (`domain/names.ts`: length, and no control, zero-width or bidi characters). Lookups use `Map`s, and ids always come from `createId()`.
 - **Writing** (`data/import-repo.ts`) creates stores first, then appends departments, then creates items, then appends locations. It only ever adds, so if a later step fails, nothing is left pointing at a missing department.
 
 The rules users see are in [functional spec §5](docs/functional-spec.md#5-data-rules).

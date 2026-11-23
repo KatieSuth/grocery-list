@@ -28,6 +28,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { confirmAction, confirmDestructive } from '@/utils/confirm';
 import { notify } from '@/utils/notify';
 import { pickCsvFile } from '@/utils/pick-csv-file';
+import { runWrite } from '@/utils/run-write';
 
 const CANT_IMPORT = 'Can’t import this file';
 
@@ -130,7 +131,7 @@ export default function SettingsScreen() {
             spoken: COLOR_SCHEME_SPOKEN[value],
           }))}
           selected={colorScheme}
-          onChange={(choice) => void setColorSchemeChoice(db, choice)}
+          onChange={(choice) => runWrite(() => setColorSchemeChoice(db, choice), 'Could not save this setting. Please try again.')}
         />
         <ThemedText type="small" themeColor="textSecondary">
           {colorScheme === 'system'
@@ -148,8 +149,10 @@ export default function SettingsScreen() {
             asDefault
             sort={sortChoice.sort}
             direction={sortChoice.direction}
-            onChangeSort={(sort) => void setItemSortChoice(db, { ...sortChoice, sort })}
-            onChangeDirection={(direction) => void setItemSortChoice(db, { ...sortChoice, direction })}
+            onChangeSort={(sort) => runWrite(() => setItemSortChoice(db, { ...sortChoice, sort }), 'Could not save this setting. Please try again.')}
+            onChangeDirection={(direction) =>
+              runWrite(() => setItemSortChoice(db, { ...sortChoice, direction }), 'Could not save this setting. Please try again.')
+            }
           />
           <ThemedText type="small" themeColor="textSecondary">
             How the Items tab is sorted when it opens. Sorting there changes it only until you leave the app.
@@ -174,8 +177,9 @@ export default function SettingsScreen() {
           />
         </View>
         <ThemedText type="small" themeColor="textSecondary">
-          Columns: Store, Item name, Department, Brand (optional). A header row is fine. New stores and departments are
-          added, and items already in your list are skipped.
+          Columns: Store, Item name, Department, Brand (optional), Location (optional, the store’s). A header row is fine.
+          New stores and departments are added, and items already in your list are skipped. Give a location when two
+          stores share a name.
         </ThemedText>
         {importStatus ? (
           <View style={styles.status} accessibilityLiveRegion="polite">

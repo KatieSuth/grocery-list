@@ -1,4 +1,4 @@
-import { setChecked, setInCart, setQuantity } from '@/data/list-repo';
+import { clearCart, setChecked, setInCart, setQuantity } from '@/data/list-repo';
 import { finishTrip } from '@/data/trips-repo';
 import type { AppDatabase } from '@/db/database';
 import { closeTestDatabases, createTestDatabase } from '@/test-utils/db';
@@ -150,7 +150,7 @@ test('completing an interrupted trip leaves alone items checked again or deleted
   expect((await tripsLogged(db))[0].pending).toBeUndefined();
 });
 
-test('an interrupted trip is completed before a new one; the new cart is left for next time', async () => {
+test('an interrupted trip is completed first, then the cart at this store is finished too', async () => {
   const db = await createTestDatabase();
   await cartAtCorner(db);
   await db.trips.insert({
@@ -162,12 +162,29 @@ test('an interrupted trip is completed before a new one; the new cart is left fo
     items: [{ itemId: 'peas', name: 'Peas', department: 'Frozen' }],
   });
 
+  const record = await finishTrip(db, 's1');
+  // The record returned is this trip's, not the interrupted one's.
+  expect(record?.id).not.toBe('t0');
+  expect(record?.storeId).toBe('s1');
+  const logged = await tripsLogged(db);
+  expect(logged).toHaveLength(2);
+  expect(logged.every((t) => t.pending === undefined)).toBe(true);
+  expect(await checkedIds(db)).toEqual(['soup']);
+});
+
+test('finishing with only an interrupted trip to complete returns that trip', async () => {
+  const db = await createTestDatabase();
+  await cartAtCorner(db);
+  await clearCart(db);
+  await db.trips.insert({
+    id: 't0',
+    storeId: 's2',
+    storeName: 'Big Box',
+    finishedAt: 500,
+    pending: true,
+    items: [{ itemId: 'peas', name: 'Peas', department: 'Frozen' }],
+  });
+
   expect((await finishTrip(db, 's1'))?.id).toBe('t0');
   expect(await tripsLogged(db)).toHaveLength(1);
-  expect(await checkedIds(db)).toEqual(['apples', 'ham', 'soup']);
-
-  // The next Finish handles the cart at Corner Market as usual.
-  await finishTrip(db, 's1');
-  expect(await tripsLogged(db)).toHaveLength(2);
-  expect(await checkedIds(db)).toEqual(['soup']);
 });

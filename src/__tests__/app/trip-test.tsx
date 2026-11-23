@@ -3,9 +3,11 @@ import { act, cleanup, fireEvent, screen, within } from 'expo-router/testing-lib
 import { Alert, Platform, type AlertButton } from 'react-native';
 
 import { Colors } from '@/constants/theme';
+import * as listRepo from '@/data/list-repo';
 import type { AppDatabase } from '@/db/database';
 import { eventually, renderApp } from '@/test-utils/app';
 import { closeTestDatabases } from '@/test-utils/db';
+import { WRITE_FAILED_TITLE } from '@/utils/run-write';
 
 jest.mock('@/db/database', () => ({
   ...jest.requireActual('@/db/database'),
@@ -319,4 +321,60 @@ test('if finishing fails partway, pressing Finish again completes it without log
   expect(trip().queryByText('Could not finish the trip. Please try again.')).toBeNull();
   expect(await db.trips.count().exec()).toBe(1);
   expect(await entry(db, 'apples')).toBeUndefined();
+});
+
+test('the store dropdown is locked while a trip is being finished', async () => {
+  const db = await renderApp({ initialUrl: '/trip', seed: (db) => seed(db, { tripStoreId: 'corner' }) });
+  await fireEvent.press(await trip().findByRole('checkbox', { name: 'Apples' }));
+  await eventually(async () => expect(checkbox('Apples')).toBeChecked());
+  // Finishing never completes, so the screen stays in the middle of it.
+  jest.spyOn(db.trips, 'insert').mockReturnValue(new Promise(() => {}));
+  answerAlertsWith('Finish trip');
+
+  await press('Finish trip');
+  expect(await trip().findByRole('button', { name: 'Store: Corner Market' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Finish trip' })).toBeDisabled();
+});
+
+test('finishing and switching also logs a trip that was interrupted earlier', async () => {
+  const db = await renderApp({
+    initialUrl: '/trip',
+    seed: async (db) => {
+      await seed(db, { tripStoreId: 'corner' });
+      // Logged at Big Box, but interrupted before it was completed.
+      await db.trips.insert({
+        id: 'old',
+        storeId: 'bigbox',
+        storeName: 'Big Box',
+        finishedAt: 1,
+        pending: true,
+        items: [{ itemId: 'peas', name: 'Peas', department: 'Frozen' }],
+      });
+    },
+  });
+  await fireEvent.press(await trip().findByRole('checkbox', { name: 'Apples' }));
+  await eventually(async () => expect(checkbox('Apples')).toBeChecked());
+  answerAlertsWith('Finish and switch');
+
+  await chooseStore('Big Box');
+  expect(await screen.findByText('Trip finished: 1 item logged as bought.')).toBeOnTheScreen();
+  await eventually(async () => expect(await db.trips.count().exec()).toBe(2));
+  // Both trips are complete, and what was in the cart at Corner Market was logged, not dropped.
+  const trips = (await db.trips.find().exec()).map((t) => t.toJSON());
+  expect(trips.every((t) => t.pending === undefined)).toBe(true);
+  expect(trips.find((t) => t.id !== 'old')?.items.map((i) => i.itemId)).toEqual(['apples']);
+  expect(await entry(db, 'apples')).toBeUndefined();
+  expect(await entry(db, 'peas')).toBeUndefined();
+});
+
+test('a failed check-off is reported', async () => {
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  await renderApp({ initialUrl: '/trip', seed: (db) => seed(db, { tripStoreId: 'corner' }) });
+  jest.spyOn(listRepo, 'setInCart').mockRejectedValue(new Error('nope'));
+
+  await fireEvent.press(await trip().findByRole('checkbox', { name: 'Apples' }));
+  await eventually(async () =>
+    expect(alert).toHaveBeenCalledWith(WRITE_FAILED_TITLE, 'Could not update Apples. Please try again.'),
+  );
+  expect(checkbox('Apples')).not.toBeChecked();
 });

@@ -18,6 +18,7 @@ import { buildTripList } from '@/domain/trip';
 import type { Store } from '@/domain/types';
 import { useItems, useListEntries, useStores, useTripSettings } from '@/hooks/use-data';
 import { confirmAction } from '@/utils/confirm';
+import { runWrite } from '@/utils/run-write';
 
 const countItems = (n: number) => (n === 1 ? '1 item' : `${n} items`);
 
@@ -69,17 +70,18 @@ export default function TripScreen() {
     }
   };
 
-  const switchTo = async (next: Store) => {
-    // A new trip starts with an empty cart.
-    await clearCart(db);
-    await setTripStore(db, next.id);
-  };
+  const switchTo = (next: Store) =>
+    runWrite(async () => {
+      // A new trip starts with an empty cart.
+      await clearCart(db);
+      await setTripStore(db, next.id);
+    }, `Could not switch to ${next.name}. Please try again.`);
 
   const handleChooseStore = (next: Store) => {
     if (next.id === store?.id) return;
     setNote(undefined);
     if (!store || !list || list.inCartCount === 0) {
-      void switchTo(next);
+      switchTo(next);
       return;
     }
     // Don't leave checked-off items behind at the old store.
@@ -89,8 +91,8 @@ export default function TripScreen() {
       confirmLabel: 'Finish and switch',
       cancelLabel: 'Not yet',
       onConfirm: () =>
-        void finish(store).then(async (ok) => {
-          if (ok) await switchTo(next);
+        void finish(store).then((ok) => {
+          if (ok) switchTo(next);
         }),
     });
   };
@@ -104,8 +106,8 @@ export default function TripScreen() {
       confirmLabel: 'Finish trip',
       // The trip is over, so the next one starts by choosing a store.
       onConfirm: () =>
-        void finish(current).then(async (ok) => {
-          if (ok) await clearTripStore(db);
+        void finish(current).then((ok) => {
+          if (ok) runWrite(() => clearTripStore(db), 'The trip was finished, but the store could not be cleared.');
         }),
     });
   };
@@ -125,7 +127,8 @@ export default function TripScreen() {
           </View>
         ) : undefined
       }>
-      <StoreDropdown stores={stores} selected={store} onChoose={handleChooseStore} />
+      {/* Locked while finishing, so the cart can't be cleared halfway through. */}
+      <StoreDropdown stores={stores} selected={store} onChoose={handleChooseStore} disabled={finishing} />
 
       {note ? (
         <ThemedText type="small" themeColor="textSecondary" accessibilityLiveRegion="polite">
@@ -150,7 +153,9 @@ export default function TripScreen() {
                 accessibilityLabel="Reverse order"
                 accessibilityHint="Lists departments in the opposite order, for walking the store the other way"
                 value={settings.reversed}
-                onValueChange={(reversed) => void setTripReversed(db, reversed)}
+                onValueChange={(reversed) =>
+                  runWrite(() => setTripReversed(db, reversed), 'Could not change the order. Please try again.')
+                }
               />
             </View>
           </View>
@@ -170,7 +175,12 @@ export default function TripScreen() {
                   <TripItemRow
                     key={row.item.id}
                     row={row}
-                    onToggle={() => void setInCart(db, row.item.id, !row.inCart)}
+                    onToggle={() =>
+                      runWrite(
+                        () => setInCart(db, row.item.id, !row.inCart),
+                        `Could not update ${row.item.name}. Please try again.`,
+                      )
+                    }
                   />
                 ))}
               </View>

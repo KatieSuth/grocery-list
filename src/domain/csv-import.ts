@@ -2,12 +2,15 @@ import Papa from 'papaparse';
 
 import { FILE_TOO_BIG } from '@/utils/csv-file';
 import { createId } from '@/utils/id';
-import { nameKey, normalizeText } from '@/utils/text';
+import { nameKey } from '@/utils/text';
+
+import { checkName, MAX_NAME_LENGTH } from './names';
 
 import type { Department, Item, ItemLocation, Store } from './types';
 
 /*
- * Importing stores, departments and items from a CSV file: "Store, Item name, Department, Brand".
+ * Importing stores, departments and items from a CSV file: "Store, Item name, Department, Brand,
+ * Location". Brand and Location (the store's) are optional.
  *
  * The file comes from outside the app, so it's treated as hostile: its size, row count, field
  * lengths and characters are all bounded, it's parsed as plain text into arrays of strings
@@ -19,8 +22,8 @@ import type { Department, Item, ItemLocation, Store } from './types';
 export const MAX_IMPORT_BYTES = 1_000_000;
 /** Most data rows in one file (not counting a header or blank lines). */
 export const MAX_IMPORT_ROWS = 2_000;
-/** Longest store, item, department or brand name, after spacing is tidied. */
-export const MAX_FIELD_LENGTH = 100;
+/** Longest store, item, department or brand name or store location, after spacing is tidied. */
+export const MAX_FIELD_LENGTH = MAX_NAME_LENGTH;
 /** Most departments a store can end up with. */
 export const MAX_DEPARTMENTS_PER_STORE = 200;
 /** Most stores there can be after an import. */
@@ -36,6 +39,8 @@ export type ImportRow = {
   department: string;
   /** Empty when the item has no brand. */
   brand: string;
+  /** The store's location, when the file gives one. */
+  location?: string;
 };
 
 export type ImportError = {
@@ -46,15 +51,8 @@ export type ImportError = {
 
 export type ParseImportResult = { ok: true; rows: ImportRow[] } | { ok: false; errors: ImportError[] };
 
-const COLUMNS = ['Store', 'Item name', 'Department', 'Brand'] as const;
-
-/**
- * Characters a name may not contain: control characters (including NUL), bidirectional
- * overrides and isolates (which can make text display as something else), and zero-width
- * characters (which make two names look the same). Tabs and line breaks are allowed; they're
- * whitespace and get collapsed into single spaces.
- */
-const FORBIDDEN_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F​-‍‪-‮⁦-⁩﻿]/;
+const COLUMNS = ['Store', 'Item name', 'Department', 'Brand', 'Location'] as const;
+const OPTIONAL_COLUMNS: readonly string[] = ['Brand', 'Location'];
 
 /** Shortens text quoted back to the user, so a hostile file can't flood an alert. */
 export function quote(value: string): string {
@@ -73,33 +71,27 @@ export function prepareImportText(text: string): { ok: true; text: string } | { 
   if (text.length > MAX_IMPORT_BYTES) {
     return { ok: false, error: FILE_TOO_BIG };
   }
-  if (text.includes('�')) {
+  if (text.includes('\uFFFD')) {
     return { ok: false, error: 'This doesn’t look like a CSV file. Save it as “CSV UTF-8” and try again.' };
   }
-  return { ok: true, text: text.startsWith('﻿') ? text.slice(1) : text };
+  return { ok: true, text: text.startsWith('\uFEFF') ? text.slice(1) : text };
 }
 
 function isHeader(cells: string[]): boolean {
-  const [store, item, department, brand = ''] = cells.map(nameKey);
+  const [store, item, department, brand = '', location = ''] = cells.map(nameKey);
   return (
     store === 'store' &&
     (item === 'item name' || item === 'item') &&
     department === 'department' &&
-    (brand === 'brand' || brand === '')
+    (brand === 'brand' || brand === '') &&
+    (location === 'location' || location === 'store location' || location === '')
   );
 }
 
-/** Problems with one field, or its tidied value. */
-function checkField(raw: string, column: (typeof COLUMNS)[number], required: boolean): string | ImportError {
-  if (FORBIDDEN_CHARACTERS.test(raw)) {
-    return { message: `${column} contains hidden or control characters, which aren’t allowed.` };
-  }
-  const value = normalizeText(raw);
-  if (required && !value) return { message: `${column} is empty.` };
-  if (value.length > MAX_FIELD_LENGTH) {
-    return { message: `${column} is longer than ${MAX_FIELD_LENGTH} characters.` };
-  }
-  return value;
+/** Problems with one field, or its tidied value. The same rules as names typed in the app. */
+function checkField(raw: string, column: (typeof COLUMNS)[number]): string | ImportError {
+  const result = checkName(raw, column, { required: !OPTIONAL_COLUMNS.includes(column) });
+  return result.ok ? result.value : { message: result.error };
 }
 
 /** Reads the CSV's rows. Every problem is collected, so the user can fix them all at once. */
@@ -146,18 +138,18 @@ export function parseImportCsv(text: string): ParseImportResult {
       break;
     }
     if (cells.length > COLUMNS.length) {
-      errors.push({ row, message: 'There are more than 4 columns. Use: Store, Item name, Department, Brand.' });
+      errors.push({ row, message: 'There are more than 5 columns. Use: Store, Item name, Department, Brand, Location.' });
       continue;
     }
 
-    const values = COLUMNS.map((column, i) => checkField(cells[i] ?? '', column, column !== 'Brand'));
+    const values = COLUMNS.map((column, i) => checkField(cells[i] ?? '', column));
     const problems = values.filter((v): v is ImportError => typeof v !== 'string');
     if (problems.length > 0) {
       errors.push(...problems.map((p) => ({ row, message: p.message })));
       continue;
     }
-    const [store, name, department, brand] = values as string[];
-    rows.push({ row, store, name, department, brand });
+    const [store, name, department, brand, location] = values as string[];
+    rows.push({ row, store, name, department, brand, ...(location ? { location } : {}) });
   }
 
   if (errors.length > 0) return { ok: false, errors };
@@ -171,6 +163,8 @@ export type ImportCounts = {
   newItems: number;
   /** Existing items added to another store. */
   updatedItems: number;
+  /** Existing stores without a location that get the one in the file. */
+  locatedStores: number;
   /** Rows already in the app (or repeated in the file). */
   skipped: number;
 };
@@ -180,6 +174,8 @@ export type ImportPlan = {
   newStores: Store[];
   /** Departments to add to the end of existing stores, by store id. */
   departmentAdds: Map<string, Department[]>;
+  /** Locations to give existing stores that have none, by store id. */
+  storeLocations: Map<string, string>;
   newItems: Item[];
   /** Locations to add to existing items, by item id. */
   locationAdds: Map<string, ItemLocation[]>;
@@ -190,22 +186,42 @@ export type PlanImportResult = { ok: true; plan: ImportPlan } | { ok: false; err
 
 const itemKey = (name: string, brand: string) => `${nameKey(name)}\n${nameKey(brand)}`;
 
+const locationKey = (store: Pick<Store, 'location'>) => nameKey(store.location ?? '');
+
+/**
+ * Which store a row means, among `stores` (the app's plus any the file has added so far):
+ * - the store with the same name and location (the first, if there are several);
+ * - else, for a row with a location: a store with that name and no location, which gets it;
+ * - else, for a row without one: the only store with that name. If there are several, the row
+ *   has to say which, so it's an error.
+ * Undefined means the store is new.
+ */
+function matchStore(row: ImportRow, stores: Store[]): Store | ImportError | undefined {
+  const named = stores.filter((s) => nameKey(s.name) === nameKey(row.store));
+  const location = nameKey(row.location ?? '');
+  const exact = named.find((s) => locationKey(s) === location);
+  if (exact) return exact;
+  if (location) return named.find((s) => !locationKey(s));
+  if (named.length > 1) {
+    return {
+      row: row.row,
+      message: `There’s more than one store called ${quote(row.store)}. Put its location in the Location column to say which.`,
+    };
+  }
+  return named[0];
+}
+
 /**
  * Works out what importing `rows` would change, without changing anything. Names are matched
- * ignoring case and spacing, and existing spellings are kept. Stores and departments that don't
- * exist yet are added; an item that's already at the store in the same department is skipped.
- * An item can be in only one department per store, so a row that would put it in a second one
- * is an error.
+ * ignoring case and spacing, and existing spellings are kept. Stores are matched by name and
+ * location (see matchStore). Stores and departments that don't exist yet are added; an item
+ * that's already at the store in the same department is skipped. An item can be in only one
+ * department per store, so a row that would put it in a second one is an error.
  */
 export function planImport(rows: ImportRow[], stores: Store[], items: Item[], now = Date.now()): PlanImportResult {
   const errors: ImportError[] = [];
-  // Working copies, looked up by name key. Maps, not objects, so names like "__proto__" are just names.
-  const storesByKey = new Map<string, Store>();
-  for (const store of stores) {
-    if (!storesByKey.has(nameKey(store.name))) {
-      storesByKey.set(nameKey(store.name), { ...store, departments: [...store.departments] });
-    }
-  }
+  // Working copies. Maps, not objects, so names like "__proto__" are just names.
+  const working = stores.map((store) => ({ ...store, departments: [...store.departments] }));
   const itemsByKey = new Map<string, Item>();
   for (const item of items) {
     const key = itemKey(item.name, item.brand ?? '');
@@ -214,6 +230,7 @@ export function planImport(rows: ImportRow[], stores: Store[], items: Item[], no
 
   const newStores: Store[] = [];
   const departmentAdds = new Map<string, Department[]>();
+  const storeLocations = new Map<string, string>();
   const newItems: Item[] = [];
   const locationAdds = new Map<string, ItemLocation[]>();
   const newItemIds = new Set<string>();
@@ -224,11 +241,26 @@ export function planImport(rows: ImportRow[], stores: Store[], items: Item[], no
   let order = 0;
 
   for (const row of rows) {
-    let store = storesByKey.get(nameKey(row.store));
+    const matched = matchStore(row, working);
+    if (matched && !('id' in matched)) {
+      errors.push(matched);
+      continue;
+    }
+    let store = matched;
     if (!store) {
-      store = { id: createId(), name: row.store, departments: [], createdAt: now + order++ };
-      storesByKey.set(nameKey(row.store), store);
+      store = {
+        id: createId(),
+        name: row.store,
+        ...(row.location ? { location: row.location } : {}),
+        departments: [],
+        createdAt: now + order++,
+      };
+      working.push(store);
       newStores.push(store);
+    } else if (row.location && !store.location) {
+      // A store with no location yet gets the one in the file.
+      store.location = row.location;
+      if (!newStores.includes(store)) storeLocations.set(store.id, row.location);
     }
 
     let department = store.departments.find((d) => nameKey(d.name) === nameKey(row.department));
@@ -284,10 +316,10 @@ export function planImport(rows: ImportRow[], stores: Store[], items: Item[], no
     }
   }
 
-  if (storesByKey.size > MAX_STORES) {
+  if (working.length > MAX_STORES) {
     errors.push({ message: `This would make more than ${MAX_STORES} stores.` });
   }
-  for (const store of storesByKey.values()) {
+  for (const store of working) {
     if (store.departments.length > MAX_DEPARTMENTS_PER_STORE) {
       errors.push({ message: `${quote(store.name)} would have more than ${MAX_DEPARTMENTS_PER_STORE} departments.` });
     }
@@ -299,6 +331,7 @@ export function planImport(rows: ImportRow[], stores: Store[], items: Item[], no
     plan: {
       newStores,
       departmentAdds,
+      storeLocations,
       newItems,
       locationAdds,
       counts: {
@@ -306,6 +339,7 @@ export function planImport(rows: ImportRow[], stores: Store[], items: Item[], no
         newDepartments,
         newItems: newItems.length,
         updatedItems: locationAdds.size,
+        locatedStores: storeLocations.size,
         skipped,
       },
     },
@@ -313,16 +347,17 @@ export function planImport(rows: ImportRow[], stores: Store[], items: Item[], no
 }
 
 /** True when importing would change nothing (every row is already in the app). */
-export function isEmptyImport({ newStores, newDepartments, newItems, updatedItems }: ImportCounts): boolean {
-  return newStores + newDepartments + newItems + updatedItems === 0;
+export function isEmptyImport({ newStores, newDepartments, newItems, updatedItems, locatedStores }: ImportCounts): boolean {
+  return newStores + newDepartments + newItems + updatedItems + locatedStores === 0;
 }
 
-function changes({ newStores, newDepartments, newItems, updatedItems }: ImportCounts): string[] {
+function changes({ newStores, newDepartments, newItems, updatedItems, locatedStores }: ImportCounts): string[] {
   return [
     ...(newItems > 0 ? [plural(newItems, 'new item')] : []),
     ...(updatedItems > 0 ? [`${plural(updatedItems, 'existing item')} at another store`] : []),
     ...(newStores > 0 ? [plural(newStores, 'new store')] : []),
     ...(newDepartments > 0 ? [plural(newDepartments, 'new department')] : []),
+    ...(locatedStores > 0 ? [`a location for ${plural(locatedStores, 'existing store')}`] : []),
   ];
 }
 

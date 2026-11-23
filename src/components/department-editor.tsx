@@ -16,6 +16,7 @@ import {
   removeDepartment,
   suggestDepartments,
 } from '@/domain/departments';
+import { MAX_NAME_LENGTH } from '@/domain/names';
 import type { Department, Store } from '@/domain/types';
 import { normalizeText, sameName } from '@/utils/text';
 import { useTheme } from '@/hooks/use-theme';
@@ -192,6 +193,7 @@ export function DepartmentEditor({ departments, onChange, error, knownStores, cu
             submitBehavior="submit"
             error={addError}
             extraSpaceBelow={suggestionsSpace}
+            maxLength={MAX_NAME_LENGTH}
           />
         </View>
         <View style={styles.addButton}>

@@ -9,12 +9,23 @@ import { Screen } from '@/components/screen';
 import { ErrorText, TextField } from '@/components/text-field';
 import { deleteStore, saveStore } from '@/data/stores-repo';
 import { useDatabase } from '@/db/database-provider';
-import { emptyStoreDraft, hasErrors, storeToDraft, validateStoreDraft } from '@/domain/store-draft';
-import type { Store } from '@/domain/types';
-import { useStores } from '@/hooks/use-data';
+import {
+  countItemsAtStore,
+  emptyStoreDraft,
+  hasErrors,
+  removedDepartmentsInUse,
+  storeDraftChanged,
+  storeToDraft,
+  validateStoreDraft,
+} from '@/domain/store-draft';
+import { MAX_NAME_LENGTH } from '@/domain/names';
+import type { Item, Store } from '@/domain/types';
+import { useItems, useStores } from '@/hooks/use-data';
+import { useUnsavedChangesWarning } from '@/hooks/use-unsaved-changes-warning';
 import { confirmDestructive } from '@/utils/confirm';
 import { goBack } from '@/utils/navigation';
-
+import { runWrite } from '@/utils/run-write';
+import { normalizeText, sameName } from '@/utils/text';
 
 type Props = {
   /** Where Save, Cancel and Delete return to. */
@@ -25,9 +36,10 @@ type Props = {
 export function StoreFormScreen({ backTo }: Props) {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const stores = useStores();
-  if (!stores) return null;
+  const items = useItems();
+  if (!stores || !items) return null;
 
-  if (!id) return <StoreForm stores={stores} backTo={backTo} />;
+  if (!id) return <StoreForm stores={stores} items={items} backTo={backTo} />;
   const store = stores.find((s) => s.id === id);
   if (!store) {
     return (
@@ -36,41 +48,69 @@ export function StoreFormScreen({ backTo }: Props) {
       </Screen>
     );
   }
-  return <StoreForm key={store.id} store={store} stores={stores} backTo={backTo} />;
+  return <StoreForm key={store.id} store={store} stores={stores} items={items} backTo={backTo} />;
 }
 
-function StoreForm({ store, stores, backTo }: Props & { store?: Store; stores: Store[] }) {
+const countItems = (n: number) => (n === 1 ? '1 item' : `${n} items`);
+
+function StoreForm({ store, stores, items, backTo }: Props & { store?: Store; stores: Store[]; items: Item[] }) {
   const db = useDatabase();
-  const [draft, setDraft] = useState(() => (store ? storeToDraft(store) : emptyStoreDraft()));
+  const [initial] = useState(() => (store ? storeToDraft(store) : emptyStoreDraft()));
+  const [draft, setDraft] = useState(initial);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>();
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  const leave = useUnsavedChangesWarning(storeDraftChanged(draft, initial), 'store');
 
-  const errors = submitted ? validateStoreDraft(draft) : {};
+  const otherStores = stores.filter((s) => s.id !== store?.id);
+  const errors = submitted ? validateStoreDraft(draft, otherStores) : {};
 
-  const handleSave = async () => {
-    setSubmitted(true);
-    if (hasErrors(validateStoreDraft(draft))) return;
+  const save = async () => {
     setSaving(true);
     setSaveError(undefined);
     try {
       await saveStore(db, draft, store?.id);
-      goBack(backTo);
+      leave(backTo);
     } catch {
       setSaveError('Could not save this store. Please try again.');
       setSaving(false);
     }
   };
 
+  const handleSave = () => {
+    setSubmitted(true);
+    if (hasErrors(validateStoreDraft(draft, otherStores))) return;
+    const removed = store ? removedDepartmentsInUse(store, draft, items) : undefined;
+    if (!removed || removed.itemCount === 0) {
+      void save();
+      return;
+    }
+    // Removing a department takes its items out of this store; make sure that's meant.
+    const readded = removed.names.some((name) => draft.departments.some((d) => sameName(d.name, name)));
+    confirmDestructive({
+      title: 'Remove departments with items?',
+      message:
+        `${countItems(removed.itemCount)} in ${removed.names.join(', ')} will no longer be listed under ${normalizeText(draft.name)}.` +
+        (readded ? ' A department added back with the same name starts out empty; its items aren’t moved to it.' : ''),
+      confirmLabel: 'Remove and save',
+      cancelLabel: 'Keep editing',
+      onConfirm: () => void save(),
+    });
+  };
+
   const handleDelete = (target: Store) => {
+    const count = countItemsAtStore(target.id, items);
     confirmDestructive({
       title: `Delete ${target.name}?`,
-      message: 'Items will no longer be listed under this store.',
+      message:
+        count > 0
+          ? `${countItems(count)} will no longer be listed under this store.`
+          : 'No items are listed under this store.',
       confirmLabel: 'Delete',
       onConfirm: () => {
-        goBack(backTo);
-        void deleteStore(db, target.id);
+        leave(backTo);
+        runWrite(() => deleteStore(db, target.id), `Could not delete ${target.name}. Please try again.`);
       },
     });
   };
@@ -81,7 +121,7 @@ function StoreForm({ store, stores, backTo }: Props & { store?: Store; stores: S
       footer={
         <>
           <Button variant="secondary" label="Cancel" onPress={() => goBack(backTo)} />
-          <Button label="Save" disabled={saving} onPress={() => void handleSave()} />
+          <Button label="Save" disabled={saving} onPress={handleSave} />
         </>
       }>
       <TextField
@@ -92,6 +132,7 @@ function StoreForm({ store, stores, backTo }: Props & { store?: Store; stores: S
         error={errors.name}
         autoCapitalize="words"
         autoFocus={!store}
+        maxLength={MAX_NAME_LENGTH}
       />
       <TextField
         label="Location"
@@ -99,6 +140,8 @@ function StoreForm({ store, stores, backTo }: Props & { store?: Store; stores: S
         placeholder="e.g. Main St, downtown"
         value={draft.location}
         onChangeText={(location) => setDraft({ ...draft, location })}
+        error={errors.location}
+        maxLength={MAX_NAME_LENGTH}
       />
       <DepartmentEditor
         departments={draft.departments}

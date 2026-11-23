@@ -22,6 +22,7 @@ test('choosing a store or a department closes the keyboard', async () => {
       selections={{ s1: null }}
       onToggleStore={onToggleStore}
       onChooseDepartment={onChooseDepartment}
+      onAddDepartment={jest.fn()}
     />
   );
 

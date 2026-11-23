@@ -1,12 +1,18 @@
+import { useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 
+import { Button } from '@/components/button';
+
 import { CheckboxBox } from '@/components/checkbox-box';
-import { ErrorText } from '@/components/text-field';
+import { ErrorText, TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { sortDepartmentsByName } from '@/domain/departments';
+import { MAX_NAME_LENGTH } from '@/domain/names';
 import type { Store } from '@/domain/types';
 import { useTheme } from '@/hooks/use-theme';
+
+export type AddDepartmentOutcome = { ok: true; note: string } | { ok: false; error: string };
 
 type Props = {
   stores: Store[];
@@ -14,6 +20,11 @@ type Props = {
   selections: Record<string, string | null>;
   onToggleStore: (storeId: string) => void;
   onChooseDepartment: (storeId: string, departmentId: string) => void;
+  /**
+   * Adds a department to the store, so the user needn't leave the form when it's missing.
+   * Resolves to an error, or to a note saying what happened once the department is chosen.
+   */
+  onAddDepartment: (storeId: string, name: string) => Promise<AddDepartmentOutcome>;
   storesError?: string;
   departmentErrors?: Record<string, string>;
 };
@@ -23,16 +34,47 @@ type Props = {
  *
  * Choosing closes the keyboard: the user is done typing the name, and the keyboard would
  * otherwise cover the departments that appear.
+ *
+ * A department that's missing can be added right here, without leaving the form (which would
+ * mean saving or discarding the item first).
  */
 export function StoreLocationPicker({
   stores,
   selections,
   onToggleStore,
   onChooseDepartment,
+  onAddDepartment,
   storesError,
   departmentErrors = {},
 }: Props) {
   const theme = useTheme();
+  /** The store a department is being added to, if any; one at a time. */
+  const [addingTo, setAddingTo] = useState<string>();
+  const [newName, setNewName] = useState('');
+  const [addError, setAddError] = useState<string>();
+  const [adding, setAdding] = useState(false);
+  /** Said after adding, for one store: e.g. where the new department went. */
+  const [addedNote, setAddedNote] = useState<{ storeId: string; message: string }>();
+
+  const startAdding = (storeId: string) => {
+    setAddingTo(storeId);
+    setNewName('');
+    setAddError(undefined);
+    setAddedNote(undefined);
+  };
+
+  const add = async (store: Store) => {
+    setAdding(true);
+    const outcome = await onAddDepartment(store.id, newName);
+    setAdding(false);
+    if (!outcome.ok) {
+      setAddError(outcome.error);
+      return;
+    }
+    setAddingTo(undefined);
+    setAddedNote({ storeId: store.id, message: outcome.note });
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -97,6 +139,61 @@ export function StoreLocationPicker({
                     </Pressable>
                   );
                 })}
+                {addingTo === store.id ? null : (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Add a department to ${store.name}`}
+                    onPress={() => startAdding(store.id)}
+                    style={[styles.chip, styles.addChip, { borderColor: theme.border }]}>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      + New department
+                    </ThemedText>
+                  </Pressable>
+                )}
+                {addingTo === store.id ? (
+                  <View style={[styles.fullWidth, styles.addForm]}>
+                    <TextField
+                      label="New department"
+                      accessibilityLabel={`New department at ${store.name}`}
+                      placeholder="e.g. Bakery"
+                      value={newName}
+                      onChangeText={(text) => {
+                        setNewName(text);
+                        setAddError(undefined);
+                      }}
+                      onSubmitEditing={() => void add(store)}
+                      returnKeyType="done"
+                      submitBehavior="submit"
+                      autoFocus
+                      error={addError}
+                      maxLength={MAX_NAME_LENGTH}
+                    />
+                    <View style={styles.addButtons}>
+                      <Button
+                        compact
+                        variant="ghost"
+                        label="Cancel"
+                        accessibilityLabel="Cancel adding a department"
+                        onPress={() => setAddingTo(undefined)}
+                      />
+                      <Button
+                        compact
+                        variant="secondary"
+                        label="Add"
+                        accessibilityLabel={`Add department to ${store.name}`}
+                        disabled={adding}
+                        onPress={() => void add(store)}
+                      />
+                    </View>
+                  </View>
+                ) : null}
+                {addedNote?.storeId === store.id ? (
+                  <View style={styles.fullWidth}>
+                    <ThemedText type="small" themeColor="textSecondary" accessibilityLiveRegion="polite">
+                      {addedNote.message}
+                    </ThemedText>
+                  </View>
+                ) : null}
                 {departmentErrors[store.id] ? (
                   <View style={styles.fullWidth}>
                     <ErrorText message={departmentErrors[store.id]} />
@@ -140,4 +237,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   fullWidth: { width: '100%' },
+  addChip: { borderStyle: 'dashed' },
+  addForm: { gap: Spacing.two },
+  addButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.two },
 });

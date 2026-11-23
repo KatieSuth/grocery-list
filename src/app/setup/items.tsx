@@ -11,6 +11,7 @@ import { useDatabase } from '@/db/database-provider';
 import { describeLocations } from '@/domain/describe';
 import { useItems, useStores } from '@/hooks/use-data';
 import { goBack } from '@/utils/navigation';
+import { runWrite } from '@/utils/run-write';
 
 export default function ItemsSetupScreen() {
   const db = useDatabase();
@@ -19,7 +20,7 @@ export default function ItemsSetupScreen() {
   if (!items || !stores) return null;
 
   const hasItems = items.length > 0;
-  const finish = () => void setSetupComplete(db, true);
+  const finish = () => runWrite(() => setSetupComplete(db, true), 'Could not finish setup. Please try again.');
 
   return (
     <Screen

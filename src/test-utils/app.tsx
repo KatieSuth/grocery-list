@@ -1,4 +1,5 @@
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
+import { Alert, type AlertButton } from 'react-native';
 
 import { getAppDatabase, type AppDatabase } from '@/db/database';
 
@@ -15,6 +16,13 @@ export async function renderApp(options: { initialUrl?: string; seed?: (db: AppD
   jest.mocked(getAppDatabase).mockResolvedValue(db);
   await renderRouter('./src/app', { initialUrl: options.initialUrl });
   return db;
+}
+
+/** Makes Alert.alert immediately choose the button with the given text. Returns the spy. */
+export function answerAlertWith(text: string) {
+  return jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons?: AlertButton[]) => {
+    buttons?.find((b) => b.text === text)?.onPress?.();
+  });
 }
 
 export const press = async (name: string | RegExp) =>

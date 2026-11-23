@@ -4,39 +4,49 @@ import { useState } from "react";
 import { Button } from "@/components/button";
 import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
-import { StoreLocationPicker } from "@/components/store-location-picker";
+import {
+  StoreLocationPicker,
+  type AddDepartmentOutcome,
+} from "@/components/store-location-picker";
 import { ErrorText, TextField } from "@/components/text-field";
 import { ThemedText } from "@/components/themed-text";
 import { deleteItem, saveItem } from "@/data/items-repo";
+import { addStoreDepartment } from "@/data/stores-repo";
 import { useDatabase } from "@/db/database-provider";
 import {
   chooseDepartment,
   draftToLocations,
   emptyItemDraft,
+  findDuplicateItem,
   isItemDraftBlank,
+  itemDraftChanged,
   itemToDraft,
   toggleStore,
   validateItemDraft,
 } from "@/domain/item-draft";
 import { hasErrors } from "@/domain/store-draft";
+import { MAX_NAME_LENGTH } from "@/domain/names";
 import type { Item, Store } from "@/domain/types";
 import { useItems, useStores } from "@/hooks/use-data";
-import { confirmDestructive } from "@/utils/confirm";
+import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
+import { confirmAction, confirmDestructive } from "@/utils/confirm";
 import { goBack } from "@/utils/navigation";
+import { runWrite } from "@/utils/run-write";
+import { sameName } from "@/utils/text";
 
 type Props = {
   /** Where Save, Cancel and Delete return to. */
   backTo: Href;
 };
 
-/** Add (no `id` param) or edit (`?id=`) a item. Shared by setup and the main app. */
+/** Add (no `id` param) or edit (`?id=`) an item. Shared by setup and the main app. */
 export function ItemFormScreen({ backTo }: Props) {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const items = useItems();
   const stores = useStores();
   if (!items || !stores) return null;
 
-  if (!id) return <ItemForm stores={stores} backTo={backTo} />;
+  if (!id) return <ItemForm items={items} stores={stores} backTo={backTo} />;
   const item = items.find((i) => i.id === id);
   if (!item) {
     return (
@@ -56,22 +66,53 @@ export function ItemFormScreen({ backTo }: Props) {
       </Screen>
     );
   }
-  return <ItemForm key={item.id} item={item} stores={stores} backTo={backTo} />;
+  return (
+    <ItemForm
+      key={item.id}
+      item={item}
+      items={items}
+      stores={stores}
+      backTo={backTo}
+    />
+  );
+}
+
+/** Asks whether to save an item that has the same name and brand as one already in the list. */
+function confirmSavingDuplicate(duplicate: Item): Promise<boolean> {
+  const described = duplicate.brand
+    ? `${duplicate.name} (${duplicate.brand})`
+    : duplicate.name;
+  return new Promise((resolve) =>
+    confirmAction({
+      title: "Already in your list",
+      message: `${described} is already in your list. Save another one anyway?`,
+      confirmLabel: "Save anyway",
+      cancelLabel: "Keep editing",
+      onConfirm: () => resolve(true),
+      onCancel: () => resolve(false),
+    }),
+  );
 }
 
 function ItemForm({
   item,
+  items,
   stores,
   backTo,
-}: Props & { item?: Item; stores: Store[] }) {
+}: Props & { item?: Item; items: Item[]; stores: Store[] }) {
   const db = useDatabase();
-  const [draft, setDraft] = useState(() =>
+  const [initial] = useState(() =>
     item ? itemToDraft(item) : emptyItemDraft(),
   );
+  const [draft, setDraft] = useState(initial);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string>();
   const [saveError, setSaveError] = useState<string>();
+  const leave = useUnsavedChangesWarning(
+    itemDraftChanged(draft, initial),
+    "item",
+  );
 
   const errors = submitted ? validateItemDraft(draft, stores) : {};
 
@@ -80,6 +121,9 @@ function ItemForm({
     setSubmitted(true);
     setMessage(undefined);
     if (hasErrors(validateItemDraft(draft, stores))) return null;
+    // Two items with the same name and brand can be meant, but usually aren't.
+    const duplicate = findDuplicateItem(draft, items, item?.id);
+    if (duplicate && !(await confirmSavingDuplicate(duplicate))) return null;
     setSaving(true);
     setSaveError(undefined);
     try {
@@ -111,10 +155,42 @@ function ItemForm({
   const handleContinue = async () => {
     // Nothing entered (e.g. right after "Add more"): just go back.
     if (!item && isItemDraftBlank(draft)) {
-      goBack(backTo);
+      leave(backTo);
       return;
     }
-    if (await save()) goBack(backTo);
+    if (await save()) leave(backTo);
+  };
+
+  /** Adds a missing department to a store and chooses it for this item. */
+  const handleAddDepartment = async (
+    storeId: string,
+    name: string,
+  ): Promise<AddDepartmentOutcome> => {
+    // The picker only offers stores from this list.
+    const store = stores.find((s) => s.id === storeId) as Store;
+    // Typed a name the store already has: just choose that one.
+    const existing = store.departments.find((d) => sameName(d.name, name));
+    if (existing) {
+      setDraft((d) => chooseDepartment(d, storeId, existing.id));
+      return {
+        ok: true,
+        note: `${store.name} already has ${existing.name}, so it’s chosen.`,
+      };
+    }
+    try {
+      const result = await addStoreDepartment(db, storeId, name);
+      if (!result.ok) return result;
+      setDraft((d) => chooseDepartment(d, storeId, result.department.id));
+      return {
+        ok: true,
+        note: `Added ${result.department.name} at the end of ${store.name}’s departments. You can move it on the store’s page.`,
+      };
+    } catch {
+      return {
+        ok: false,
+        error: "Could not add the department. Please try again.",
+      };
+    }
   };
 
   const handleDelete = (target: Item) => {
@@ -122,8 +198,11 @@ function ItemForm({
       title: `Delete ${target.name}?`,
       confirmLabel: "Delete",
       onConfirm: () => {
-        goBack(backTo);
-        void deleteItem(db, target.id);
+        leave(backTo);
+        runWrite(
+          () => deleteItem(db, target.id),
+          `Could not delete ${target.name}. Please try again.`,
+        );
       },
     });
   };
@@ -177,6 +256,7 @@ function ItemForm({
         onChangeText={(name) => setDraft({ ...draft, name })}
         error={errors.name}
         autoFocus={!item}
+        maxLength={MAX_NAME_LENGTH}
       />
       <TextField
         label="Brand/Distinguisher"
@@ -184,6 +264,8 @@ function ItemForm({
         placeholder="e.g. 'Organic Valley,' '3-pack,' etc."
         value={draft.brand}
         onChangeText={(brand) => setDraft({ ...draft, brand })}
+        error={errors.brand}
+        maxLength={MAX_NAME_LENGTH}
       />
       {stores.length > 0 ? (
         <StoreLocationPicker
@@ -193,6 +275,7 @@ function ItemForm({
           onChooseDepartment={(storeId, departmentId) =>
             setDraft(chooseDepartment(draft, storeId, departmentId))
           }
+          onAddDepartment={handleAddDepartment}
           storesError={errors.stores}
           departmentErrors={errors.departments}
         />

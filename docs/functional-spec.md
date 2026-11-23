@@ -68,6 +68,7 @@ App launch
 
 - Once setup is complete, setup screens are not reachable by back navigation or link. Stores and items are edited from the Stores and Items tabs.
 - The device or header back gesture acts like Cancel on the forms: nothing is saved.
+- **Unsaved changes:** leaving a store or item form that has changes, by Cancel or going back, asks first: "Leave without saving?" / "This store hasn’t been saved. If you leave now, your changes will be lost." ("item" on the item form), with **Keep editing** and **Leave**. Leave discards the changes. A form with no changes closes without asking.
 
 ---
 
@@ -140,16 +141,21 @@ The first screen on a new install.
 **Footer**
 - **Cancel:** discards changes and returns to the Stores screen.
 - **Save:** validates. If valid, saves and returns to the Stores screen, where the store now appears.
+- If the save would remove departments that items are in, it asks first: "Remove departments with items?" / "3 items in Produce, Deli will no longer be listed under Corner Market.", with **Keep editing** and **Remove and save**. If a removed department was added back under the same name, it adds: "A department added back with the same name starts out empty; its items aren’t moved to it." Removing only empty departments saves without asking.
 
 **Validation** (shown after the first Save attempt, then updated as the user types)
 | Rule | Message |
 | --- | --- |
 | Name is blank | "Store name is required." |
+| Name or location breaks the name rules (§ Names) | e.g. "Store name is longer than 100 characters." |
+| Another store has the same name and location (ignoring case and spacing) | "You already have Corner Market at Main St. Use a different location to tell them apart." With no location: "You already have a store called Corner Market. Add a location to tell them apart." (under Location) |
 | No departments | "Add at least one department so items can be placed in this store." |
+
+Two stores can share a name as long as their locations differ (e.g. two Krogers on different streets).
 
 **Edit mode only**
 - The form opens with the store's current values.
-- A **Delete store** button asks for confirmation: "Delete <name>?" / "Items will no longer be listed under this store." The options are Cancel and Delete. Delete removes the store and returns to the Stores screen. (In a web browser, this is the browser's own OK/Cancel dialog. The same applies to deleting items.)
+- A **Delete store** button asks for confirmation: "Delete <name>?" / "2 items will no longer be listed under this store." (or "No items are listed under this store.") The options are Cancel and Delete. Delete removes the store and returns to the Stores screen. (In a web browser, this is the browser's own OK/Cancel dialog. The same applies to deleting items.)
 
 ### 4.3 Items ("Your items")
 
@@ -190,14 +196,22 @@ The first screen on a new install.
 - Every store is listed with a checkbox, in the same order as the Stores screen.
 - Checking a store shows its departments as choices, **A–Z** (ignoring case), not in the store's walking order. Walking order is kept for the shopping trip. The user picks exactly one.
 - Unchecking a store hides its choices and clears the selection for that store.
+- After a store's choices is a **+ New department** button, for when the department the item is in is missing. It opens a "New department" field with Cancel and **Add**:
+  - Add (or the keyboard's Done) adds the department to that store straight away, at the **end of its walking order**, and chooses it for the item: "Added Dairy at the end of Corner Market’s departments. You can move it on the store’s page."
+  - A name the store already has (ignoring case and spacing) just chooses that department: "Corner Market already has Produce, so it’s chosen."
+  - A blank name shows "Enter a department name." If saving fails: "Could not add the department. Please try again."
+  - The department stays on the store even if the item is then cancelled.
 - If no stores exist, the form shows "Go back and add a store first, so you can say where to find this item."
 
 **Validation** (shown after the first save attempt)
 | Rule | Message |
 | --- | --- |
 | Name is blank | "Item name is required." |
+| Name or brand breaks the name rules (§ Names) | e.g. "Brand contains hidden or control characters, which aren’t allowed." |
 | No store checked | "Choose at least one store." |
 | A checked store has no department chosen | "Choose a department in <store>." (under that store) |
+
+**Duplicates:** saving an item with the same name and brand as another (ignoring case and spacing; no brand matches no brand) asks first: "Already in your list" / "Milk (Acme) is already in your list. Save another one anyway?", with **Keep editing** and **Save anyway**. It's a warning, not an error: two can be meant.
 
 **Footer: adding a new item**
 | Button | Behavior |
@@ -226,7 +240,7 @@ After setup, the app has four tabs along the bottom:
 
 - The app opens on **Items**, including right after setup is finished or skipped.
 - Icons are each platform's standard symbols: SF Symbols on iOS (`list.bullet`, `cart`, `storefront`, `gearshape`), Material Symbols on Android (`list`, `shopping_cart`, `storefront`, `settings`). The Trip, Stores and Settings icons switch to their filled versions when selected on iOS.
-- Each tab keeps its own history. Editing an item or store opens inside its tab, with the tab bar still visible, and Save, Cancel, or Delete return to that tab's list.
+- Each tab keeps its own history. Adding or editing an item or store opens a form over the tabs, with the tab bar hidden, so a form is never left open in the background while data changes on another tab. Save, Cancel, or Delete return to the tab's list (see unsaved changes, above).
 
 #### 4.5.1 Trip tab ("Shopping trip")
 
@@ -264,6 +278,8 @@ After setup, the app has four tabs along the bottom:
   - The chosen store is **cleared**, so the tab goes back to "Where are you shopping?" and the next trip starts by choosing a store. The Reverse order choice is kept.
   - The tab shows "Trip finished: 2 items logged as bought."
 - If saving fails: "Could not finish the trip. Please try again." The store stays chosen and the items stay in the cart, so the user can press Finish trip again.
+- If an earlier finish was interrupted (e.g. the app closed partway), the next finish completes that earlier trip first, then finishes this one as usual. Nothing is logged twice, and nothing in the current cart is dropped.
+- The store dropdown can't be opened while a trip is being finished.
   - Finishing saves the log record first, marked as in progress, then updates the items, then marks the record done. If it's interrupted at any point (an error, or the app being closed), the next Finish completes **that same trip**. It is never logged twice and no items are lost.
   - If there's an unfinished trip, the next Finish completes it first. Anything put in the cart since is left there for the following Finish.
   - An item that was unchecked and checked again since the interrupted attempt keeps its new check.
@@ -379,7 +395,7 @@ With no stores: "No stores yet."
 **Your data:** "Your stores, items, list and trip history are stored only on this device.", an **Import from CSV** button, and a **Delete all data** button.
 
 **Import from CSV** adds stores, departments and items from a CSV file (see "Importing a CSV file" in Data rules).
-- Under the button: "Columns: Store, Item name, Department, Brand (optional). A header row is fine. New stores and departments are added, and items already in your list are skipped."
+- Under the button: "Columns: Store, Item name, Department, Brand (optional), Location (optional, the store’s). A header row is fine. New stores and departments are added, and items already in your list are skipped. Give a location when two stores share a name."
 - Tapping it opens the system file picker (the browser's file chooser on the web), limited to one CSV or text file.
 - Once a file is chosen, a spinner shows "Checking the file…" while it's read and checked, and "Importing…" while it's saved. Import from CSV and Delete all data are disabled meanwhile. The spinner stops before any message appears.
 - If the file can't be used, an alert titled "Can’t import this file" says why and ends "Nothing was imported." Problems in rows are listed as "Row 3: Department is empty.", up to five, then "…and N more problems."
@@ -414,7 +430,11 @@ With no stores: "No stores yet."
 
 **Keeping items consistent when stores change**
 - **Deleting a store** removes that store from every item's locations. The items themselves stay.
-- **Removing a department and saving the store** removes that department from every item that used it. Those items are no longer listed under that store.
+- **Removing a department and saving the store** removes that department from every item that used it. Those items are no longer listed under that store. The store form asks before doing this (see 4.2).
+
+**When a change can't be saved**
+- Taps that save straight away (checking an item, checking off on a trip, Reverse order, settings, deleting a store or item) show "Something went wrong" with what couldn't be done, e.g. "Could not update your list. Please try again."
+- Quantities are saved once typing pauses (under half a second), and right away if the Items screen closes.
 - An item can end up with no locations this way. It stays in the list as "No store selected" until the user edits it.
 
 **Checked items**
@@ -430,17 +450,21 @@ With no stores: "No stores yet."
 - The trip log is kept indefinitely. Deleting an item or store later doesn't change past records, which keep the names as they were.
 
 **Importing a CSV file**
-- Columns, in order: Store, Item name, Department, Brand. Brand may be empty or left out. Extra empty cells at the end of a row are ignored; more than four columns is an error.
-- The first row is skipped if it's a header (Store, Item name or Item, Department, and optionally Brand, in any case). Blank rows are skipped.
+- Columns, in order: Store, Item name, Department, Brand, Location. Brand and Location (the store's) may be empty or left out. Extra empty cells at the end of a row are ignored; more than five columns is an error.
+- The first row is skipped if it's a header (Store, Item name or Item, Department, and optionally Brand and Location or Store location, in any case). Blank rows are skipped.
 - Values are text only and are cleaned up like typed names. Commas, quotes and line breaks work inside quoted values (`"Bread, sourdough"`); a quote inside a quoted value is doubled (`""`).
 - Names are matched ignoring case and spacing, and existing spellings are kept.
-  - A store that doesn't exist is created, with its departments in the order they first appear in the file.
+  - Stores are matched by name **and location**. A row with a location means the store with that name and location. A row without one means the only store with that name; if several stores share the name, the row is an error asking for its location.
+  - If a row gives a location for a store that has none (same name), the store gets that location rather than a second store being made. The question before importing says so, e.g. "…and a location for 1 existing store."
+  - A store that doesn't exist (by name and location) is created, with its location and its departments in the order they first appear in the file.
   - A department that doesn't exist at a store is added to the end of that store's order.
   - An item is the same item if its name and brand match (no brand matches no brand). If it's already at that store in that department, the row is skipped. If it exists but isn't at that store, the store is added to it. Otherwise a new item is created.
 - An item can be in only one department per store, so a row that would put an item in a second department at a store (compared with the app, or with an earlier row) is an error.
 - The whole file is checked first. If any row has a problem, nothing is imported.
-- Limits: files up to 1 MB, up to 2,000 rows, names up to 100 characters, up to 200 departments per store, and up to 100 stores in total.
-- Not allowed in any value: control characters, invisible zero-width characters, and characters that change text direction. Accents, emoji and other languages are fine.
+- Limits: files up to 1 MB, up to 2,000 rows, up to 200 departments per store, and up to 100 stores in total. Values follow the name rules (§ Names).
+
+**Names**
+- Store, item, department and brand names and store locations follow the same rules whether typed or imported: up to 100 characters (the fields stop at 100), and no control characters, invisible zero-width characters, or characters that change text direction. Accents, emoji and other languages are fine. Spacing is tidied.
 
 **Persistence**
 - Everything is saved on the device as soon as the user taps Save, Add more, Continue, Delete, Finish, Skip for now, or a master-list checkbox. Quantities save as they're typed.

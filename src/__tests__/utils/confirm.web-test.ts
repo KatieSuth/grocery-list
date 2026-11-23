@@ -24,3 +24,12 @@ test('on web, confirmAction uses the same dialog', () => {
   expect(window.confirm).toHaveBeenCalledWith('Finish trip?');
   expect(onConfirm).toHaveBeenCalled();
 });
+
+test('on web, cancelling calls onCancel if given', () => {
+  jest.spyOn(window, 'confirm').mockReturnValue(false);
+  const onConfirm = jest.fn();
+  const onCancel = jest.fn();
+  confirmAction({ title: 'Save anyway?', confirmLabel: 'Save', onConfirm, onCancel });
+  expect(onCancel).toHaveBeenCalled();
+  expect(onConfirm).not.toHaveBeenCalled();
+});

@@ -12,10 +12,12 @@ type Props = {
   stores: Store[];
   selected?: Store;
   onChoose: (store: Store) => void;
+  /** Shown but can't be opened, e.g. while a trip is being finished. */
+  disabled?: boolean;
 };
 
 /** A dropdown-style field showing the chosen store; tapping it lists the stores to pick from. */
-export function StoreDropdown({ stores, selected, onChoose }: Props) {
+export function StoreDropdown({ stores, selected, onChoose, disabled }: Props) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   return (
@@ -26,10 +28,12 @@ export function StoreDropdown({ stores, selected, onChoose }: Props) {
         accessibilityLabel={selected ? `Store: ${selected.name}` : 'Choose a store'}
         accessibilityHint="Opens the list of stores"
         aria-expanded={open}
+        aria-disabled={!!disabled}
+        disabled={disabled}
         onPress={() => setOpen(true)}
         style={({ pressed }) => [
           styles.field,
-          { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressOpacity(pressed) },
+          { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressOpacity(pressed, disabled) },
         ]}>
         <View style={styles.text}>
           <ThemedText style={selected ? styles.name : { color: theme.textSecondary }}>
