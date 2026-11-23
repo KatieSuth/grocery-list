@@ -80,7 +80,7 @@ The first screen on a new install.
 
 **Content**
 - Heading "Where do you shop?" and a one-line explanation.
-- A list of saved stores in the order they were created. Each row shows:
+- A list of saved stores, A–Z by name and then by location (see **Store order** in §5). Each row shows:
   - the store name,
   - the location (if any),
   - the departments in order, e.g. "Produce → Bakery → Frozen".
@@ -164,7 +164,7 @@ Two stores can share a name as long as their locations differ (e.g. two Krogers 
 - Items sorted alphabetically (case-insensitive). Each row shows:
   - the item name,
   - the brand (if any),
-  - where to find it, in store order, e.g. "Corner Market · Deli, Big Box · Frozen". If the item has no remaining locations: "No store selected".
+  - where to find it, in store order, e.g. "Big Box · Frozen, Corner Market · Deli". If the item has no remaining locations: "No store selected".
 - An **Add an item** button that opens the Item form.
 
 **When there are no items**
@@ -424,10 +424,11 @@ With no stores: "No stores yet."
 **Text cleanup.** Names, locations, and brands are trimmed, and repeated spaces are collapsed, so "  Corner   Market " is saved as "Corner Market". A location or brand that is blank after cleanup is saved as "not set", not as an empty value.
 
 **Ordering**
-- Stores: the order they were created.
+- Stores: A–Z by name, then by location (see **Store order** below).
 - Departments: the order the user arranged, everywhere except the item form's department choices, which are A–Z.
 - Items: alphabetical by name, ignoring case.
 - An item's locations: always shown in store order.
+- **Store order:** stores are listed A–Z by name, then by location, ignoring case and accents. A store with no location comes before one with the same name that has a location ("Kroger" before "Kroger, Main St"). This order is used everywhere stores are listed: the Stores screen and setup, the Trip tab's store picker, "Where to find it" on the item form, the store filters, "Copy departments from…", and where-to-find text.
 
 **Keeping items consistent when stores change**
 - **Deleting a store** removes that store from every item's locations. The items themselves stay.

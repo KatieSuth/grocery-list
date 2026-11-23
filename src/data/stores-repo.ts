@@ -4,14 +4,16 @@ import type { AppDatabase } from '@/db/database';
 import { addDepartment } from '@/domain/departments';
 import { pruneLocations } from '@/domain/item-draft';
 import type { StoreDraft } from '@/domain/store-draft';
+import { compareStores } from '@/domain/store-sort';
 import type { Department, Store } from '@/domain/types';
 import { createId } from '@/utils/id';
 import { normalizeText } from '@/utils/text';
 
+/** All stores, A–Z by name and then location (see compareStores): the order they're listed in everywhere. */
 export function observeStores(db: AppDatabase): Observable<Store[]> {
   return db.stores
     .find({ sort: [{ createdAt: 'asc' }] })
-    .$.pipe(map((docs) => docs.map((doc) => doc.toMutableJSON())));
+    .$.pipe(map((docs) => docs.map((doc) => doc.toMutableJSON()).sort(compareStores)));
 }
 
 function fromDraft(draft: StoreDraft): Pick<Store, 'name' | 'location' | 'departments'> {

@@ -1,6 +1,6 @@
 import type { Item, Store } from './types';
 
-/** "Corner Market · Produce, Big Box · Deli" — where an item lives, in store order. */
+/** "Big Box · Deli, Corner Market · Produce" — where an item lives, in store order (A–Z). */
 export function describeLocations(item: Item, stores: Store[]): string {
   return stores
     .flatMap((store) => {

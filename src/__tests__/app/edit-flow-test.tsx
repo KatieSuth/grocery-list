@@ -115,7 +115,7 @@ test('editing an item', async () => {
   const db = await renderApp({ seed });
 
   await press('Next');
-  expect(await screen.findByText('Corner Market · Deli, Big Box · Frozen')).toBeOnTheScreen();
+  expect(await screen.findByText('Big Box · Frozen, Corner Market · Deli')).toBeOnTheScreen();
   await press(/^Milk, Acme\./);
   expect(screen).toHavePathnameWithParams('/setup/item-form?id=i1');
   expect(screen.getByLabelText('Item name')).toHaveDisplayValue('Milk');
@@ -255,8 +255,8 @@ test('typing a new department suggests ones from other stores; tapping fills it 
   // Three stores have "Bakery", but it's offered once.
   expect(await screen.findAllByRole('button', { name: 'Use Bakery' })).toHaveLength(1);
   const suggestion = screen.getByRole('button', { name: 'Use Bakery' });
-  expect(suggestion).toHaveProp('accessibilityHint', 'Fills in the name; then tap Add. Used at Corner Market, Big Box, Co-op.');
-  expect(screen.getByText('Corner Market, Big Box, Co-op')).toBeOnTheScreen();
+  expect(suggestion).toHaveProp('accessibilityHint', 'Fills in the name; then tap Add. Used at Big Box, Co-op, Corner Market.');
+  expect(screen.getByText('Big Box, Co-op, Corner Market')).toBeOnTheScreen();
 
   // Tapping fills the box but doesn't add yet; the suggestion is no longer offered.
   await fireEvent.press(suggestion);
@@ -413,7 +413,7 @@ test('a missing department can be added from the item form, and is chosen for th
   expect(store?.departments.map((d) => d.name)).toEqual(['Produce', 'Deli', 'Dairy']);
 
   await press('Save');
-  expect(await screen.findByText('Corner Market · Dairy, Big Box · Frozen')).toBeOnTheScreen();
+  expect(await screen.findByText('Big Box · Frozen, Corner Market · Dairy')).toBeOnTheScreen();
   const dairy = store?.departments[2].id;
   expect((await db.items.findOne('i1').exec())?.toJSON().locations).toContainEqual({ storeId: 's1', departmentId: dairy });
 });
@@ -500,7 +500,7 @@ test('editing an item without making it a duplicate saves without asking', async
   await press(/^Milk, Acme\./);
   // Milk matches only itself.
   await press('Save');
-  expect(await screen.findByText('Corner Market · Deli, Big Box · Frozen')).toBeOnTheScreen();
+  expect(await screen.findByText('Big Box · Frozen, Corner Market · Deli')).toBeOnTheScreen();
   expect(alert).not.toHaveBeenCalled();
   expect(await db.items.count().exec()).toBe(1);
 });
@@ -556,7 +556,7 @@ test('screen readers hear where each item is on the setup items list', async () 
   await renderApp({ seed });
   await press('Next');
   expect(
-    await screen.findByRole('button', { name: 'Milk, Acme. Deli at Corner Market, Frozen at Big Box.' }),
+    await screen.findByRole('button', { name: 'Milk, Acme. Frozen at Big Box, Deli at Corner Market.' }),
   ).toBeOnTheScreen();
 });
 

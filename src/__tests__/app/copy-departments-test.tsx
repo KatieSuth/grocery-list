@@ -28,7 +28,8 @@ async function seed(db: AppDatabase) {
     ],
     createdAt: 1,
   });
-  await db.stores.insert({ id: 's2', name: 'Big Box', departments: [{ id: 'd5', name: 'Deli' }], createdAt: 2 });
+  // Listed after Corner Market (stores are A–Z), so Corner Market's spelling "deli" is the one reused.
+  await db.stores.insert({ id: 's2', name: 'Value Mart', departments: [{ id: 'd5', name: 'Deli' }], createdAt: 2 });
 }
 
 /** Department names in the editor, in list order. */
@@ -55,7 +56,7 @@ test('copies another store’s departments after the current ones, skipping name
   const corner = screen.getByRole('button', { name: 'Copy from Corner Market, Main St' });
   expect(corner).toHaveProp('accessibilityHint', 'Departments: Bakery, deli, Frozen Foods, Produce');
   expect(screen.getByText('Bakery → deli → Frozen Foods → Produce')).toBeOnTheScreen();
-  expect(screen.getByRole('button', { name: 'Copy from Big Box' })).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'Copy from Value Mart' })).toBeOnTheScreen();
 
   // Cancel changes nothing.
   await press('Cancel copying');
@@ -87,10 +88,10 @@ test('copies another store’s departments after the current ones, skipping name
 
 test('when editing a store, it is not offered as a source', async () => {
   await renderApp({ seed });
-  await press(/^Big Box\./);
+  await press(/^Value Mart\./);
   await press('Remove Deli');
   await press('Copy departments from another store');
-  expect(screen.queryByRole('button', { name: 'Copy from Big Box' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Copy from Value Mart' })).toBeNull();
   await press('Copy from Corner Market, Main St');
   // All four are new here, including "deli" now that Deli was removed.
   expect(departmentNames()).toEqual(['Bakery', 'deli', 'Frozen Foods', 'Produce']);
@@ -101,6 +102,6 @@ test('reports a single copied department in the singular', async () => {
   await press(/^Corner Market, Main St\./);
   await press('Remove deli');
   await press('Copy departments from another store');
-  await press('Copy from Big Box');
-  expect(screen.getByText('Copied 1 department from Big Box: Deli.')).toBeOnTheScreen();
+  await press('Copy from Value Mart');
+  expect(screen.getByText('Copied 1 department from Value Mart: Deli.')).toBeOnTheScreen();
 });

@@ -77,11 +77,14 @@ test('deleteStore removes the store and its item locations', async () => {
   expect((await db.items.findOne('i1').exec())?.toJSON().locations).toEqual([{ storeId: b.id, departmentId: 'd2' }]);
 });
 
-test('observeStores lists stores in creation order', async () => {
+test('observeStores lists stores A–Z by name, then location, not in the order they were added', async () => {
   const db = await createTestDatabase();
-  await db.stores.insert({ id: 'late', name: 'Late', departments: [], createdAt: 20 });
-  await db.stores.insert({ id: 'early', name: 'Early', departments: [], createdAt: 10 });
-  expect((await firstValueFrom(observeStores(db))).map((s) => s.name)).toEqual(['Early', 'Late']);
+  await db.stores.insert({ id: 'z', name: 'Zippy', departments: [], createdAt: 1 });
+  await db.stores.insert({ id: 'k2', name: 'Kroger', location: 'Main St', departments: [], createdAt: 2 });
+  await db.stores.insert({ id: 'k1', name: 'kroger', location: 'Elm St', departments: [], createdAt: 3 });
+  await db.stores.insert({ id: 'a', name: 'Aldi', departments: [], createdAt: 4 });
+  const stores = await firstValueFrom(observeStores(db));
+  expect(stores.map((s) => s.id)).toEqual(['a', 'k1', 'k2', 'z']);
 });
 
 test('addStoreDepartment adds a tidied department at the end of the walking order', async () => {

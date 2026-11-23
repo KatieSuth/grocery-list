@@ -171,7 +171,7 @@ test('the full setup: store, items with add more / continue, back, finish', asyn
   expect(screen).toHavePathname('/setup/items');
   expect(screen.getByText('Milk')).toBeOnTheScreen();
   expect(screen.getByText('Organic Valley')).toBeOnTheScreen();
-  expect(screen.getByText('Corner Market · Deli, Big Box · Frozen')).toBeOnTheScreen();
+  expect(screen.getByText('Big Box · Frozen, Corner Market · Deli')).toBeOnTheScreen();
   expect(screen.getByText('Big Box · Produce')).toBeOnTheScreen();
   expect(screen.queryByText(/at any time/)).toBeNull();
 

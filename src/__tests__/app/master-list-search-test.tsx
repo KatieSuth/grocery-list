@@ -105,7 +105,8 @@ test('the filter panel lists each store, department and brand once', async () =>
     screen
       .queryAllByRole('checkbox', { name: new RegExp(`^${group}: `) })
       .map((c) => (c.props.accessibilityLabel as string).replace(`${group}: `, ''));
-  expect(options('Stores')).toEqual(['Corner Market', 'Big Box']);
+  // Stores are listed A–Z.
+  expect(options('Stores')).toEqual(['Big Box', 'Corner Market']);
   // Both stores have a Deli; it appears once.
   expect(options('Departments')).toEqual(['Deli', 'Frozen', 'Produce']);
   // "Acme" and "acme" are one brand.
