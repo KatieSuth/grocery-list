@@ -124,6 +124,30 @@ test('a trip log from before pending trips is migrated', async () => {
   await db.close();
 });
 
+test("a trip log from before stores' locations were saved is migrated, keeping its trips", async () => {
+  const { itemSchema, listEntrySchema, settingsSchema, storeSchema, tripSchema } = jest.requireActual('@/db/schema');
+  const { createAppDatabase } = jest.requireActual('@/db/database');
+  const storage = getRxStorageMemory();
+
+  const old = await openOldDatabase('prelocation', storage, {
+    stores: { schema: storeSchema },
+    items: { schema: itemSchema, migrationStrategies: { 1: keep } },
+    listEntries: { schema: listEntrySchema, migrationStrategies: { 1: keep } },
+    settings: { schema: settingsSchema, migrationStrategies: { 1: keep, 2: keep, 3: keep } },
+    trips: { schema: olderVersion(tripSchema, 1, ['storeLocation']), migrationStrategies: { 1: keep } },
+  });
+  const trip = { id: 't1', storeId: 's1', storeName: 'Shop', finishedAt: 5, items: [{ itemId: 'i1', name: 'Milk', department: 'Deli' }] };
+  await old.trips.insert(trip);
+  await old.close();
+
+  const db = await createAppDatabase('prelocation', { storage });
+  const doc = await db.trips.findOne('t1').exec();
+  expect(doc?.toJSON()).toEqual(trip);
+  await doc?.incrementalPatch({ storeLocation: 'Main St' });
+  expect((await db.trips.findOne('t1').exec())?.storeLocation).toBe('Main St');
+  await db.close();
+});
+
 test('settings from before the appearance choice are migrated, keeping the trip settings', async () => {
   const { itemSchema, listEntrySchema, settingsSchema, storeSchema, tripSchema } = jest.requireActual('@/db/schema');
   const { createAppDatabase } = jest.requireActual('@/db/database');
@@ -134,7 +158,7 @@ test('settings from before the appearance choice are migrated, keeping the trip 
     items: { schema: itemSchema, migrationStrategies: { 1: keep } },
     listEntries: { schema: listEntrySchema, migrationStrategies: { 1: keep } },
     settings: { schema: olderVersion(settingsSchema, 1, ['colorScheme']), migrationStrategies: { 1: keep } },
-    trips: { schema: tripSchema, migrationStrategies: { 1: keep } },
+    trips: { schema: tripSchema, migrationStrategies: { 1: keep, 2: keep } },
   });
   const settings = { id: 'app', setupComplete: true, tripStoreId: 's1', tripReversed: true };
   await old.settings.insert(settings);
@@ -161,7 +185,7 @@ test('settings from before the default sort are migrated, keeping everything', a
       schema: olderVersion(settingsSchema, 2, ['itemSort', 'itemSortDirection']),
       migrationStrategies: { 1: keep, 2: keep },
     },
-    trips: { schema: tripSchema, migrationStrategies: { 1: keep } },
+    trips: { schema: tripSchema, migrationStrategies: { 1: keep, 2: keep } },
   });
   const settings = { id: 'app', setupComplete: true, tripStoreId: 's1', tripReversed: true, colorScheme: 'dark' };
   await old.settings.insert(settings);

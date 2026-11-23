@@ -11,6 +11,7 @@ import {
   itemSchema,
   listEntrySchema,
   settingsMigrations,
+  tripMigrations,
   settingsSchema,
   storeSchema,
   tripSchema,
@@ -59,7 +60,7 @@ export async function createAppDatabase(
     items: { schema: itemSchema, migrationStrategies: addedOptionalFields },
     listEntries: { schema: listEntrySchema, migrationStrategies: addedOptionalFields },
     settings: { schema: settingsSchema, migrationStrategies: settingsMigrations },
-    trips: { schema: tripSchema, migrationStrategies: addedOptionalFields },
+    trips: { schema: tripSchema, migrationStrategies: tripMigrations },
   });
   return db;
 }

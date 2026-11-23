@@ -1,7 +1,7 @@
 # Grocery List: Functional Specification
 
-**Status:** Setup flow, all four main tabs (including Settings), and the shopping trip are built. Finished trips are logged, but there's no screen to view the log yet.
-**Last updated:** 2026-11-05
+**Status:** Setup flow, all four main tabs (including Settings), the shopping trip and the trip history are built.
+**Last updated:** 2026-11-23
 
 This document describes what the app does from the user's point of view: screens, fields, rules, and behavior. For how it's built, see the [README](../README.md).
 
@@ -39,7 +39,7 @@ The app runs on iOS and Android, and in a web browser (used for development and 
 | **Checked item** | An item the user has ticked on the master list: something they need. Checked items are what the shopping trip lists. |
 | **In the cart** | A checked item the user has checked off on the current trip. It stays checked on the master list until the trip is finished. |
 | **Trip** | One visit to one store. Finishing it logs the items in the cart as bought and unchecks them from the master list. |
-| **Trip log** | The saved record of finished trips: the store, when, and each item bought (name, brand, quantity and department, as they were then). |
+| **Trip log** | The saved record of finished trips: the store and its location, when, and each item bought (name, brand, quantity and department, as they were then). Shown on the Trip history screen. |
 | **Last bought** | The date an item was last in a finished trip, saved on the item itself so the master list doesn't need to read the log. |
 | **Quantity** | Optional free text attached to a checked item, e.g. "4" or "1/2 pound". Discarded when the item is unchecked. |
 | **Appearance** | Whether the app is light, dark, or follows the device's setting (the default). Saved on the device. |
@@ -60,7 +60,7 @@ App launch
   │                                        └─ Finish / Skip for now ──▶ Main app
   │
   └─ setup complete ──────▶ Main app (tabs)
-                              ├─ Trip   (opens here)
+                              ├─ Trip   (opens here) ──▶ Trip history ──▶ Trip
                               ├─ Items  ──▶ Item form (add / edit)
                               ├─ Stores ──▶ Store form (add / edit)
                               └─ Settings ── Delete all data ──▶ back to setup
@@ -296,7 +296,27 @@ After setup, the app has four tabs along the bottom:
 
 On the web, the questions use the browser's own OK/Cancel dialog, so the button labels differ.
 
-*Planned (not built):* checked items from the master list will appear here. See §8.
+**Trip history**
+- A clock icon at the top right of the Shopping trip screen ("Trip history") opens the log of finished trips. It stays on the Trip tab, so the tab bar stays visible; back returns to the trip.
+- Each trip is a card showing the store's name, its location (if any) and when the trip was finished: "Corner Market" / "Main St" / "Sun, Nov 23, 2026, 4:12 PM". Newest first. Items aren't shown on the list.
+  - The store's name and location are as they were when the trip was finished. Trips logged before the location was saved show the store's current location, or none if the store has since been deleted.
+  - Trips still being finished (an interrupted Finish) aren't listed until they're completed.
+- A count under the search box says what's shown: "2 trips, last 90 days", or "1 trip bought “ham”, last 90 days" while searching.
+- **Search** ("Search items or brands") shows only trips that bought an item whose name or brand contains the text, ignoring case and extra spaces. It applies within the filters.
+- **Filter button** next to the search box opens a panel; it's highlighted, with a badge, while filters differ from the defaults (each selected store counts as one, and dates other than the last 90 days count as one). "Clear filters" goes back to the defaults and keeps the search.
+  - **Dates:** Last 30 days, **Last 90 days** (the default), Last 6 months, Last year, or Custom. There's no "all time". Presets count back from today, including today.
+  - **Custom** starts with the dates that were shown, as **From** and **To** fields that open the phone's calendar (on the web, the browser's date field). From can't be after To, and To can't be after today; days outside that are greyed out. Both days are included in full.
+  - **Stores:** one option per store that has a trip in the log (including stores deleted since), labelled with its location, e.g. "Corner Market, Main St". Any selected store matches.
+- With no trips at all: "No trips yet" / "When you finish a shopping trip, it's listed here with the store and the date." With none matching: "No matching trips", and a **Clear search and filters** button.
+- Filters and search reset when the screen is closed.
+
+**A past trip**
+- Tapping a trip opens its page: store, location, date and time, and the number of items, then everything bought on that trip.
+- Each item shows its name, then brand, quantity and department as they were at the time ("Ham" / "Acme · 1 lb · Deli").
+- **Sort by:** **Name** (the default) or Department. **Order:** **A–Z** (the default) or Z–A.
+  - By department: one heading per department (ignoring case), items by name under each; the department isn't repeated on the items. Z–A reverses both the departments and the items.
+  - The sort isn't remembered; each trip opens by name, A–Z.
+- If the trip is no longer in the log (e.g. after Delete all data): "Trip not found" / "This trip is no longer in the log."
 
 #### 4.5.2 Items tab: the master list ("Items")
 
@@ -449,7 +469,7 @@ With no stores: "No stores yet."
 **Trips**
 - Checking off on the trip, the Reverse order switch and the chosen store save immediately.
 - Finishing a trip saves the log record, the last-bought dates and the unchecks.
-- The trip log is kept indefinitely. Deleting an item or store later doesn't change past records, which keep the names as they were.
+- The trip log is kept indefinitely. Deleting an item or store later doesn't change past records, which keep the names (and, from 2026-11-23, the store's location) as they were.
 
 **Importing a CSV file**
 - Columns, in order: Store, Item name, Department, Brand, Location. Brand and Location (the store's) may be empty or left out. Extra empty cells at the end of a row are ignored; more than five columns is an error.
@@ -492,6 +512,8 @@ With no stores: "No stores yet."
 - Touch targets are at least 44 points: buttons, fields and rows are 48 points tall; chips are 36 points tall with a 4-point invisible margin of extra tap area (they're 8 points apart, so the targets don't overlap); the ✕ remove control has a larger tap area than it looks; drag handles are 40 points square.
 - Text meets 4.5:1 contrast in both themes. The outlines of fields, chips, the store dropdown and the filter button meet 3:1 against the background and element fills, so it's clear they're controls. Secondary buttons and picker options are outlined the same way (the current choice in a picker has a thicker tinted outline). Dividers keep a lighter color. A test checks the theme colors.
 - Text grows with the system text size. The filter-count badge grows too, up to 1.5×, so it doesn't cover the filter icon; department position numbers widen for "10" and up; the ✓ in checkboxes stays sized to its box.
+- Trip history: the clock icon is a 48-point "Trip history" button ("Shows your past shopping trips"). Each trip card is one button that says everything it shows with nothing abbreviated: "Corner Market, Main St. Sunday, November 23, 2026 at 4:12 PM." ("Shows the items bought on this trip"). The filter button says the dates and how many filters are on: "Filter trips, last 90 days, 1 filter on". Date choices are radio buttons; the custom From and To fields announce their day ("From, August 25, 2026", "Opens a calendar to choose the day") and use the platform's own accessible calendar. The trip count ("2 trips, last 90 days") is read aloud when it changes.
+- A past trip's summary (store, location, date, number of items) is a heading, as are the Sort by / Order sections and the department headings. Each item is read as one line: "Ham, Acme, 1 lb, Deli".
 - Follows the system light/dark setting unless Light or Dark is chosen in Settings.
 - Appearance choices are radio buttons and report which is selected.
 
@@ -545,7 +567,6 @@ The original request left these open. They are easy to revisit.
 
 These were deliberately left out of the first build:
 
-- **Viewing the trip log.** Finished trips are saved, but there's no screen to browse them yet.
 - **Online backend and sync.** The data model is ready for it (RxDB supports replication), but nothing leaves the device today.
 - **Store addresses.** Location is free text only.
 - **UPC barcode scanning** to add items.

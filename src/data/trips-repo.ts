@@ -1,9 +1,17 @@
 import type { RxDocument } from 'rxdb';
+import { map, type Observable } from 'rxjs';
 
 import type { AppDatabase } from '@/db/database';
 import { buildTripList } from '@/domain/trip';
 import type { TripItem, TripRecord } from '@/domain/types';
 import { createId } from '@/utils/id';
+
+/** Every finished trip in the log, newest first. Trips still being finished aren't included. */
+export function observeTrips(db: AppDatabase): Observable<TripRecord[]> {
+  return db.trips.find({ sort: [{ finishedAt: 'desc' }] }).$.pipe(
+    map((docs) => docs.filter((doc) => !doc.pending).map((doc) => doc.toMutableJSON())),
+  );
+}
 
 /**
  * Ends the visit to a store. The items checked off there are logged as bought, get their
@@ -55,6 +63,7 @@ async function logCart(db: AppDatabase, storeId: string): Promise<TripRecord | n
     id: createId(),
     storeId,
     storeName: store.name,
+    ...(store.location ? { storeLocation: store.location } : {}),
     finishedAt: Date.now(),
     items: bought,
     pending: true,

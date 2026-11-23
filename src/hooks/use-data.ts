@@ -9,6 +9,7 @@ import {
   observeTripSettings,
 } from '@/data/settings-repo';
 import { observeStores } from '@/data/stores-repo';
+import { observeTrips } from '@/data/trips-repo';
 import { useDatabase } from '@/db/database-provider';
 
 import { useObservable } from './use-observable';
@@ -53,4 +54,10 @@ export function useColorSchemeChoice() {
 export function useItemSortChoice() {
   const db = useDatabase();
   return useObservable(useMemo(() => observeItemSortChoice(db), [db]));
+}
+
+/** The trip log, newest first; undefined while loading. */
+export function useTrips() {
+  const db = useDatabase();
+  return useObservable(useMemo(() => observeTrips(db), [db]));
 }

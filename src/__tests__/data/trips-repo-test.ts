@@ -1,5 +1,7 @@
 import { clearCart, setChecked, setInCart, setQuantity } from '@/data/list-repo';
-import { finishTrip } from '@/data/trips-repo';
+import { firstValueFrom } from 'rxjs';
+
+import { finishTrip, observeTrips } from '@/data/trips-repo';
 import type { AppDatabase } from '@/db/database';
 import { closeTestDatabases, createTestDatabase } from '@/test-utils/db';
 
@@ -187,4 +189,37 @@ test('finishing with only an interrupted trip to complete returns that trip', as
 
   expect((await finishTrip(db, 's1'))?.id).toBe('t0');
   expect(await tripsLogged(db)).toHaveLength(1);
+});
+
+test("finishing saves the store's location at the time, when it has one", async () => {
+  const db = await createTestDatabase();
+  await seed(db);
+  await (await db.stores.findOne('s1').exec())?.incrementalPatch({ location: 'Main St' });
+  await setChecked(db, 'apples', true);
+  await setInCart(db, 'apples', true);
+  expect(await finishTrip(db, 's1')).toMatchObject({ storeName: 'Corner Market', storeLocation: 'Main St' });
+
+  // Big Box has no location, so none is saved.
+  await setChecked(db, 'peas', true);
+  await setInCart(db, 'peas', true);
+  expect(await finishTrip(db, 's2')).not.toHaveProperty('storeLocation');
+});
+
+test('the trip log lists finished trips newest first, leaving out trips still being finished', async () => {
+  const db = await createTestDatabase();
+  const trip = (id: string, finishedAt: number, pending?: boolean) =>
+    db.trips.insert({
+      id,
+      storeId: 's1',
+      storeName: 'Corner Market',
+      finishedAt,
+      items: [{ itemId: 'apples', name: 'Apples', department: 'Produce' }],
+      ...(pending ? { pending } : {}),
+    });
+  await trip('old', 100);
+  await trip('new', 300);
+  await trip('unfinished', 400, true);
+  await trip('middle', 200);
+  const trips = await firstValueFrom(observeTrips(db));
+  expect(trips.map((t) => t.id)).toEqual(['new', 'middle', 'old']);
 });

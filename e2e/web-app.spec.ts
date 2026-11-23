@@ -382,6 +382,66 @@ test('a shopping trip: choose a store, check off, finish', async ({ page }) => {
   expect(problems).toEqual([]);
 });
 
+test('trip history: past trips can be searched, filtered and opened', async ({ page }) => {
+  const problems = watchConsole(page);
+  await setUpOneStoreAndItem(page); // Corner Market; Milk in Deli
+  await addItem(page, { name: 'Apples', department: 'Produce', brand: 'Orchard' });
+
+  // Check both on the master list (each may already be checked by "Needed"), then finish a trip with both.
+  const items = page.getByTestId('master-list');
+  for (const name of ['Milk', 'Apples']) {
+    const box = items.getByRole('checkbox', { name });
+    await expect(box).toBeVisible();
+    if ((await box.getAttribute('aria-checked')) !== 'true') await box.click();
+    await expect(box).toHaveAttribute('aria-checked', 'true');
+  }
+  await page.getByRole('tab', { name: 'Trip' }).click();
+  await button(page, 'Choose a store').click();
+  await page.getByRole('dialog', { name: 'Which store are you at?' }).getByRole('button', { name: 'Corner Market' }).click();
+  const trip = page.getByTestId('trip-screen');
+  await trip.getByRole('checkbox', { name: 'Milk' }).click();
+  await trip.getByRole('checkbox', { name: /^Apples/ }).click();
+  page.once('dialog', (d) => void d.accept());
+  await button(page, 'Finish trip').click();
+  await expect(page.getByText('Trip finished: 2 items logged as bought.')).toBeVisible();
+
+  // The clock icon at the top right opens the log.
+  await button(page, 'Trip history').click();
+  const history = page.getByTestId('trip-history');
+  await expect(history.getByText('1 trip, last 90 days')).toBeVisible();
+  const card = history.getByRole('button', { name: /^Corner Market\. .* at .*\.$/ });
+  await expect(card).toBeVisible();
+  await expect(history.getByText('Milk')).toHaveCount(0);
+
+  // Searching by brand finds it; something never bought doesn't.
+  const search = history.getByLabel('Search items or brands bought');
+  await search.fill('orchard');
+  await expect(card).toBeVisible();
+  await search.fill('bread');
+  await expect(history.getByText('No matching trips')).toBeVisible();
+  await search.fill('');
+
+  // Custom dates use the browser's date inputs, which can't go past today.
+  await history.getByRole('button', { name: /^Filter trips, / }).click();
+  await history.getByRole('radio', { name: 'Custom dates' }).click();
+  const to = history.getByLabel('To', { exact: true });
+  const today = await to.inputValue();
+  await expect(to).toHaveAttribute('max', today);
+  await expect(card).toBeVisible();
+  await history.getByRole('radio', { name: 'Last 30 days' }).click();
+
+  // Opening the trip lists what was bought, A to Z, or by department.
+  await card.click();
+  const detail = page.getByTestId('trip-detail');
+  await expect(detail.getByTestId('trip-item')).toHaveText([/^Apples/, /^Milk/]);
+  await detail.getByRole('radio', { name: 'Z to A' }).click();
+  await expect(detail.getByTestId('trip-item')).toHaveText([/^Milk/, /^Apples/]);
+  await detail.getByRole('radio', { name: 'Sort by department' }).click();
+  await expect(detail.getByTestId('trip-item-heading')).toHaveText(['Produce', 'Deli']);
+
+  expect(problems).toEqual([]);
+});
+
 test('settings: dark mode sticks across reloads; deleting all data starts over', async ({ page }) => {
   const problems = watchConsole(page);
   await setUpOneStoreAndItem(page);

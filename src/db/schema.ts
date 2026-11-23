@@ -114,13 +114,14 @@ export const settingsSchema: RxJsonSchema<SettingsDoc> = {
 
 export const tripSchema: RxJsonSchema<TripRecord> = {
   title: 'trip',
-  version: 1,
+  version: 2,
   primaryKey: 'id',
   type: 'object',
   properties: {
     id: { type: 'string', maxLength: 64 },
     storeId: { type: 'string' },
     storeName: { type: 'string' },
+    storeLocation: { type: 'string' },
     finishedAt: timestamp,
     items: {
       type: 'array',
@@ -149,6 +150,9 @@ const unchanged = <T>(doc: T) => doc;
  * documents are valid as they are.
  */
 export const addedOptionalFields = { 1: unchanged };
+
+/** Trips version 2 only added the optional storeLocation. */
+export const tripMigrations = { 1: unchanged, 2: unchanged };
 
 /** Settings version 2 only added the optional colorScheme. */
 export const settingsMigrations = { 1: unchanged, 2: unchanged, 3: unchanged };

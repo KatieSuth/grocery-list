@@ -4,7 +4,7 @@ An Expo app for iOS and Android that keeps your grocery items organized by store
 
 Built so far:
 - the first-run **setup flow**: add stores and departments, then the items you usually buy and where to find them;
-- the **main app**, with four tabs: Items (the master list and home screen, with checkboxes, free-text quantities, search, filters, sorting and "last bought"), Trip (the shopping trip: pick a store, check items into the cart in department order, finish to log them as bought), Stores (store configuration), and Settings (light/dark mode, the Items tab's default sort, Import from CSV, Delete all data).
+- the **main app**, with four tabs: Items (the master list and home screen, with checkboxes, free-text quantities, search, filters, sorting and "last bought"), Trip (the shopping trip: pick a store, check items into the cart in department order, finish to log them as bought; a history icon opens past trips, searchable by item or brand and filterable by dates and store), Stores (store configuration), and Settings (light/dark mode, the Items tab's default sort, Import from CSV, Delete all data).
 
 See the [functional specification](docs/functional-spec.md) for screen-by-screen behavior.
 
@@ -93,7 +93,9 @@ src/
     store-form.tsx        "/store-form"  → StoreFormScreen (back to /stores); covers the tabs
     (tabs)/               Main app (NativeTabs); each tab has its own Stack
       (items)/index.tsx   "/"        Master list (the home tab): search, filters, checkbox + quantity per item
-      trip/index.tsx      "/trip"    Shopping trip: store dropdown, cart, Finish
+      trip/index.tsx      "/trip"    Shopping trip: store dropdown, cart, Finish; history icon
+      trip/history/index.tsx "/trip/history"  Trip log: search, date range + store filters
+      trip/history/[id].tsx  "/trip/history/:id"  One past trip's items, by name or department
       stores/index.tsx    "/stores"  Store configuration
       settings/index.tsx  "/settings"  Appearance, items' default sort, Import from CSV, Delete all data
   screens/                Screens used by more than one route
@@ -110,6 +112,7 @@ src/
     item-filter.ts        Master-list search + checked/store/department/brand filters
     item-sort.ts          Master-list sort: by name, department or last bought; either direction
     trip.ts               Trip list: checked items at a store, by department in walking order
+    trip-history.ts       Trip log: date ranges, store options, search, item sort, date text
     last-bought.ts        "Last bought yesterday" text
     appearance.ts         System / Light / Dark choice and labels
     csv-import.ts         CSV import: parse + validate the file (papaparse), plan the changes, messages
@@ -119,7 +122,7 @@ src/
     items-repo.ts         observe / save / delete items
     list-repo.ts          check / uncheck items, set quantity, cart marks
     settings-repo.ts      setupComplete flag, trip store + reverse order, appearance, items' default sort
-    trips-repo.ts         finishTrip(): log, set last bought, uncheck
+    trips-repo.ts         finishTrip(): log, set last bought, uncheck; observeTrips() newest first
     erase-repo.ts         deleteAllData(): delete and purge everything, back to setup
     import-repo.ts        applyImportPlan(): write a checked CSV import (adds, and fills in missing store locations)
   db/
@@ -131,7 +134,7 @@ src/
     change-events.ts      Clears RxDB's leftover change-event keys after Delete all data
     database-provider.tsx <DatabaseProvider>, useDatabase()
   hooks/
-    use-data.ts           useStores(), useItems(), useListEntries(), useSetupComplete(), useTripSettings(), useColorSchemeChoice(), useItemSortChoice()
+    use-data.ts           useStores(), useItems(), useListEntries(), useSetupComplete(), useTripSettings(), useColorSchemeChoice(), useItemSortChoice(), useTrips()
     use-unsaved-changes-warning.ts  Asks before a form with changes is closed (usePreventRemove)
     use-delayed-quantity-save.ts    Saves quantities once typing pauses (and on close / backgrounding)
     use-announcement.ts   Reads a message aloud on iOS (Android uses live regions)

@@ -62,6 +62,8 @@ export type TripRecord = {
   storeId: string;
   /** The store's name at the time. */
   storeName: string;
+  /** The store's location at the time, if it had one. Trips logged before this was saved don't have it. */
+  storeLocation?: string;
   finishedAt: number;
   items: TripItem[];
   /**

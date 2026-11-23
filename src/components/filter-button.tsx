@@ -22,16 +22,43 @@ type Props = {
  * filters are on, and is highlighted while either differs from the defaults.
  */
 export function FilterButton({ count, sort, direction, defaultChoice, expanded, onPress }: Props) {
-  const theme = useTheme();
-  const active = count > 0;
   const sortChanged = sort !== defaultChoice.sort || direction !== defaultChoice.direction;
   const spokenSort = `by ${SORT_LABELS[sort].toLowerCase()}, ${directionSpoken(sort)[direction]}`;
+  return (
+    <FilterIconButton
+      label={`Sort and filter, ${spokenSort}`}
+      count={count}
+      highlighted={sortChanged}
+      expanded={expanded}
+      onPress={onPress}
+    />
+  );
+}
+
+type IconProps = {
+  /** What it's announced as, before the number of filters on ("Sort and filter, by name, A to Z"). */
+  label: string;
+  /** Number of active filters; shown as a badge. */
+  count: number;
+  /** Highlights the icon for a change the badge doesn't count, such as a non-default sort. */
+  highlighted?: boolean;
+  expanded: boolean;
+  onPress: () => void;
+};
+
+/**
+ * A filter icon button that opens a panel. It's highlighted while filters are on, `highlighted`
+ * is set, or the panel is open, and announces how many filters are on.
+ */
+export function FilterIconButton({ label, count, highlighted = false, expanded, onPress }: IconProps) {
+  const theme = useTheme();
+  const active = count > 0;
   const spokenFilters = count === 1 ? ', 1 filter on' : count > 1 ? `, ${count} filters on` : '';
-  const color = active || sortChanged || expanded ? theme.tint : theme.text;
+  const color = active || highlighted || expanded ? theme.tint : theme.text;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Sort and filter, ${spokenSort}${spokenFilters}`}
+      accessibilityLabel={`${label}${spokenFilters}`}
       aria-expanded={expanded}
       onPress={onPress}
       style={({ pressed }) => [
