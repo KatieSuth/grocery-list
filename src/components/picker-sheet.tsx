@@ -68,11 +68,12 @@ export function PickerSheet({
                 onPress={() => onChoose(option.key)}
                 style={({ pressed }) => [
                   styles.choice,
-                  {
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: option.current ? theme.tint : 'transparent',
-                    opacity: pressOpacity(pressed),
-                  },
+                  // The current choice has a thicker tinted outline; the others a thin one (and a
+                  // point more padding, to stay the same size), so each shows it can be tapped.
+                  option.current
+                    ? { borderColor: theme.tint, borderWidth: 2 }
+                    : { borderColor: theme.controlBorder, borderWidth: 1, padding: Spacing.three + 1 },
+                  { backgroundColor: theme.backgroundElement, opacity: pressOpacity(pressed) },
                 ]}>
                 <View style={styles.choiceText}>
                   <ThemedText style={styles.choiceTitle}>{option.title}</ThemedText>
@@ -124,7 +125,6 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     padding: Spacing.three,
     borderRadius: 12,
-    borderWidth: 2,
     minHeight: 48,
   },
   choiceText: { flex: 1, gap: Spacing.half },

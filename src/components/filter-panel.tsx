@@ -6,7 +6,7 @@ import { ChoiceChips } from '@/components/choice-chips';
 import { pressOpacity } from '@/components/press-feedback';
 import { SortChoices } from '@/components/sort-choices';
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { ChipHitSlop, Spacing } from '@/constants/theme';
 import {
   toggleKey,
   type CheckedFilter,
@@ -135,9 +135,10 @@ function FilterGroup({ title, empty, options, selected, onToggle }: GroupProps) 
                 aria-checked={on}
                 accessibilityLabel={`${title}: ${option.label}`}
                 onPress={() => onToggle(option.key)}
+                hitSlop={ChipHitSlop}
                 style={[
                   styles.chip,
-                  { borderColor: on ? theme.tint : theme.border, backgroundColor: on ? theme.tint : theme.background },
+                  { borderColor: on ? theme.tint : theme.controlBorder, backgroundColor: on ? theme.tint : theme.background },
                 ]}>
                 <ThemedText type="small" style={{ color: on ? theme.onTint : theme.text }}>
                   {option.label}

@@ -110,7 +110,7 @@ function QuantityInput({
       maxLength={QUANTITY_MAX_LENGTH}
       returnKeyType="done"
       onChangeText={onChange}
-      style={[styles.quantity, { color: theme.text, backgroundColor: theme.background, borderColor: theme.border }]}
+      style={[styles.quantity, { color: theme.text, backgroundColor: theme.background, borderColor: theme.controlBorder }]}
     />
   );
 }

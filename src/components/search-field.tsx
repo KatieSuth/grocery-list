@@ -15,7 +15,7 @@ type Props = {
 export function SearchField({ label, placeholder, value, onChangeText }: Props) {
   const theme = useTheme();
   return (
-    <View style={[styles.box, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+    <View style={[styles.box, { backgroundColor: theme.backgroundElement, borderColor: theme.controlBorder }]}>
       <TextInput
         accessibilityLabel={label}
         placeholder={placeholder}

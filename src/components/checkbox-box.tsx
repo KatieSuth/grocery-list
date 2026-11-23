@@ -13,7 +13,12 @@ export function CheckboxBox({ checked }: { checked: boolean }) {
         { borderColor: checked ? theme.tint : theme.textSecondary },
         checked && { backgroundColor: theme.tint },
       ]}>
-      {checked ? <ThemedText style={[styles.check, { color: theme.onTint }]}>✓</ThemedText> : null}
+      {/* A mark drawn to fit the 24-point box, not text: it mustn't grow out of the box with large text. */}
+      {checked ? (
+        <ThemedText allowFontScaling={false} style={[styles.check, { color: theme.onTint }]}>
+          ✓
+        </ThemedText>
+      ) : null}
     </View>
   );
 }

@@ -381,3 +381,13 @@ test('a failed check-off is reported', async () => {
   );
   expect(checkbox('Apples')).not.toBeChecked();
 });
+
+test('in the store picker, the current store has a thicker tinted outline', async () => {
+  await renderApp({ initialUrl: '/trip', seed: (db) => seed(db, { tripStoreId: 'corner' }) });
+  await press('Store: Corner Market');
+  expect(trip().getByRole('button', { name: 'Corner Market, Main St, current' })).toHaveStyle({
+    borderColor: Colors.light.tint,
+    borderWidth: 2,
+  });
+  expect(trip().getByRole('button', { name: 'Big Box' })).toHaveStyle({ borderColor: Colors.light.controlBorder, borderWidth: 1 });
+});

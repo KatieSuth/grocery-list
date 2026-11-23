@@ -33,7 +33,7 @@ export function StoreDropdown({ stores, selected, onChoose, disabled }: Props) {
         onPress={() => setOpen(true)}
         style={({ pressed }) => [
           styles.field,
-          { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressOpacity(pressed, disabled) },
+          { backgroundColor: theme.backgroundElement, borderColor: theme.controlBorder, opacity: pressOpacity(pressed, disabled) },
         ]}>
         <View style={styles.text}>
           <ThemedText style={selected ? styles.name : { color: theme.textSecondary }}>

@@ -197,7 +197,7 @@ Two stores can share a name as long as their locations differ (e.g. two Krogers 
 - Every store is listed with a checkbox, in the same order as the Stores screen.
 - Checking a store shows its departments as choices, **A–Z** (ignoring case), not in the store's walking order. Walking order is kept for the shopping trip. The user picks exactly one.
 - Unchecking a store hides its choices and clears the selection for that store.
-- After a store's choices is a **+ New department** button, for when the department the item is in is missing. It opens a "New department" field with Cancel and **Add**:
+- Below a store's choices is a **+ New department** button, for when the department the item is in is missing. It opens a "New department" field with Cancel and **Add**:
   - Add (or the keyboard's Done) adds the department to that store straight away, at the **end of its walking order**, and chooses it for the item: "Added Dairy at the end of Corner Market’s departments. You can move it on the store’s page."
   - A name the store already has (ignoring case and spacing) just chooses that department: "Corner Market already has Produce, so it’s chosen."
   - A blank name shows "Enter a department name." If saving fails: "Could not add the department. Please try again."
@@ -480,12 +480,17 @@ With no stores: "No stores yet."
 
 - Every button, field, checkbox, and department choice has a spoken label. For example, a department's drag handle announces "Reorder Produce, position 1 of 3", with Move up / Move down actions. Department choices announce "Deli in Corner Market".
 - Checkboxes and department choices report their checked state.
+- Optional fields are announced with "optional", e.g. "Location, optional".
+- On the store form, each department's position number isn't read on its own; its drag handle already says "position 1 of 3".
+- On the item form, each store's department choices are a group of just the departments; "+ New department" is a separate button below them.
 - On the master list, each checkbox is announced by the item's name. The quantity field is announced as "Quantity for <item>". The rest of the row is a separate "Edit this item" button, announced with everything it shows: "Soup, Acme. Deli at Corner Market. Last bought yesterday."
 - Store and item cards say everything they show, e.g. "Corner Market, Main St. Departments in order: Produce, Deli." (not "→" or "·").
 - Status notes and errors are read aloud when they appear ("Trip finished: 2 items logged as bought.", "Saved “Milk”…", "Item name is required.", "Showing 3 of 10 items", "Importing…"): by TalkBack and the web from live regions, and by VoiceOver through an announcement.
 - On/off settings (Needed on the item form, Reverse order on the trip) are one control each: the whole row toggles, and it's announced once, e.g. "Needed, switch, on", with its description.
 - Screen titles ("Where do you shop?"), form sections ("Departments", "Where to find it"), Settings sections ("Appearance", "Default sort"…), the sort panel's sections, list group headings and dialog titles are headings, so screen-reader users can jump between them.
-- Touch targets are at least 48 points tall (the ✕ remove control has a larger tap area than it looks; drag handles are 40 points square).
+- Touch targets are at least 44 points: buttons, fields and rows are 48 points tall; chips are 36 points tall with a 4-point invisible margin of extra tap area (they're 8 points apart, so the targets don't overlap); the ✕ remove control has a larger tap area than it looks; drag handles are 40 points square.
+- Text meets 4.5:1 contrast in both themes. The outlines of fields, chips, the store dropdown and the filter button meet 3:1 against the background and element fills, so it's clear they're controls. Secondary buttons and picker options are outlined the same way (the current choice in a picker has a thicker tinted outline). Dividers keep a lighter color. A test checks the theme colors.
+- Text grows with the system text size. The filter-count badge grows too, up to 1.5×, so it doesn't cover the filter icon; department position numbers widen for "10" and up; the ✓ in checkboxes stays sized to its box.
 - Follows the system light/dark setting unless Light or Dark is chosen in Settings.
 - Appearance choices are radio buttons and report which is selected.
 

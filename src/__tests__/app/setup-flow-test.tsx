@@ -46,7 +46,7 @@ test('adding a store with custom, reordered departments', async () => {
   expect(screen).toHavePathname('/setup/store-form');
 
   await type('Store name', '  Corner   Market ');
-  await type('Location', 'Main St');
+  await type('Location, optional', 'Main St');
   await press('Remove Deli');
   // Reorder with the screen-reader actions on the drag handle...
   await moveDepartment('Produce', 'down');
@@ -140,7 +140,7 @@ test('the full setup: store, items with add more / continue, back, finish', asyn
   expect(screen.getByText('Choose at least one store.')).toBeOnTheScreen();
 
   await type('Item name', 'Milk');
-  await type('Brand/Distinguisher', 'Organic Valley');
+  await type('Brand/Distinguisher, optional', 'Organic Valley');
   await fireEvent.press(screen.getByRole('checkbox', { name: 'Corner Market' }));
   await press('Add more');
   expect(await screen.findByText('Choose a department in Corner Market.')).toBeOnTheScreen();

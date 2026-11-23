@@ -38,7 +38,7 @@ export function FilterButton({ count, sort, direction, defaultChoice, expanded, 
         styles.button,
         {
           backgroundColor: theme.backgroundElement,
-          borderColor: expanded ? theme.tint : theme.border,
+          borderColor: expanded ? theme.tint : theme.controlBorder,
           opacity: pressOpacity(pressed),
         },
       ]}>
@@ -53,7 +53,10 @@ export function FilterButton({ count, sort, direction, defaultChoice, expanded, 
       />
       {active ? (
         <View style={[styles.badge, { backgroundColor: theme.tint }]}>
-          <ThemedText style={[styles.badgeText, { color: theme.onTint }]}>{count}</ThemedText>
+          {/* It sits on the button's corner: let it grow with large text, but not over the icon. */}
+          <ThemedText maxFontSizeMultiplier={1.5} style={[styles.badgeText, { color: theme.onTint }]}>
+            {count}
+          </ThemedText>
         </View>
       ) : null}
     </Pressable>
@@ -74,7 +77,7 @@ const styles = StyleSheet.create({
     top: -6,
     right: -6,
     minWidth: 20,
-    height: 20,
+    minHeight: 20,
     borderRadius: 10,
     paddingHorizontal: 5,
     alignItems: 'center',

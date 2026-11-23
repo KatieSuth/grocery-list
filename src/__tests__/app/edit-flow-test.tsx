@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
-import { act, cleanup, fireEvent, screen, waitFor } from 'expo-router/testing-library';
+import { act, cleanup, fireEvent, screen, waitFor, within } from 'expo-router/testing-library';
 import { Alert } from 'react-native';
 
+import { Colors } from '@/constants/theme';
 import type { AppDatabase } from '@/db/database';
 import {
   addDepartments,
@@ -64,13 +65,13 @@ test('editing a store updates it and removes item locations for deleted departme
   await press(/^Corner Market, Main St\./);
   expect(screen).toHavePathnameWithParams('/setup/store-form?id=s1');
   expect(screen.getByLabelText('Store name')).toHaveDisplayValue('Corner Market');
-  expect(screen.getByLabelText('Location')).toHaveDisplayValue('Main St');
+  expect(screen.getByLabelText('Location, optional')).toHaveDisplayValue('Main St');
   // The first department can only move down; the last only up.
   expect(departmentActions('Produce')).toEqual(['moveDown']);
   expect(departmentActions('Deli')).toEqual(['moveUp']);
 
   await type('Store name', 'Corner Mkt');
-  await type('Location', '   ');
+  await type('Location, optional', '   ');
   await moveDepartment('Deli', 'up');
   await press('Remove Deli');
   await press('Save');
@@ -122,7 +123,7 @@ test('editing an item', async () => {
   // Edit mode uses Save/Cancel instead of Add more/Continue.
   expect(screen.queryByRole('button', { name: 'Add more' })).toBeNull();
 
-  await type('Brand/Distinguisher', '');
+  await type('Brand/Distinguisher, optional', '');
   await fireEvent.press(screen.getByRole('checkbox', { name: 'Big Box' }));
   await fireEvent.press(screen.getByRole('radio', { name: 'Produce in Corner Market' }));
   await press('Save');
@@ -471,7 +472,7 @@ test('saving an item with the same name and brand as another asks first', async 
   await press('Next');
   await press('Add an item');
   await type('Item name', ' milk ');
-  await type('Brand/Distinguisher', 'ACME');
+  await type('Brand/Distinguisher, optional', 'ACME');
   await fireEvent.press(screen.getByRole('checkbox', { name: 'Big Box' }));
   await fireEvent.press(screen.getByRole('radio', { name: 'Frozen in Big Box' }));
 
@@ -508,7 +509,7 @@ test('a store can’t have the same name and location as another', async () => {
   const db = await renderApp({ seed });
   await press('Add a store');
   await type('Store name', 'corner market');
-  await type('Location', 'MAIN ST');
+  await type('Location, optional', 'MAIN ST');
   await addDepartments('Deli');
   await press('Save');
   expect(
@@ -516,7 +517,7 @@ test('a store can’t have the same name and location as another', async () => {
   ).toBeOnTheScreen();
 
   // A different location tells them apart.
-  await type('Location', 'Elm St');
+  await type('Location, optional', 'Elm St');
   expect(screen.queryByText(/You already have/)).toBeNull();
   await press('Save');
   await waitFor(async () => expect(await db.stores.count().exec()).toBe(3));
@@ -526,7 +527,7 @@ test('name fields are limited to the longest name allowed', async () => {
   await renderApp({ seed });
   await press('Add a store');
   expect(screen.getByLabelText('Store name')).toHaveProp('maxLength', 100);
-  expect(screen.getByLabelText('Location')).toHaveProp('maxLength', 100);
+  expect(screen.getByLabelText('Location, optional')).toHaveProp('maxLength', 100);
   expect(screen.getByLabelText('New department')).toHaveProp('maxLength', 100);
 });
 
@@ -571,4 +572,44 @@ test('screen titles and form sections are headings, so screen readers can jump b
   expect(await screen.findByRole('header', { name: 'What do you usually buy?' })).toBeOnTheScreen();
   await press('Add an item');
   expect(await screen.findByRole('header', { name: 'Where to find it' })).toBeOnTheScreen();
+});
+
+test('optional fields say so, and department positions aren’t read twice', async () => {
+  await renderApp({ seed });
+  await press(/^Corner Market, Main St\./);
+  // "(optional)" is shown beside the label, and spoken with it.
+  expect(screen.getByLabelText('Location, optional')).toHaveDisplayValue('Main St');
+  // The drag handle says "position 1 of 2", so the number beside it is hidden from screen readers.
+  expect(screen.getByLabelText(/^Reorder Produce, position 1 of 2/)).toBeOnTheScreen();
+  expect(screen.getByText('1', { includeHiddenElements: true })).toHaveProp('accessibilityElementsHidden', true);
+  expect(screen.queryByText('1')).toBeNull();
+});
+
+test('the department choices group holds only the departments, not the New department button', async () => {
+  await renderApp({ seed });
+  await press('Next');
+  await press(/^Milk, Acme\./);
+  // A plain container, so it's found by its label rather than its role.
+  const group = screen.getByLabelText('Department in Corner Market');
+  expect(group).toHaveProp('accessibilityRole', 'radiogroup');
+  expect(within(group).getAllByRole('radio').map((r) => r.props.accessibilityLabel)).toEqual([
+    'Deli in Corner Market',
+    'Produce in Corner Market',
+  ]);
+  expect(within(group).queryByRole('button')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Add a department to Corner Market' })).toBeOnTheScreen();
+});
+
+test('secondary buttons and picker options are outlined, so they read as tappable', async () => {
+  await renderApp({ seed });
+  await press('Add a store');
+  expect(screen.getByRole('button', { name: 'Cancel' })).toHaveStyle({ borderColor: Colors.light.controlBorder, borderWidth: 1 });
+
+  await addDepartments('Deli');
+  await press('Copy departments from another store');
+  // Options are outlined; none is the current choice here.
+  expect(screen.getByRole('button', { name: 'Copy from Big Box' })).toHaveStyle({
+    borderColor: Colors.light.controlBorder,
+    borderWidth: 1,
+  });
 });

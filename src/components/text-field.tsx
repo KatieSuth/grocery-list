@@ -40,14 +40,15 @@ export function TextField({ label, error, optional, extraSpaceBelow = 0, onFocus
         {optional ? <ThemedText type="small" themeColor="textSecondary"> (optional)</ThemedText> : null}
       </ThemedText>
       <TextInput
-        accessibilityLabel={label}
+        // "(optional)" is shown beside the label, so say it too.
+        accessibilityLabel={optional ? `${label}, optional` : label}
         placeholderTextColor={theme.textSecondary}
         style={[
           styles.input,
           {
             color: theme.text,
             backgroundColor: theme.backgroundElement,
-            borderColor: error ? theme.danger : theme.border,
+            borderColor: error ? theme.danger : theme.controlBorder,
           },
         ]}
         {...rest}

@@ -7,7 +7,7 @@ import { CheckboxBox } from '@/components/checkbox-box';
 import { StatusText } from '@/components/status-text';
 import { ErrorText, TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { ChipHitSlop, Spacing } from '@/constants/theme';
 import { sortDepartmentsByName } from '@/domain/departments';
 import { MAX_NAME_LENGTH } from '@/domain/names';
 import type { Store } from '@/domain/types';
@@ -117,37 +117,42 @@ export function StoreLocationPicker({
             </Pressable>
 
             {selected ? (
-              <View style={styles.departments} accessibilityRole="radiogroup" accessibilityLabel={`Department in ${store.name}`}>
-                {/* A–Z is easiest to scan here; the store's walking order is for the shopping trip. */}
-                {sortDepartmentsByName(store.departments).map((dept) => {
-                  const chosen = selections[store.id] === dept.id;
-                  return (
-                    <Pressable
-                      key={dept.id}
-                      accessibilityRole="radio"
-                      aria-checked={chosen}
-                      accessibilityLabel={`${dept.name} in ${store.name}`}
-                      onPress={() => {
-                        Keyboard.dismiss();
-                        onChooseDepartment(store.id, dept.id);
-                      }}
-                      style={[
-                        styles.chip,
-                        { borderColor: chosen ? theme.tint : theme.border },
-                        chosen && { backgroundColor: theme.tint },
-                      ]}>
-                      <ThemedText type="small" style={chosen ? { color: theme.onTint } : undefined}>
-                        {dept.name}
-                      </ThemedText>
-                    </Pressable>
-                  );
-                })}
+              <View style={styles.departments}>
+                {/* Only the choices are in the group, so screen readers count just the departments. */}
+                <View style={styles.choices} accessibilityRole="radiogroup" accessibilityLabel={`Department in ${store.name}`}>
+                  {/* A–Z is easiest to scan here; the store's walking order is for the shopping trip. */}
+                  {sortDepartmentsByName(store.departments).map((dept) => {
+                    const chosen = selections[store.id] === dept.id;
+                    return (
+                      <Pressable
+                        key={dept.id}
+                        accessibilityRole="radio"
+                        aria-checked={chosen}
+                        accessibilityLabel={`${dept.name} in ${store.name}`}
+                        onPress={() => {
+                          Keyboard.dismiss();
+                          onChooseDepartment(store.id, dept.id);
+                        }}
+                        hitSlop={ChipHitSlop}
+                        style={[
+                          styles.chip,
+                          { borderColor: chosen ? theme.tint : theme.controlBorder },
+                          chosen && { backgroundColor: theme.tint },
+                        ]}>
+                        <ThemedText type="small" style={chosen ? { color: theme.onTint } : undefined}>
+                          {dept.name}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
                 {addingTo === store.id ? null : (
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`Add a department to ${store.name}`}
                     onPress={() => startAdding(store.id)}
-                    style={[styles.chip, styles.addChip, { borderColor: theme.border }]}>
+                    hitSlop={ChipHitSlop}
+                    style={[styles.chip, styles.addChip, { borderColor: theme.controlBorder }]}>
                     <ThemedText type="small" themeColor="textSecondary">
                       + New department
                     </ThemedText>
@@ -224,12 +229,11 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   storeName: { fontWeight: 600 },
   departments: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: Spacing.two,
     paddingHorizontal: Spacing.three,
     paddingBottom: Spacing.three,
   },
+  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   chip: {
     minHeight: 36,
     justifyContent: 'center',
@@ -238,7 +242,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   fullWidth: { width: '100%' },
-  addChip: { borderStyle: 'dashed' },
+  addChip: { borderStyle: 'dashed', alignSelf: 'flex-start' },
   addForm: { gap: Spacing.two },
   addButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.two },
 });

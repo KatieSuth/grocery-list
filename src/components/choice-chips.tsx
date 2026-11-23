@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { ChipHitSlop, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props<T extends string> = {
@@ -29,9 +29,10 @@ export function ChoiceChips<T extends string>({ title, choices, selected, onChan
               aria-checked={on}
               accessibilityLabel={spoken}
               onPress={() => onChange(value)}
+              hitSlop={ChipHitSlop}
               style={[
                 styles.chip,
-                { borderColor: on ? theme.tint : theme.border, backgroundColor: on ? theme.tint : theme.background },
+                { borderColor: on ? theme.tint : theme.controlBorder, backgroundColor: on ? theme.tint : theme.background },
               ]}>
               <ThemedText type="small" style={{ color: on ? theme.onTint : theme.text }}>
                 {label}

@@ -135,7 +135,12 @@ export function DepartmentEditor({ departments, onChange, error, knownStores, cu
                   />
                 </View>
               </Sortable.Handle>
-              <ThemedText themeColor="textSecondary" style={styles.position}>
+              {/* The drag handle already says "position 1 of 4"; don't read the number again. */}
+              <ThemedText
+                themeColor="textSecondary"
+                style={styles.position}
+                accessibilityElementsHidden
+                importantForAccessibility="no">
                 {index + 1}
               </ThemedText>
               <ThemedText style={styles.name}>{dept.name}</ThemedText>
@@ -217,7 +222,7 @@ export function DepartmentEditor({ departments, onChange, error, knownStores, cu
               onPress={() => handleChangeText(suggestion.name)}
               style={({ pressed }) => [
                 styles.suggestion,
-                { borderColor: theme.border, opacity: pressOpacity(pressed) },
+                { borderColor: theme.controlBorder, opacity: pressOpacity(pressed) },
               ]}>
               <ThemedText style={styles.suggestionName}>{suggestion.name}</ThemedText>
               <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={styles.flex}>
@@ -244,7 +249,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   handle: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  position: { width: 20 },
+  // Grows with large text, so "10" and up aren't cut off.
+  position: { minWidth: 20 },
   name: { flex: 1 },
   copy: { gap: Spacing.one, alignItems: 'flex-start' },
   addRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },

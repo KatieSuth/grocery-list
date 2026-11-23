@@ -40,6 +40,8 @@ export function Button({ label, variant = 'primary', compact, disabled, ...rest 
         compact && styles.compact,
         { backgroundColor: background, opacity: pressOpacity(pressed, disabled) },
         variant === 'danger' && { borderColor: theme.danger, borderWidth: 1 },
+        // Its fill is barely darker than the page, so an outline shows it's a button.
+        variant === 'secondary' && { borderColor: theme.controlBorder, borderWidth: 1 },
       ]}
       {...rest}>
       <ThemedText style={[styles.label, { color }]}>{label}</ThemedText>

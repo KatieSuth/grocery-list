@@ -16,7 +16,10 @@ export const Colors = {
     textSecondary: '#60646C',
     tint: '#1F7A4D',
     onTint: '#ffffff',
+    /** Dividers and decorative outlines. */
     border: '#D9D9E0',
+    /** Outlines that show something is a control (fields, chips): at least 3:1 against the background and element fill. */
+    controlBorder: '#80838D',
     danger: '#C62828',
     /** A switch's track when off: at least 3:1 against the background and the white thumb. */
     switchTrackOff: '#8B8D98',
@@ -30,6 +33,7 @@ export const Colors = {
     tint: '#4CC38A',
     onTint: '#04140B',
     border: '#3A3D42',
+    controlBorder: '#6F737B',
     danger: '#FF6B6B',
     switchTrackOff: '#62666E',
   },
@@ -73,3 +77,9 @@ export const Spacing = {
 } as const;
 
 export const MaxContentWidth = 800;
+
+/**
+ * Extra tap area around chips. They're 36 points tall with 8 points between them, so 4 more on
+ * each side makes 44-point targets that don't overlap, without making the chips look bigger.
+ */
+export const ChipHitSlop = Spacing.one;

@@ -456,3 +456,23 @@ test('settings sections and dialog titles are headings', async () => {
   await press('Choose a store');
   expect(await screen.findByRole('header', { name: 'Which store are you at?' })).toBeOnTheScreen();
 });
+
+test('chips have room to tap, and large text doesn’t overflow the badge or checkmarks', async () => {
+  await renderApp({
+    seed: async (db) => {
+      await seed(db);
+      await db.listEntries.insert({ itemId: 'i1', checkedAt: 1 });
+    },
+  });
+  await openTab('/');
+  await press(/^Sort and filter/);
+  await press('Stores');
+  // 36-point chips with 4 more on each side: 44-point targets.
+  expect(screen.getByRole('radio', { name: 'Sort by name' })).toHaveProp('hitSlop', 4);
+  expect(screen.getByRole('radio', { name: 'Checked items only' })).toHaveProp('hitSlop', 4);
+  await fireEvent.press(screen.getByRole('checkbox', { name: 'Stores: Corner Market' }));
+
+  // The filter badge grows with large text, up to a point; the checkmark stays inside its box.
+  expect(await screen.findByText('1', { exact: true })).toHaveProp('maxFontSizeMultiplier', 1.5);
+  expect(screen.getByText('✓')).toHaveProp('allowFontScaling', false);
+});
