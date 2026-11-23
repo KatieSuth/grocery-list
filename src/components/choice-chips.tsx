@@ -16,7 +16,9 @@ export function ChoiceChips<T extends string>({ title, choices, selected, onChan
   const theme = useTheme();
   return (
     <View style={styles.group}>
-      <ThemedText type="smallBold">{title}</ThemedText>
+      <ThemedText type="smallBold" accessibilityRole="header">
+        {title}
+      </ThemedText>
       <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={title}>
         {choices.map(({ value, label, spoken }) => {
           const on = selected === value;

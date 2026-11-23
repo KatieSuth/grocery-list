@@ -40,7 +40,7 @@ const CHECKED_CHOICES: { value: CheckedFilter; label: string; spoken: string }[]
 export function FilterPanel({ options, filter, onChange, sort, direction, onChangeSort, onChangeDirection }: Props) {
   const theme = useTheme();
   return (
-    <View style={[styles.panel, { backgroundColor: theme.backgroundElement }]}>
+    <View testID="filter-panel" style={[styles.panel, { backgroundColor: theme.backgroundElement }]}>
       <SortChoices sort={sort} direction={direction} onChangeSort={onChangeSort} onChangeDirection={onChangeDirection} />
       {sort === 'department' ? (
         <ThemedText type="small" themeColor="textSecondary">

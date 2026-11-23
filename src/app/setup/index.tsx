@@ -26,7 +26,9 @@ export default function StoresSetupScreen() {
           <Button variant="secondary" label="Skip for now" onPress={() => runWrite(() => setSetupComplete(db, true), 'Could not finish setup. Please try again.')} />
         )
       }>
-      <ThemedText type="subtitle">Where do you shop?</ThemedText>
+      <ThemedText type="subtitle" accessibilityRole="header">
+        Where do you shop?
+      </ThemedText>
       <ThemedText themeColor="textSecondary">
         Add the stores you go to, and the order you walk through their departments.
       </ThemedText>

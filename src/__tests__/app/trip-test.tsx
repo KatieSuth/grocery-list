@@ -122,11 +122,14 @@ test('choosing a store lists what to get there, by department in walking order',
 
   // Reverse order, for walking the store the other way.
   // The track is visible when off, not just when on.
-  const reverseSwitch = trip().getByLabelText('Reverse order');
+  const reverseSwitch = trip().getByTestId('switch-row-toggle', { includeHiddenElements: true });
   const [offProp, onProp] = Platform.OS === 'ios' ? ['tintColor', 'onTintColor'] : ['trackColorForFalse', 'trackColorForTrue'];
   expect(reverseSwitch).toHaveProp(offProp, Colors.light.switchTrackOff);
   expect(reverseSwitch).toHaveProp(onProp, Colors.light.tint);
-  await fireEvent(trip().getByLabelText('Reverse order'), 'valueChange', true);
+  // The whole row is one switch for screen readers; tapping it toggles.
+  const reverseRow = trip().getByRole('switch', { name: 'Reverse order' });
+  expect(reverseRow).not.toBeChecked();
+  await fireEvent.press(reverseRow);
   await eventually(async () => expect(tripRows()).toEqual(['# Deli', 'Ham, Acme, 1 lb', '# Produce', 'Apples']));
   expect((await db.settings.findOne('app').exec())?.tripReversed).toBe(true);
 

@@ -4,6 +4,7 @@ import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import { SpaceBelowFocusedFieldContext } from '@/components/space-below-focused-field';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
+import { useAnnouncement } from '@/hooks/use-announcement';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = Omit<TextInputProps, 'style'> & {
@@ -68,8 +69,10 @@ export function TextField({ label, error, optional, extraSpaceBelow = 0, onFocus
   );
 }
 
+/** An error message, read aloud by screen readers when it appears or changes. */
 export function ErrorText({ message }: { message: string }) {
   const theme = useTheme();
+  useAnnouncement(message);
   return (
     <ThemedText type="small" style={{ color: theme.danger }} accessibilityLiveRegion="polite">
       {message}

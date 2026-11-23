@@ -49,7 +49,7 @@ export function PickerSheet({
           aria-label={title.replace(/…$/, '')}
           style={[styles.sheet, { backgroundColor: theme.background }]}>
           <View style={styles.header}>
-            <ThemedText type="subtitle" style={styles.title}>
+            <ThemedText type="subtitle" accessibilityRole="header" style={styles.title}>
               {title}
             </ThemedText>
             {message ? (

@@ -8,7 +8,7 @@ import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { setSetupComplete } from '@/data/settings-repo';
 import { useDatabase } from '@/db/database-provider';
-import { describeLocations } from '@/domain/describe';
+import { describeLocations, describeLocationsSpoken } from '@/domain/describe';
 import { useItems, useStores } from '@/hooks/use-data';
 import { goBack } from '@/utils/navigation';
 import { runWrite } from '@/utils/run-write';
@@ -34,7 +34,9 @@ export default function ItemsSetupScreen() {
           )}
         </>
       }>
-      <ThemedText type="subtitle">What do you usually buy?</ThemedText>
+      <ThemedText type="subtitle" accessibilityRole="header">
+        What do you usually buy?
+      </ThemedText>
       <ThemedText themeColor="textSecondary">
         Add the items you pick up regularly and where to find them.
       </ThemedText>
@@ -45,11 +47,8 @@ export default function ItemsSetupScreen() {
             key={item.id}
             title={item.name}
             subtitle={item.brand}
-            detail={
-              <ThemedText type="small" themeColor="textSecondary">
-                {describeLocations(item, stores) || 'No store selected'}
-              </ThemedText>
-            }
+            detail={describeLocations(item, stores) || 'No store selected'}
+            spokenDetail={describeLocationsSpoken(item, stores)}
             accessibilityHint="Edit this item"
             onPress={() => router.push({ pathname: '/setup/item-form', params: { id: item.id } })}
           />

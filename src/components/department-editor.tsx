@@ -5,6 +5,7 @@ import Sortable, { type SortableGridProps } from 'react-native-sortables';
 
 import { Button } from '@/components/button';
 import { CopyDepartmentsPrompt } from '@/components/copy-departments-prompt';
+import { StatusText } from '@/components/status-text';
 import { pressOpacity } from '@/components/press-feedback';
 import { ErrorText, TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
@@ -87,7 +88,9 @@ export function DepartmentEditor({ departments, onChange, error, knownStores, cu
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <ThemedText type="smallBold">Departments</ThemedText>
+        <ThemedText type="smallBold" accessibilityRole="header">
+          Departments
+        </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
           Put them in the order you usually walk through the store. Drag the handle to reorder.
         </ThemedText>
@@ -167,11 +170,7 @@ export function DepartmentEditor({ departments, onChange, error, knownStores, cu
               setChoosingCopySource(true);
             }}
           />
-          {copyNote ? (
-            <ThemedText type="small" themeColor="textSecondary" accessibilityLiveRegion="polite">
-              {copyNote}
-            </ThemedText>
-          ) : null}
+          {copyNote ? <StatusText message={copyNote} /> : null}
           <CopyDepartmentsPrompt
             visible={choosingCopySource}
             stores={copySources}

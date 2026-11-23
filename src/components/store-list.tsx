@@ -1,6 +1,5 @@
 import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
-import { ThemedText } from '@/components/themed-text';
 import type { Store } from '@/domain/types';
 
 type Props = {
@@ -18,11 +17,13 @@ export function StoreList({ stores, onSelect }: Props) {
       key={store.id}
       title={store.name}
       subtitle={store.location}
-      detail={
-        <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-          {store.departments.map((d) => d.name).join(' → ')}
-        </ThemedText>
+      detail={store.departments.map((d) => d.name).join(' → ')}
+      spokenDetail={
+        store.departments.length > 0
+          ? `Departments in order: ${store.departments.map((d) => d.name).join(', ')}`
+          : 'No departments'
       }
+      detailNumberOfLines={1}
       accessibilityHint="Edit this store"
       onPress={() => onSelect(store)}
     />

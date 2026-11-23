@@ -4,10 +4,11 @@ import { StyleSheet, View } from 'react-native';
 import { Button } from '@/components/button';
 import { EmptyState } from '@/components/empty-state';
 import { Screen } from '@/components/screen';
+import { StatusText } from '@/components/status-text';
 import { StoreDropdown } from '@/components/store-dropdown';
+import { SwitchRow } from '@/components/switch-row';
 import { ErrorText } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
-import { ToggleSwitch } from '@/components/toggle-switch';
 import { TripItemRow } from '@/components/trip-item-row';
 import { Spacing } from '@/constants/theme';
 import { clearCart, setInCart } from '@/data/list-repo';
@@ -130,35 +131,26 @@ export default function TripScreen() {
       {/* Locked while finishing, so the cart can't be cleared halfway through. */}
       <StoreDropdown stores={stores} selected={store} onChoose={handleChooseStore} disabled={finishing} />
 
-      {note ? (
-        <ThemedText type="small" themeColor="textSecondary" accessibilityLiveRegion="polite">
-          {note}
-        </ThemedText>
-      ) : null}
+      {note ? <StatusText message={note} /> : null}
       {error ? <ErrorText message={error} /> : null}
 
       {!store || !list ? (
         <EmptyState title="Where are you shopping?" message="Choose a store to see what to get there." />
       ) : (
         <>
-          <View style={styles.toolbar}>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.flex}>
-              {list.remainingCount + list.inCartCount === 0
-                ? 'Nothing to get here'
-                : `${list.inCartCount} of ${list.remainingCount + list.inCartCount} in cart`}
-            </ThemedText>
-            <View style={styles.reverse}>
-              <ThemedText type="small">Reverse order</ThemedText>
-              <ToggleSwitch
-                accessibilityLabel="Reverse order"
-                accessibilityHint="Lists departments in the opposite order, for walking the store the other way"
-                value={settings.reversed}
-                onValueChange={(reversed) =>
-                  runWrite(() => setTripReversed(db, reversed), 'Could not change the order. Please try again.')
-                }
-              />
-            </View>
-          </View>
+          <ThemedText type="small" themeColor="textSecondary">
+            {list.remainingCount + list.inCartCount === 0
+              ? 'Nothing to get here'
+              : `${list.inCartCount} of ${list.remainingCount + list.inCartCount} in cart`}
+          </ThemedText>
+          <SwitchRow
+            label="Reverse order"
+            description="Departments last to first, for walking the store the other way."
+            value={settings.reversed}
+            onValueChange={(reversed) =>
+              runWrite(() => setTripReversed(db, reversed), 'Could not change the order. Please try again.')
+            }
+          />
 
           {list.sections.length === 0 ? (
             <EmptyState
@@ -201,9 +193,6 @@ export default function TripScreen() {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
   footer: { flex: 1 },
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  reverse: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   section: { gap: Spacing.two },
 });

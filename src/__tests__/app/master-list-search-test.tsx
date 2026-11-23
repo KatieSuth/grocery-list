@@ -255,12 +255,17 @@ test('the filter panel explains when there is nothing to filter by', async () =>
   expect(screen.getByText('No items yet')).toBeOnTheScreen();
 });
 
-/** Department headings and item rows, in display order. */
-const listRows = () =>
-  within(screen.getByTestId('master-list'))
-    .queryAllByRole(/^(header|checkbox)$/)
-    .map((el) => (el.props.accessibilityRole === 'header' ? `# ${el.props.children}` : el.props.accessibilityLabel))
-    .filter((label: string) => !label.includes(': '));
+const HEADINGS_AND_ROWS = /^(header|checkbox)$/;
+
+/** Department headings and item rows, in display order (not the sort and filter panel's). */
+const listRows = () => {
+  const panel = screen.queryByTestId('filter-panel');
+  const inPanel = new Set(panel ? within(panel).queryAllByRole(HEADINGS_AND_ROWS) : []);
+  return within(screen.getByTestId('master-list'))
+    .queryAllByRole(HEADINGS_AND_ROWS)
+    .filter((el) => !inPanel.has(el))
+    .map((el) => (el.props.accessibilityRole === 'header' ? `# ${el.props.children}` : el.props.accessibilityLabel));
+};
 
 const radio = (name: string) => screen.getByRole('radio', { name });
 

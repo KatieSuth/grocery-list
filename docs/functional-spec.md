@@ -260,7 +260,7 @@ After setup, the app has four tabs along the bottom:
 - With nothing to get: "Nothing to get at Corner Market" / "Check items on the Items tab that are sold here, and they'll show up in department order."
 
 **Reverse order**
-- A **Reverse order** switch lists the departments last-to-first, for walking the store the other way. Items within a department stay A–Z.
+- A **Reverse order** switch, on its own row under the "2 of 5 in cart" count ("Departments last to first, for walking the store the other way."), lists the departments last-to-first. Items within a department stay A–Z.
 - It's remembered across launches, and applies to whichever store is chosen.
 
 **Checking off**
@@ -480,8 +480,11 @@ With no stores: "No stores yet."
 
 - Every button, field, checkbox, and department choice has a spoken label. For example, a department's drag handle announces "Reorder Produce, position 1 of 3", with Move up / Move down actions. Department choices announce "Deli in Corner Market".
 - Checkboxes and department choices report their checked state.
-- On the master list, each checkbox is announced by the item's name. The quantity field is announced as "Quantity for <item>". The rest of the row is a separate "Edit this item" button.
-- On Android, TalkBack announces validation and "Saved" messages when they appear. On iOS, VoiceOver doesn't announce them automatically yet; this is a known gap.
+- On the master list, each checkbox is announced by the item's name. The quantity field is announced as "Quantity for <item>". The rest of the row is a separate "Edit this item" button, announced with everything it shows: "Soup, Acme. Deli at Corner Market. Last bought yesterday."
+- Store and item cards say everything they show, e.g. "Corner Market, Main St. Departments in order: Produce, Deli." (not "→" or "·").
+- Status notes and errors are read aloud when they appear ("Trip finished: 2 items logged as bought.", "Saved “Milk”…", "Item name is required.", "Showing 3 of 10 items", "Importing…"): by TalkBack and the web from live regions, and by VoiceOver through an announcement.
+- On/off settings (Needed on the item form, Reverse order on the trip) are one control each: the whole row toggles, and it's announced once, e.g. "Needed, switch, on", with its description.
+- Screen titles ("Where do you shop?"), form sections ("Departments", "Where to find it"), Settings sections ("Appearance", "Default sort"…), the sort panel's sections, list group headings and dialog titles are headings, so screen-reader users can jump between them.
 - Touch targets are at least 48 points tall (the ✕ remove control has a larger tap area than it looks; drag handles are 40 points square).
 - Follows the system light/dark setting unless Light or Dark is chosen in Settings.
 - Appearance choices are radio buttons and report which is selected.

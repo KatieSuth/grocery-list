@@ -1,18 +1,16 @@
 import { useLocalSearchParams, type Href } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
 
 import { Button } from "@/components/button";
 import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
+import { StatusText } from "@/components/status-text";
 import {
   StoreLocationPicker,
   type AddDepartmentOutcome,
 } from "@/components/store-location-picker";
 import { ErrorText, TextField } from "@/components/text-field";
-import { ThemedText } from "@/components/themed-text";
-import { ToggleSwitch } from "@/components/toggle-switch";
-import { Spacing } from "@/constants/theme";
+import { SwitchRow } from "@/components/switch-row";
 import { deleteItem, saveItem } from "@/data/items-repo";
 import { setChecked } from "@/data/list-repo";
 import { addStoreDepartment } from "@/data/stores-repo";
@@ -256,15 +254,7 @@ function ItemForm({
         )
       }
     >
-      {message ? (
-        <ThemedText
-          type="small"
-          themeColor="textSecondary"
-          accessibilityLiveRegion="polite"
-        >
-          {message}
-        </ThemedText>
-      ) : null}
+      {message ? <StatusText message={message} /> : null}
       <TextField
         label="Item name"
         placeholder="e.g. Milk"
@@ -284,20 +274,12 @@ function ItemForm({
         maxLength={MAX_NAME_LENGTH}
       />
       {item ? null : (
-        <View style={styles.needed}>
-          <View style={styles.neededText}>
-            <ThemedText type="smallBold">Needed</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              Check it on your list when it’s saved.
-            </ThemedText>
-          </View>
-          <ToggleSwitch
-            accessibilityLabel="Needed"
-            accessibilityHint="When on, the item is checked on your list as soon as it’s saved"
-            value={needed}
-            onValueChange={setNeeded}
-          />
-        </View>
+        <SwitchRow
+          label="Needed"
+          description="Check it on your list when it’s saved."
+          value={needed}
+          onValueChange={setNeeded}
+        />
       )}
       {stores.length > 0 ? (
         <StoreLocationPicker
@@ -328,8 +310,3 @@ function ItemForm({
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  needed: { flexDirection: "row", alignItems: "center", gap: Spacing.three },
-  neededText: { flex: 1, gap: Spacing.half },
-});

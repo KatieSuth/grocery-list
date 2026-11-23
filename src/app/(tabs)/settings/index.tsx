@@ -23,6 +23,7 @@ import {
   type ImportPlan,
 } from '@/domain/csv-import';
 import { ColorSchemeChoiceContext } from '@/hooks/color-scheme-choice';
+import { useAnnouncement } from '@/hooks/use-announcement';
 import { useItemSortChoice } from '@/hooks/use-data';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmAction, confirmDestructive } from '@/utils/confirm';
@@ -43,6 +44,9 @@ export default function SettingsScreen() {
   const [importStatus, setImportStatus] = useState<'checking' | 'saving'>();
   const [importError, setImportError] = useState<string>();
   const theme = useTheme();
+  const importStatusText =
+    importStatus === 'checking' ? 'Checking the file…' : importStatus === 'saving' ? 'Importing…' : undefined;
+  useAnnouncement(importStatusText);
 
   const applyImport = async (plan: ImportPlan) => {
     setImportStatus('saving');
@@ -185,7 +189,7 @@ export default function SettingsScreen() {
           <View style={styles.status} accessibilityLiveRegion="polite">
             <ActivityIndicator color={theme.textSecondary} />
             <ThemedText type="small" themeColor="textSecondary">
-              {importStatus === 'checking' ? 'Checking the file…' : 'Importing…'}
+              {importStatusText}
             </ThemedText>
           </View>
         ) : null}

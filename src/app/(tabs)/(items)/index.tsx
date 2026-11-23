@@ -8,12 +8,13 @@ import { FilterButton } from '@/components/filter-button';
 import { FilterPanel } from '@/components/filter-panel';
 import { MasterItemRow } from '@/components/master-item-row';
 import { SearchField } from '@/components/search-field';
+import { StatusText } from '@/components/status-text';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { setChecked } from '@/data/list-repo';
 import { useDatabase } from '@/db/database-provider';
-import { describeLocations } from '@/domain/describe';
+import { describeLocations, describeLocationsSpoken } from '@/domain/describe';
 import { describeLastBought } from '@/domain/last-bought';
 import {
   activeFilterCount,
@@ -145,9 +146,7 @@ export default function MasterListScreen() {
             ) : null}
 
             {narrowed && items.length > 0 ? (
-              <ThemedText type="small" themeColor="textSecondary" accessibilityLiveRegion="polite">
-                Showing {visible.length} of {items.length} items
-              </ThemedText>
+              <StatusText message={`Showing ${visible.length} of ${items.length} items`} />
             ) : null}
 
             <Button label="Add an item" onPress={() => router.push('/item-form')} />
@@ -172,6 +171,7 @@ export default function MasterListScreen() {
             <MasterItemRow
               item={row.item}
               whereToFind={describeLocations(row.item, stores)}
+              whereToFindSpoken={describeLocationsSpoken(row.item, stores)}
               lastBought={row.item.lastBoughtAt ? describeLastBought(row.item.lastBoughtAt, now) : undefined}
               entry={entries[row.item.id]}
               quantity={typedQuantities[row.item.id] ?? entries[row.item.id]?.quantity ?? ''}

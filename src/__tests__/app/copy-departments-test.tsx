@@ -87,7 +87,7 @@ test('copies another store’s departments after the current ones, skipping name
 
 test('when editing a store, it is not offered as a source', async () => {
   await renderApp({ seed });
-  await press('Big Box');
+  await press(/^Big Box\./);
   await press('Remove Deli');
   await press('Copy departments from another store');
   expect(screen.queryByRole('button', { name: 'Copy from Big Box' })).toBeNull();
@@ -98,7 +98,7 @@ test('when editing a store, it is not offered as a source', async () => {
 
 test('reports a single copied department in the singular', async () => {
   await renderApp({ seed });
-  await press('Corner Market, Main St');
+  await press(/^Corner Market, Main St\./);
   await press('Remove deli');
   await press('Copy departments from another store');
   await press('Copy from Big Box');

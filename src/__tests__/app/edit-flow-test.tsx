@@ -61,7 +61,7 @@ test('editing a store updates it and removes item locations for deleted departme
   const alert = answerAlertWith('Remove and save');
   const db = await renderApp({ seed });
 
-  await press('Corner Market, Main St');
+  await press(/^Corner Market, Main St\./);
   expect(screen).toHavePathnameWithParams('/setup/store-form?id=s1');
   expect(screen.getByLabelText('Store name')).toHaveDisplayValue('Corner Market');
   expect(screen.getByLabelText('Location')).toHaveDisplayValue('Main St');
@@ -94,7 +94,7 @@ test('deleting a store asks for confirmation and removes it from items', async (
   const alert = answerAlertWith('Cancel');
   const db = await renderApp({ seed });
 
-  await press('Corner Market, Main St');
+  await press(/^Corner Market, Main St\./);
   await press('Delete store');
   expect(alert).toHaveBeenCalledWith('Delete Corner Market?', expect.any(String), expect.any(Array));
   expect(screen).toHavePathnameWithParams('/setup/store-form?id=s1');
@@ -115,7 +115,7 @@ test('editing an item', async () => {
 
   await press('Next');
   expect(await screen.findByText('Corner Market · Deli, Big Box · Frozen')).toBeOnTheScreen();
-  await press('Milk, Acme');
+  await press(/^Milk, Acme\./);
   expect(screen).toHavePathnameWithParams('/setup/item-form?id=i1');
   expect(screen.getByLabelText('Item name')).toHaveDisplayValue('Milk');
   expect(screen.getByRole('radio', { name: 'Deli in Corner Market' })).toBeChecked();
@@ -136,7 +136,7 @@ test('editing an item', async () => {
 test('edit mode validates and can be cancelled', async () => {
   const db = await renderApp({ seed });
   await press('Next');
-  await press('Milk, Acme');
+  await press(/^Milk, Acme\./);
 
   await type('Item name', ' ');
   await press('Save');
@@ -153,7 +153,7 @@ test('deleting an item', async () => {
   answerAlertWith('Cancel');
   const db = await renderApp({ seed });
   await press('Next');
-  await press('Milk, Acme');
+  await press(/^Milk, Acme\./);
   await press('Delete item');
   expect(await db.items.count().exec()).toBe(1);
 
@@ -302,7 +302,7 @@ test('adding a typed name that matches another store reuses its spelling', async
 test('removing departments with items asks first; keeping editing saves nothing', async () => {
   const alert = answerAlertWith('Keep editing');
   const db = await renderApp({ seed });
-  await press('Corner Market, Main St');
+  await press(/^Corner Market, Main St\./);
 
   // Produce has no items: removing it alone wouldn't ask. Deli has Milk.
   await press('Remove Produce');
@@ -323,7 +323,7 @@ test('removing departments with items asks first; keeping editing saves nothing'
 test('removing only departments without items saves without asking', async () => {
   const alert = jest.spyOn(Alert, 'alert');
   const db = await renderApp({ seed });
-  await press('Corner Market, Main St');
+  await press(/^Corner Market, Main St\./);
   await press('Remove Produce');
   await press('Save');
 
@@ -342,7 +342,7 @@ test('deleting a store says how many items it takes out', async () => {
     },
   });
 
-  await press('Corner Market, Main St');
+  await press(/^Corner Market, Main St\./);
   await press('Delete store');
   expect(alert).toHaveBeenLastCalledWith(
     'Delete Corner Market?',
@@ -351,7 +351,7 @@ test('deleting a store says how many items it takes out', async () => {
   );
 
   await press('Cancel');
-  await press('Co-op');
+  await press(/^Co-op\./);
   await press('Delete store');
   expect(alert).toHaveBeenLastCalledWith('Delete Co-op?', 'No items are listed under this store.', expect.any(Array));
 });
@@ -359,7 +359,7 @@ test('deleting a store says how many items it takes out', async () => {
 test('going back from a form with unsaved changes asks first', async () => {
   const alert = answerAlertWith('Keep editing');
   await renderApp({ seed });
-  await press('Corner Market, Main St');
+  await press(/^Corner Market, Main St\./);
   await type('Store name', 'Renamed');
 
   // As the header's back button, a back swipe or Android's back button would.
@@ -379,7 +379,7 @@ test('a failed delete is reported', async () => {
   const failingRemove = { remove: () => Promise.reject(new Error('nope')) };
 
   jest.spyOn(db.stores, 'findOne').mockReturnValue(failingRemove as never);
-  await press('Corner Market, Main St');
+  await press(/^Corner Market, Main St\./);
   await press('Delete store');
   await waitFor(() =>
     expect(alert).toHaveBeenCalledWith(WRITE_FAILED_TITLE, 'Could not delete Corner Market. Please try again.'),
@@ -388,7 +388,7 @@ test('a failed delete is reported', async () => {
 
   jest.spyOn(db.items, 'findOne').mockReturnValue(failingRemove as never);
   await press('Next');
-  await press('Milk, Acme');
+  await press(/^Milk, Acme\./);
   await press('Delete item');
   await waitFor(() => expect(alert).toHaveBeenCalledWith(WRITE_FAILED_TITLE, 'Could not delete Milk. Please try again.'));
 });
@@ -396,7 +396,7 @@ test('a failed delete is reported', async () => {
 test('a missing department can be added from the item form, and is chosen for the item', async () => {
   const db = await renderApp({ seed });
   await press('Next');
-  await press('Milk, Acme');
+  await press(/^Milk, Acme\./);
 
   await press('Add a department to Corner Market');
   await type('New department at Corner Market', '  Dairy ');
@@ -420,7 +420,7 @@ test('a missing department can be added from the item form, and is chosen for th
 test('adding a department the store already has from the item form just chooses it', async () => {
   const db = await renderApp({ seed });
   await press('Next');
-  await press('Milk, Acme');
+  await press(/^Milk, Acme\./);
 
   await press('Add a department to Corner Market');
   await type('New department at Corner Market', 'produce');
@@ -434,7 +434,7 @@ test('adding a department the store already has from the item form just chooses 
 test('adding a department from the item form shows problems, and can be cancelled', async () => {
   await renderApp({ seed });
   await press('Next');
-  await press('Milk, Acme');
+  await press(/^Milk, Acme\./);
 
   await press('Add a department to Big Box');
   await press('Add department to Big Box');
@@ -455,7 +455,7 @@ test('adding a department from the item form shows problems, and can be cancelle
 test('a department name the store already has, added since the form opened, is refused', async () => {
   await renderApp({ seed });
   await press('Next');
-  await press('Milk, Acme');
+  await press(/^Milk, Acme\./);
   jest
     .spyOn(storesRepo, 'addStoreDepartment')
     .mockResolvedValue({ ok: false, error: '"Bakery" is already in the list.' });
@@ -496,7 +496,7 @@ test('editing an item without making it a duplicate saves without asking', async
   const alert = jest.spyOn(Alert, 'alert');
   const db = await renderApp({ seed });
   await press('Next');
-  await press('Milk, Acme');
+  await press(/^Milk, Acme\./);
   // Milk matches only itself.
   await press('Save');
   expect(await screen.findByText('Corner Market · Deli, Big Box · Frozen')).toBeOnTheScreen();
@@ -549,4 +549,26 @@ test('the duplicate warning names an item without a brand by its name alone', as
     'Bread is already in your list. Save another one anyway?',
     expect.any(Array),
   );
+});
+
+test('screen readers hear where each item is on the setup items list', async () => {
+  await renderApp({ seed });
+  await press('Next');
+  expect(
+    await screen.findByRole('button', { name: 'Milk, Acme. Deli at Corner Market, Frozen at Big Box.' }),
+  ).toBeOnTheScreen();
+});
+
+test('screen titles and form sections are headings, so screen readers can jump between them', async () => {
+  await renderApp({ seed });
+  expect(await screen.findByRole('header', { name: 'Where do you shop?' })).toBeOnTheScreen();
+
+  await press(/^Corner Market, Main St\./);
+  expect(await screen.findByRole('header', { name: 'Departments' })).toBeOnTheScreen();
+  await press('Cancel');
+
+  await press('Next');
+  expect(await screen.findByRole('header', { name: 'What do you usually buy?' })).toBeOnTheScreen();
+  await press('Add an item');
+  expect(await screen.findByRole('header', { name: 'Where to find it' })).toBeOnTheScreen();
 });

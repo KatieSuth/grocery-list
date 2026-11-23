@@ -4,6 +4,7 @@ import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 import { Button } from '@/components/button';
 
 import { CheckboxBox } from '@/components/checkbox-box';
+import { StatusText } from '@/components/status-text';
 import { ErrorText, TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -78,7 +79,9 @@ export function StoreLocationPicker({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <ThemedText type="smallBold">Where to find it</ThemedText>
+        <ThemedText type="smallBold" accessibilityRole="header">
+          Where to find it
+        </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
           Pick each store that carries it, then the department.
         </ThemedText>
@@ -189,9 +192,7 @@ export function StoreLocationPicker({
                 ) : null}
                 {addedNote?.storeId === store.id ? (
                   <View style={styles.fullWidth}>
-                    <ThemedText type="small" themeColor="textSecondary" accessibilityLiveRegion="polite">
-                      {addedNote.message}
-                    </ThemedText>
+                    <StatusText message={addedNote.message} />
                   </View>
                 ) : null}
                 {departmentErrors[store.id] ? (

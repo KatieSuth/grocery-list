@@ -12,6 +12,8 @@ type Props = {
   item: Item;
   /** "Store · Department" text for where to find the item. */
   whereToFind: string;
+  /** The same for screen readers: "Deli at Store". */
+  whereToFindSpoken: string;
   /** e.g. "Last bought yesterday"; absent if never bought. */
   lastBought?: string;
   /** Present when the item is checked. */
@@ -27,7 +29,17 @@ type Props = {
 };
 
 /** A master-list row: checkbox, item summary (tap to edit), and a quantity field while checked. */
-export function MasterItemRow({ item, whereToFind, lastBought, entry, quantity, onToggle, onQuantityChange, onOpen }: Props) {
+export function MasterItemRow({
+  item,
+  whereToFind,
+  whereToFindSpoken,
+  lastBought,
+  entry,
+  quantity,
+  onToggle,
+  onQuantityChange,
+  onOpen,
+}: Props) {
   const theme = useTheme();
   const checked = !!entry;
   return (
@@ -45,7 +57,10 @@ export function MasterItemRow({ item, whereToFind, lastBought, entry, quantity, 
       <View style={styles.body}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={item.brand ? `${item.name}, ${item.brand}` : item.name}
+          // Screen readers read this label instead of the text inside, so it says everything shown.
+          accessibilityLabel={`${item.brand ? `${item.name}, ${item.brand}` : item.name}. ${whereToFindSpoken}.${
+            lastBought ? ` ${lastBought}.` : ''
+          }`}
           accessibilityHint="Edit this item"
           onPress={onOpen}
           style={({ pressed }) => [styles.summary, { opacity: pressOpacity(pressed) }]}>

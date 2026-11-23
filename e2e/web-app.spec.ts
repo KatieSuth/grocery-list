@@ -257,8 +257,8 @@ test('the master list can be searched and filtered', async ({ page }) => {
   await page.getByRole('radio', { name: 'A to Z' }).click();
   await page.getByRole('radio', { name: 'Sort by department' }).click();
   await expect(button(page, 'Sort and filter, by department, A to Z')).toBeVisible();
-  // The first heading is the screen title.
-  await expect(page.getByRole('heading')).toHaveText(['Items', 'Bakery', 'Deli', 'Produce']);
+  // The first heading is the screen title, then the open sort and filter panel's sections.
+  await expect(page.getByRole('heading')).toHaveText(['Items', 'Sort by', 'Order', 'Show', 'Bakery', 'Deli', 'Produce']);
   await itemOrder().toEqual(['Bagels', 'Milk', 'Apples']);
 
   expect(problems).toEqual([]);
@@ -276,14 +276,15 @@ test('an item in two departments shows under both, sharing its check and quantit
   await button(page, 'Save').click();
   await expect(page.getByText('Big Box')).toBeVisible();
   await page.getByRole('tab', { name: 'Items' }).click();
-  await button(page, 'Milk').click();
+  // The row's spoken label goes on to say where it is, e.g. "Milk. Deli at Corner Market."
+  await page.getByRole('button', { name: /^Milk\./ }).click();
   await page.getByRole('checkbox', { name: 'Big Box' }).click();
   await page.getByRole('radio', { name: 'Frozen in Big Box' }).click();
   await button(page, 'Save').click();
 
   await button(page, 'Sort and filter, by name, A to Z').click();
   await page.getByRole('radio', { name: 'Sort by department' }).click();
-  await expect(page.getByRole('heading')).toHaveText(['Items', 'Deli', 'Frozen']);
+  await expect(page.getByRole('heading')).toHaveText(['Items', 'Sort by', 'Order', 'Show', 'Deli', 'Frozen']);
   const boxes = page.getByRole('checkbox', { name: 'Milk' });
   await expect(boxes).toHaveCount(2);
 

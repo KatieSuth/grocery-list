@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { act, cleanup, fireEvent, screen } from 'expo-router/testing-library';
-import { Alert, AppState, Platform, type AlertButton } from 'react-native';
+import { AccessibilityInfo, Alert, AppState, Platform, type AlertButton } from 'react-native';
 
 import * as listRepo from '@/data/list-repo';
 import type { AppDatabase } from '@/db/database';
@@ -46,9 +46,6 @@ async function seed(db: AppDatabase) {
     createdAt: 2,
   });
 }
-
-/** The prop holding a native switch's on/off state. */
-const switchProp = Platform.OS === 'android' ? 'on' : 'value';
 
 /** The native tab bar isn't rendered in Jest, so switch tabs the way a tab press does. */
 const openTab = (path: '/' | '/trip' | '/stores') => act(() => router.navigate(path));
@@ -230,8 +227,10 @@ test('a new item can be saved without being checked, and Add more keeps that cho
   const db = await renderApp({ seed });
   await openTab('/');
   await press('Add an item');
-  expect(screen.getByLabelText('Needed')).toHaveProp(switchProp, true);
-  await fireEvent(screen.getByLabelText('Needed'), 'valueChange', false);
+  const needed = () => screen.getByRole('switch', { name: 'Needed' });
+  expect(needed()).toBeChecked();
+  // The whole row is the switch: tapping it toggles.
+  await fireEvent.press(needed());
 
   const addBread = async (name: string) => {
     await type('Item name', name);
@@ -241,7 +240,7 @@ test('a new item can be saved without being checked, and Add more keeps that cho
   await addBread('Bread');
   await press('Add more');
   expect(await screen.findByText('Saved “Bread”. Add another, or tap Continue.')).toBeOnTheScreen();
-  expect(screen.getByLabelText('Needed')).toHaveProp(switchProp, false);
+  expect(needed()).not.toBeChecked();
   await addBread('Rolls');
   await press('Continue');
 
@@ -265,12 +264,12 @@ test('Needed applies to each item as it’s saved: on, off, then on again with A
   await press('Add more');
   expect(await screen.findByText('Saved “Apples”. Add another, or tap Continue.')).toBeOnTheScreen();
   // B: turned off.
-  await fireEvent(screen.getByLabelText('Needed'), 'valueChange', false);
+  await fireEvent.press(screen.getByRole('switch', { name: 'Needed' }));
   await fillIn('Bagels');
   await press('Add more');
   expect(await screen.findByText('Saved “Bagels”. Add another, or tap Continue.')).toBeOnTheScreen();
   // C: turned back on.
-  await fireEvent(screen.getByLabelText('Needed'), 'valueChange', true);
+  await fireEvent.press(screen.getByRole('switch', { name: 'Needed' }));
   await fillIn('Cheese');
   await press('Continue');
 
@@ -288,9 +287,9 @@ test('Needed applies to each item as it’s saved: on, off, then on again with A
 test('editing an item has no Needed switch', async () => {
   await renderApp({ seed });
   await openTab('/');
-  await press('Soup, Acme');
+  await press(/^Soup, Acme\./);
   expect(await screen.findByLabelText('Item name')).toHaveDisplayValue('Soup');
-  expect(screen.queryByLabelText('Needed')).toBeNull();
+  expect(screen.queryByRole('switch', { name: 'Needed' })).toBeNull();
 });
 
 test('a new item that saves but can’t be checked says so', async () => {
@@ -325,7 +324,7 @@ test('tapping an item opens it for editing; deleting it also unchecks it', async
   });
   await openTab('/');
 
-  await press('Soup, Acme');
+  await press(/^Soup, Acme\./);
   // The exact URL can carry an internal router flag after a tab switch; check the form instead.
   expect(screen).toHavePathname('/item-form');
   expect(screen.getByLabelText('Item name')).toHaveDisplayValue('Soup');
@@ -336,7 +335,7 @@ test('tapping an item opens it for editing; deleting it also unchecks it', async
   // Editing the item keeps it checked.
   expect(screen.getByLabelText('Quantity for Tomato soup')).toHaveDisplayValue('2 cans');
 
-  await press('Tomato soup, Acme');
+  await press(/^Tomato soup, Acme\./);
   await press('Delete item');
   expect(await screen.findByRole('checkbox', { name: 'Strawberries' })).toBeOnTheScreen();
   expect(screen.queryByText('Tomato soup')).toBeNull();
@@ -379,7 +378,7 @@ test('the stores tab lists, adds and edits stores', async () => {
   expect(await screen.findByText('Big Box')).toBeOnTheScreen();
   expect(screen).toHavePathname('/stores');
 
-  await press('Corner Market');
+  await press(/^Corner Market\./);
   expect(screen).toHavePathname('/store-form');
   expect(screen.getByLabelText('Store name')).toHaveDisplayValue('Corner Market');
   await dragDepartment(1, 0);
@@ -395,4 +394,65 @@ test('the stores tab explains when there are no stores', async () => {
   });
   await openTab('/stores');
   expect(await screen.findByText('No stores yet')).toBeOnTheScreen();
+});
+
+test('screen readers hear everything an item row shows: where to find it and when it was last bought', async () => {
+  await renderApp({
+    seed: async (db) => {
+      await seed(db);
+      await db.items.findOne('i2').patch({ lastBoughtAt: Date.now() });
+      await db.items.insert({ id: 'i3', name: 'Mystery', locations: [], createdAt: 3 });
+    },
+  });
+  await openTab('/');
+  expect(await screen.findByRole('button', { name: 'Soup, Acme. Deli at Corner Market. Last bought today.' })).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'Strawberries. Produce at Corner Market.' })).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'Mystery. No store selected.' })).toBeOnTheScreen();
+});
+
+test('screen readers hear each store’s departments in order on the stores tab', async () => {
+  await renderApp({
+    seed: async (db) => {
+      await seed(db);
+      // Left without departments by an older version of the app.
+      await db.stores.insert({ id: 's2', name: 'Big Box', location: 'Elm St', departments: [], createdAt: 2 });
+    },
+  });
+  await openTab('/stores');
+  expect(await screen.findByRole('button', { name: 'Corner Market. Departments in order: Produce, Deli.' })).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'Big Box, Elm St. No departments.' })).toBeOnTheScreen();
+});
+
+test('on iOS, status notes and errors are read aloud when they appear', async () => {
+  const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+  await renderApp({ seed });
+  await openTab('/');
+  await press('Add an item');
+
+  await press('Add more');
+  expect(await screen.findByText('Item name is required.')).toBeOnTheScreen();
+  await type('Item name', 'Bread');
+  await fireEvent.press(screen.getByRole('checkbox', { name: 'Corner Market' }));
+  await fireEvent.press(screen.getByRole('radio', { name: 'Deli in Corner Market' }));
+  await press('Add more');
+  expect(await screen.findByText('Saved “Bread”. Add another, or tap Continue.')).toBeOnTheScreen();
+
+  const spoken = announce.mock.calls.map(([message]) => message);
+  if (Platform.OS === 'ios') {
+    expect(spoken).toEqual(expect.arrayContaining(['Item name is required.', 'Saved “Bread”. Add another, or tap Continue.']));
+  } else {
+    // Android reads them from their live regions instead.
+    expect(spoken).toEqual([]);
+  }
+});
+
+test('settings sections and dialog titles are headings', async () => {
+  await renderApp({ seed });
+  await act(() => router.navigate('/settings'));
+  expect(await screen.findByRole('header', { name: 'Appearance' })).toBeOnTheScreen();
+  expect(screen.getByRole('header', { name: 'Default sort' })).toBeOnTheScreen();
+
+  await openTab('/trip');
+  await press('Choose a store');
+  expect(await screen.findByRole('header', { name: 'Which store are you at?' })).toBeOnTheScreen();
 });
