@@ -26,7 +26,7 @@ import { storeLabel } from '@/domain/describe';
 import { MAX_NAME_LENGTH } from '@/domain/names';
 import type { Item, Store } from '@/domain/types';
 import { useItems, useStores } from '@/hooks/use-data';
-import { useDeleteStore } from '@/hooks/use-delete-store';
+import { useDeleteStore, type DeleteStore } from '@/hooks/use-delete-store';
 import { useUnsavedChangesWarning } from '@/hooks/use-unsaved-changes-warning';
 import { confirmDestructive } from '@/utils/confirm';
 import { goBack } from '@/utils/navigation';
@@ -45,6 +45,10 @@ export function StoreFormScreen({ backTo }: Props) {
   const { id, copyFrom } = useLocalSearchParams<{ id?: string; copyFrom?: string }>();
   const stores = useStores();
   const items = useItems();
+  const deletion = useDeleteStore(items ?? []);
+  // The store being deleted from this form, so the form stays up (with its spinner) until it
+  // closes, instead of saying "Store not found" once the store is gone.
+  const [deletingStore, setDeletingStore] = useState<Store>();
   // Keep copying the same store even if it's deleted while the form is open (then no items are copied).
   const [copySource, setCopySource] = useState<Store>();
   const found = copyFrom ? stores?.find((s) => s.id === copyFrom) : undefined;
@@ -52,7 +56,7 @@ export function StoreFormScreen({ backTo }: Props) {
   if (!stores || !items) return null;
 
   if (!id && !copyFrom) return <StoreForm stores={stores} items={items} backTo={backTo} />;
-  const store = id ? stores.find((s) => s.id === id) : copySource;
+  const store = id ? (stores.find((s) => s.id === id) ?? deletingStore) : copySource;
   if (!store) {
     return (
       <Screen footer={<Button variant="secondary" label="Back" onPress={() => goBack(backTo)} />}>
@@ -61,7 +65,20 @@ export function StoreFormScreen({ backTo }: Props) {
     );
   }
   if (!id) return <StoreForm key={store.id} copySource={store} stores={stores} items={items} backTo={backTo} />;
-  return <StoreForm key={store.id} store={store} stores={stores} items={items} backTo={backTo} />;
+  const confirmDelete: DeleteStore['confirmDelete'] = (target, onDeleted) => {
+    setDeletingStore(target);
+    deletion.confirmDelete(target, onDeleted);
+  };
+  return (
+    <StoreForm
+      key={store.id}
+      store={store}
+      stores={stores}
+      items={items}
+      backTo={backTo}
+      deletion={{ ...deletion, confirmDelete }}
+    />
+  );
 }
 
 const countItems = (n: number) => (n === 1 ? '1 item' : `${n} items`);
@@ -73,9 +90,11 @@ type FormProps = Props & {
   copySource?: Store;
   stores: Store[];
   items: Item[];
+  /** Deleting the store being edited (see useDeleteStore). */
+  deletion?: DeleteStore;
 };
 
-function StoreForm({ store, copySource, stores, items, backTo }: FormProps) {
+function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormProps) {
   const db = useDatabase();
   const [start] = useState(() =>
     copySource
@@ -89,10 +108,12 @@ function StoreForm({ store, copySource, stores, items, backTo }: FormProps) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>();
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
-  const leave = useUnsavedChangesWarning(storeDraftChanged(draft, initial), 'store', saving);
+  const deleting = deletion?.deleting ?? false;
+  // Saving or deleting: the form can't be left (or changed) until it's written.
+  const busy = saving || deleting;
+  const leave = useUnsavedChangesWarning(storeDraftChanged(draft, initial), 'store', busy);
 
   const otherStores = stores.filter((s) => s.id !== store?.id);
-  const deleteWithConfirm = useDeleteStore(items);
   const allErrors = validateStoreDraft(draft, otherStores);
   // When copying, say straight away if the name and location are already taken (the copy starts
   // out like its source, so this is easy to miss); other problems wait until Save, as usual.
@@ -156,8 +177,8 @@ function StoreForm({ store, copySource, stores, items, backTo }: FormProps) {
       scrollRef={scrollRef}
       footer={
         <>
-          <Button variant="secondary" label="Cancel" disabled={saving} onPress={() => goBack(backTo)} />
-          <Button label="Save" disabled={saving} onPress={handleSave} />
+          <Button variant="secondary" label="Cancel" disabled={busy} onPress={() => goBack(backTo)} />
+          <Button label="Save" disabled={busy} onPress={handleSave} />
         </>
       }>
       {copySource ? (
@@ -194,11 +215,18 @@ function StoreForm({ store, copySource, stores, items, backTo }: FormProps) {
       />
       {copySource ? <CopyItemsSwitch source={copySource} items={items} value={copyItems} onChange={setCopyItems} /> : null}
       {saveError ? <ErrorText message={saveError} /> : null}
+      {deletion?.error ? <ErrorText message={deletion.error} /> : null}
       {/* Saving updates every item listed under the store (and copying lists them under the new one),
           which can take a while: the form can't be left until it's done, so say so. */}
       {saving ? <BusyOverlay message={copySource ? 'Copying store…' : 'Saving store…'} /> : null}
-      {store ? (
-        <Button variant="danger" label="Delete store" disabled={saving} onPress={() => deleteWithConfirm(store, () => leave(backTo))} />
+      {deleting ? <BusyOverlay message="Deleting store…" /> : null}
+      {store && deletion ? (
+        <Button
+          variant="danger"
+          label="Delete store"
+          disabled={busy}
+          onPress={() => deletion.confirmDelete(store, () => leave(backTo))}
+        />
       ) : null}
     </Screen>
   );

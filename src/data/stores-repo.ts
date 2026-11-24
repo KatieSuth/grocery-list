@@ -5,7 +5,7 @@ import { addDepartment } from '@/domain/departments';
 import { pruneLocations } from '@/domain/item-draft';
 import { copiedLocations, type DepartmentSources, type StoreDraft } from '@/domain/store-draft';
 import { compareStores } from '@/domain/store-sort';
-import type { Department, Store } from '@/domain/types';
+import type { Department, Item, Store } from '@/domain/types';
 import { createId } from '@/utils/id';
 import { normalizeText } from '@/utils/text';
 
@@ -25,16 +25,30 @@ function fromDraft(draft: StoreDraft): Pick<Store, 'name' | 'location' | 'depart
   };
 }
 
-/** Removes item locations that point at stores or departments that no longer exist. */
-async function pruneItemLocations(db: AppDatabase): Promise<void> {
-  const stores = (await db.stores.find().exec()).map((d) => d.toMutableJSON());
-  const items = await db.items.find().exec();
+/**
+ * Removes item locations that point at stores or departments that no longer exist (or, with
+ * `leaving`, at that store, which is about to be deleted), in a single write. Returns the items
+ * as they were before, so the change can be undone.
+ */
+async function pruneItemLocations(db: AppDatabase, leaving?: string): Promise<Item[]> {
+  const stores = (await db.stores.find().exec()).map((d) => d.toMutableJSON()).filter((s) => s.id !== leaving);
+  const items = (await db.items.find().exec()).map((d) => d.toMutableJSON());
+  const before: Item[] = [];
+  const pruned: Item[] = [];
   for (const item of items) {
-    const pruned = pruneLocations(item.toMutableJSON().locations, stores);
-    if (pruned.length !== item.locations.length) {
-      await item.incrementalPatch({ locations: pruned });
-    }
+    const locations = pruneLocations(item.locations, stores);
+    if (locations.length === item.locations.length) continue;
+    before.push(item);
+    pruned.push({ ...item, locations });
   }
+  await bulkUpsertItems(db, pruned);
+  return before;
+}
+
+async function bulkUpsertItems(db: AppDatabase, items: Item[]): Promise<void> {
+  if (items.length === 0) return;
+  const { error } = await db.items.bulkUpsert(items);
+  if (error.length > 0) throw new Error(`Could not save ${error.length} items`);
 }
 
 /** Creates a store, or updates the store with `id`. Returns the saved store. */
@@ -96,10 +110,7 @@ export async function copyStore(
       const location = locations.get(item.id);
       return location ? [{ ...item, locations: [...item.locations, location] }] : [];
     });
-    if (updated.length > 0) {
-      const { error } = await db.items.bulkUpsert(updated);
-      if (error.length > 0) throw new Error(`Could not list ${error.length} items under the copy`);
-    }
+    await bulkUpsertItems(db, updated);
     return store;
   } catch (error) {
     try {
@@ -111,9 +122,19 @@ export async function copyStore(
   }
 }
 
+/**
+ * Deletes a store, taking it off every item first, so the store only disappears once nothing is
+ * left to do (a form showing it can stay open until then). If removing the store itself then
+ * fails, the items are put back as they were.
+ */
 export async function deleteStore(db: AppDatabase, id: string): Promise<void> {
-  await db.stores.findOne(id).remove();
-  await pruneItemLocations(db);
+  const before = await pruneItemLocations(db, id);
+  try {
+    await db.stores.findOne(id).remove();
+  } catch (error) {
+    await bulkUpsertItems(db, before);
+    throw error;
+  }
 }
 
 export type AddStoreDepartmentResult = { ok: true; department: Department } | { ok: false; error: string };

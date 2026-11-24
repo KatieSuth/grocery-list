@@ -85,6 +85,37 @@ test('deleteStore removes the store and its item locations', async () => {
   expect((await db.items.findOne('i1').exec())?.toJSON().locations).toEqual([{ storeId: b.id, departmentId: 'd2' }]);
 });
 
+test('deleteStore takes the store off its items in one write, before the store goes', async () => {
+  const db = await createTestDatabase();
+  const a = await saveStore(db, draft);
+  for (const id of ['i1', 'i2']) {
+    await db.items.insert({ id, name: id, locations: [{ storeId: a.id, departmentId: 'd1' }], createdAt: 1 });
+  }
+  const write = jest.spyOn(db.items, 'bulkUpsert');
+  const storeAtWrite = jest.fn();
+  write.mockImplementation(async (docs) => {
+    storeAtWrite(await db.stores.findOne(a.id).exec());
+    write.mockRestore();
+    return db.items.bulkUpsert(docs);
+  });
+  await deleteStore(db, a.id);
+  expect(storeAtWrite).toHaveBeenCalledTimes(1);
+  expect(storeAtWrite.mock.calls[0][0]).not.toBeNull();
+  expect(await db.stores.findOne(a.id).exec()).toBeNull();
+  expect((await db.items.findOne('i2').exec())?.toJSON().locations).toEqual([]);
+});
+
+test('deleteStore puts the items back if the store itself can’t be removed', async () => {
+  const db = await createTestDatabase();
+  const a = await saveStore(db, draft);
+  await db.items.insert({ id: 'i1', name: 'Ham', locations: [{ storeId: a.id, departmentId: 'd1' }], createdAt: 1 });
+  jest.spyOn(db.stores, 'findOne').mockReturnValue({ remove: () => Promise.reject(new Error('nope')) } as never);
+  await expect(deleteStore(db, a.id)).rejects.toThrow('nope');
+  jest.restoreAllMocks();
+  expect(await db.stores.findOne(a.id).exec()).not.toBeNull();
+  expect((await db.items.findOne('i1').exec())?.toJSON().locations).toEqual([{ storeId: a.id, departmentId: 'd1' }]);
+});
+
 test('observeStores lists stores A–Z by name, then location, not in the order they were added', async () => {
   const db = await createTestDatabase();
   await db.stores.insert({ id: 'z', name: 'Zippy', departments: [], createdAt: 1 });

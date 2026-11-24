@@ -2,10 +2,12 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import type { HostInstance } from 'react-native';
 
+import { BusyOverlay } from '@/components/busy-overlay';
 import { Button } from '@/components/button';
 import { Screen } from '@/components/screen';
 import { StoreActionsMenu } from '@/components/store-actions-menu';
 import { StoreList, type StoreListActions } from '@/components/store-list';
+import { ErrorText } from '@/components/text-field';
 import type { Store } from '@/domain/types';
 import { useItems, useStores } from '@/hooks/use-data';
 import { useDeleteStore } from '@/hooks/use-delete-store';
@@ -20,7 +22,7 @@ const copyStore = (store: Store) => router.push({ pathname: '/store-form', param
 export default function StoresScreen() {
   const stores = useStores();
   const items = useItems();
-  const deleteStore = useDeleteStore(items ?? []);
+  const { confirmDelete, deleting, error } = useDeleteStore(items ?? []);
   const [menu, setMenu] = useState<{ store: Store; anchor: HostInstance | null } | null>(null);
   // Wait for the items too: Delete says how many items are listed under the store.
   if (!stores || !items) return null;
@@ -28,7 +30,7 @@ export default function StoresScreen() {
   const actions: StoreListActions = {
     onMenu: (store, anchor) => setMenu({ store, anchor }),
     onCopy: copyStore,
-    onDelete: (store) => deleteStore(store),
+    onDelete: (store) => confirmDelete(store),
   };
   /** Closes the menu, then does `action` with its store. */
   const fromMenu = (action: (store: Store) => void) => (store: Store) => {
@@ -39,6 +41,7 @@ export default function StoresScreen() {
   return (
     <Screen>
       <Button label="Add a store" onPress={() => router.push('/store-form')} />
+      {error ? <ErrorText message={error} /> : null}
       <StoreList stores={stores} onSelect={editStore} actions={actions} />
       <StoreActionsMenu
         store={menu?.store ?? null}
@@ -48,6 +51,8 @@ export default function StoresScreen() {
         onDelete={fromMenu(actions.onDelete)}
         onClose={() => setMenu(null)}
       />
+      {/* Deleting takes the store off every item, which can take a while. */}
+      {deleting ? <BusyOverlay message="Deleting store…" /> : null}
     </Screen>
   );
 }

@@ -112,6 +112,49 @@ test('Delete asks first, as on the store form, then deletes the store', async ()
   expect(screen.queryByRole('button', { name: /^Kroger/ })).toBeNull();
 });
 
+test('while a store is being deleted from the menu, a spinner covers the list until it is done', async () => {
+  answerAlertWith('Delete');
+  const db = await renderApp({ seed, initialUrl: '/stores' });
+  const remove = storesRepo.deleteStore;
+  let finish: () => void = () => {};
+  jest.spyOn(storesRepo, 'deleteStore').mockImplementation(async (...args) => {
+    await new Promise<void>((resolve) => (finish = resolve));
+    return remove(...args);
+  });
+  await openMenu();
+  await pressMenuItem('Delete Kroger, Main St');
+  // Another delete can't be started meanwhile, even before the spinner appears.
+  const alert = jest.mocked(Alert.alert);
+  alert.mockClear();
+  await fireEvent(await screen.findByRole('button', { name: /^Big Box\./ }), 'accessibilityAction', {
+    nativeEvent: { actionName: 'delete' },
+  });
+  expect(alert).not.toHaveBeenCalled();
+  expect(await screen.findByLabelText(/^Deleting store… Please keep the app open/)).toBeOnTheScreen();
+
+  await act(async () => finish());
+  await eventually(async () => expect(await db.stores.findOne('k1').exec()).toBeNull());
+  await eventually(async () => expect(screen.queryByLabelText(/^Deleting store/)).toBeNull());
+  expect(screen).toHavePathname('/stores');
+});
+
+test('a failed delete from the menu is said on the Stores tab', async () => {
+  answerAlertWith('Delete');
+  jest.spyOn(storesRepo, 'deleteStore').mockRejectedValueOnce(new Error('disk full'));
+  const db = await renderApp({ seed, initialUrl: '/stores' });
+  await openMenu();
+  await pressMenuItem('Delete Kroger, Main St');
+  expect(await screen.findByText('Could not delete Kroger. Please try again.')).toBeOnTheScreen();
+  expect(screen.queryByLabelText(/^Deleting store/)).toBeNull();
+  expect(await db.stores.findOne('k1').exec()).not.toBeNull();
+
+  // Trying again clears it.
+  await openMenu();
+  await pressMenuItem('Delete Kroger, Main St');
+  await eventually(async () => expect(await db.stores.findOne('k1').exec()).toBeNull());
+  expect(screen.queryByText(/^Could not delete/)).toBeNull();
+});
+
 test("screen readers can copy or delete a store straight from its row's actions", async () => {
   const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   await renderApp({ seed, initialUrl: '/stores' });

@@ -136,6 +136,37 @@ test('while an edit is being saved, the form can’t be left or deleted, and say
   expect(screen).toHavePathname('/setup');
 });
 
+test('while a store is being deleted, a spinner keeps the form open until it is done', async () => {
+  const answer = answerAlertWith('Delete');
+  const db = await renderApp({ seed });
+  const remove = storesRepo.deleteStore;
+  let finish: () => void = () => {};
+  // Hold the delete up just after the store has gone.
+  jest.spyOn(storesRepo, 'deleteStore').mockImplementation(async (...args) => {
+    await remove(...args);
+    await new Promise<void>((resolve) => (finish = resolve));
+  });
+  await press(/^Corner Market, Main St\./);
+  await press('Delete store');
+
+  expect(await screen.findByLabelText(/^Deleting store… Please keep the app open/)).toBeOnTheScreen();
+  expect(await db.stores.findOne('s1').exec()).toBeNull();
+  // The form stays up until it closes, rather than saying the store isn't there.
+  expect(screen.queryByText('Store not found')).toBeNull();
+  expect(screen.getByLabelText('Store name')).toHaveDisplayValue('Corner Market');
+  for (const name of ['Save', 'Cancel', 'Delete store']) {
+    expect(screen.getByRole('button', { name })).toBeDisabled();
+  }
+  answer.mockClear();
+  await act(() => router.back());
+  expect(screen).toHavePathnameWithParams('/setup/store-form?id=s1');
+  expect(answer).not.toHaveBeenCalled();
+
+  await act(async () => finish());
+  await waitFor(() => expect(screen).toHavePathname('/setup'));
+  expect(screen.queryByLabelText(/^Deleting store/)).toBeNull();
+});
+
 test('editing an item', async () => {
   const db = await renderApp({ seed });
 
@@ -407,9 +438,14 @@ test('a failed delete is reported', async () => {
   jest.spyOn(db.stores, 'findOne').mockReturnValue(failingRemove as never);
   await press(/^Corner Market, Main St\./);
   await press('Delete store');
-  await waitFor(() =>
-    expect(alert).toHaveBeenCalledWith(WRITE_FAILED_TITLE, 'Could not delete Corner Market. Please try again.'),
-  );
+  // Said on the form, which stays open so it can be tried again (an alert could be lost on iOS
+  // as the spinner closes).
+  expect(await screen.findByText('Could not delete Corner Market. Please try again.')).toBeOnTheScreen();
+  expect(screen.queryByLabelText(/^Deleting store/)).toBeNull();
+  expect(screen).toHavePathname('/setup/store-form');
+  expect(screen.getByRole('button', { name: 'Delete store' })).toBeEnabled();
+  expect(await db.stores.count().exec()).toBe(2);
+  await press('Cancel');
   expect(screen).toHavePathname('/setup');
 
   jest.spyOn(db.items, 'findOne').mockReturnValue(failingRemove as never);
