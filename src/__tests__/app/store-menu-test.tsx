@@ -1,5 +1,6 @@
+import { router } from 'expo-router';
 import { act, cleanup, fireEvent, screen, within } from 'expo-router/testing-library';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 import * as storesRepo from '@/data/stores-repo';
 import type { AppDatabase } from '@/db/database';
@@ -47,7 +48,16 @@ async function seed(db: AppDatabase) {
 
 const krogerCard = () => screen.findByRole('button', { name: /^Kroger, Main St\./ });
 const openMenu = async () => fireEvent(await krogerCard(), 'longPress');
-const pressMenuItem = async (name: string) => fireEvent.press(await screen.findByRole('menuitem', { name }));
+/** Chooses a menu option. On iOS the option runs once the menu has finished closing. */
+const pressMenuItem = async (name: string) => {
+  const item = await screen.findByRole('menuitem', { name });
+  let modal = item;
+  while (modal.type !== 'Modal' && modal.parent) modal = modal.parent;
+  // (Grabbed now: the test renderer's Modal goes as soon as it's hidden.)
+  const finishClosing = modal.props.onDismiss as () => void;
+  await fireEvent.press(item);
+  if (Platform.OS === 'ios') await act(async () => finishClosing());
+};
 const menuItems = () => screen.getAllByRole('menuitem').map((el) => el.props.accessibilityLabel as string);
 
 const locationsOf = async (db: AppDatabase, id: string) =>
@@ -233,4 +243,49 @@ test('the copy carries on if its source is deleted meanwhile, copying no items',
   await press('Save');
   await eventually(async () => expect(await db.stores.count().exec()).toBe(2));
   expect(await locationsOf(db, 'kale')).toEqual([]);
+});
+
+test('while a copy is being saved, a spinner keeps the form open until it is done', async () => {
+  const alert = jest.spyOn(Alert, 'alert');
+  const db = await renderApp({ seed, initialUrl: '/stores' });
+  // Hold the copy up once the new store is saved, while its items are written.
+  const write = db.items.bulkUpsert.bind(db.items);
+  let finish: () => void = () => {};
+  jest.spyOn(db.items, 'bulkUpsert').mockImplementation(async (docs) => {
+    await new Promise<void>((resolve) => (finish = resolve));
+    return write(docs);
+  });
+  await openMenu();
+  await pressMenuItem('Copy Kroger, Main St');
+  await type('Store name', 'Kroger');
+  await type('Location, optional', 'Elm St');
+  await press('Save');
+
+  expect(await screen.findByLabelText(/^Copying store… Please keep the app open/)).toBeOnTheScreen();
+  expect(await db.stores.count().exec()).toBe(3);
+  // The new store isn't mistaken for one with the same name and location.
+  expect(screen.queryByText(/already have/)).toBeNull();
+  expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+  // Back (or a swipe) does nothing, and doesn't offer to discard the copy.
+  await act(() => router.back());
+  expect(screen).toHavePathnameWithParams('/store-form?copyFrom=k1');
+  expect(alert).not.toHaveBeenCalled();
+
+  await act(async () => finish());
+  await eventually(async () => expect(await locationsOf(db, 'kale')).toHaveLength(2));
+  expect(screen).toHavePathname('/stores');
+  expect(screen.queryByLabelText(/^Copying store/)).toBeNull();
+});
+
+test('a copy that fails and can’t be undone says to check the store', async () => {
+  jest
+    .spyOn(storesRepo, 'copyStore')
+    .mockRejectedValueOnce(new storesRepo.CopyNotUndoneError(new Error('disk full')));
+  await renderApp({ seed, initialUrl: '/store-form?copyFrom=k1' });
+  await type('Store name', ' Kroger ');
+  await type('Location, optional', 'Elm St');
+  await press('Save');
+  expect(
+    await screen.findByText('The copy was only partly saved, and couldn’t be undone. Check Kroger on the Stores tab.'),
+  ).toBeOnTheScreen();
 });

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { AccessibilityInfo, type HostInstance } from 'react-native';
+import { AccessibilityInfo, Platform, type HostInstance } from 'react-native';
 
 import { StoreActionsMenu } from '@/components/store-actions-menu';
 import type { Store } from '@/domain/types';
@@ -50,19 +50,45 @@ test('appears above a store near the bottom of the screen', async () => {
   expect(menu()).toHaveStyle({ top: 1200 - 8 - 150 });
 });
 
-test('each option calls back with the store; dismissing returns the screen reader to it', async () => {
+test.each([
+  ['Edit Kroger', 'onEdit'],
+  ['Copy Kroger', 'onCopy'],
+  ['Delete Kroger', 'onDelete'],
+] as const)('%s calls back with the store', async (name, handler) => {
+  const on = handlers();
+  await render(<StoreActionsMenu store={store} anchor={anchorAt(100)} {...on} />);
+  const item = screen.getByRole('menuitem', { name });
+  let modal = item;
+  while (modal.type !== 'Modal' && modal.parent) modal = modal.parent;
+  // (Grabbed now: the test renderer's Modal goes as soon as it's hidden.)
+  const finishClosing = modal.props.onDismiss as () => void;
+  await fireEvent.press(item);
+  if (Platform.OS === 'ios') {
+    // iOS waits for the menu to finish closing, so a confirmation can be shown over the list.
+    expect(on[handler]).not.toHaveBeenCalled();
+    expect(screen.queryByRole('menuitem')).toBeNull();
+    await act(async () => finishClosing());
+  }
+  expect(on[handler]).toHaveBeenCalledWith(store);
+  expect(on.onClose).not.toHaveBeenCalled();
+});
+
+test('closing it without choosing does nothing more, even once it has gone', async () => {
+  const on = handlers();
+  await render(<StoreActionsMenu store={store} anchor={anchorAt(100)} {...on} />);
+  let modal = menu();
+  while (modal.type !== 'Modal' && modal.parent) modal = modal.parent;
+  await act(async () => (modal.props.onDismiss as () => void)());
+  expect(on.onEdit).not.toHaveBeenCalled();
+  expect(on.onCopy).not.toHaveBeenCalled();
+  expect(on.onDelete).not.toHaveBeenCalled();
+});
+
+test('dismissing returns the screen reader to the store', async () => {
   const focus = jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent').mockImplementation(() => {});
   const anchor = anchorAt(100);
   const on = handlers();
   await render(<StoreActionsMenu store={store} anchor={anchor} {...on} />);
-  await fireEvent.press(screen.getByRole('menuitem', { name: 'Edit Kroger' }));
-  await fireEvent.press(screen.getByRole('menuitem', { name: 'Copy Kroger' }));
-  await fireEvent.press(screen.getByRole('menuitem', { name: 'Delete Kroger' }));
-  expect(on.onEdit).toHaveBeenCalledWith(store);
-  expect(on.onCopy).toHaveBeenCalledWith(store);
-  expect(on.onDelete).toHaveBeenCalledWith(store);
-  expect(on.onClose).not.toHaveBeenCalled();
-
   await fireEvent(menu(), 'accessibilityEscape');
   expect(on.onClose).toHaveBeenCalledTimes(1);
   expect(focus.mock.calls.at(-1)?.[0]).toBe(anchor);

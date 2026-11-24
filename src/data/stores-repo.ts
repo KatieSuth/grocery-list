@@ -53,6 +53,13 @@ export async function saveStore(db: AppDatabase, draft: StoreDraft, id?: string)
   return doc.toMutableJSON();
 }
 
+/** A copy failed and couldn't be undone: the new store was left, with only some of its items. */
+export class CopyNotUndoneError extends Error {
+  constructor(readonly cause: unknown) {
+    super('A failed copy could not be undone');
+  }
+}
+
 export type CopyStoreOptions = {
   /** The store being copied. */
   sourceStoreId: string;
@@ -66,6 +73,11 @@ export type CopyStoreOptions = {
  * Saves `draft` as a new store copied from another. With `copyItems`, the source store's items
  * are listed under the new store too (see copiedLocations): the same items, not duplicates.
  * Items are matched against the source store as it is now; if it's been deleted, none are.
+ *
+ * The storage has no transactions, so the copy is made all or nothing as far as it can be: the
+ * store is written first, then every item in a single bulk write. If anything fails, the new
+ * store is deleted again, which also removes any item listings already written for it. If even
+ * that fails, a CopyNotUndoneError says so.
  */
 export async function copyStore(
   db: AppDatabase,
@@ -74,18 +86,29 @@ export async function copyStore(
 ): Promise<Store> {
   const store = await saveStore(db, draft);
   if (!copyItems) return store;
-  const source = await db.stores.findOne(sourceStoreId).exec();
-  if (!source) return store;
-  const docs = await db.items.find().exec();
-  const items = docs.map((doc) => doc.toMutableJSON());
-  const locations = copiedLocations(items, source.toMutableJSON(), store.id, draft, departmentSources);
-  for (const doc of docs) {
-    const location = locations.get(doc.id);
-    if (!location) continue;
+  try {
+    const source = await db.stores.findOne(sourceStoreId).exec();
+    if (!source) return store;
+    const items = (await db.items.find().exec()).map((doc) => doc.toMutableJSON());
+    const locations = copiedLocations(items, source.toMutableJSON(), store.id, draft, departmentSources);
     // The store is new, so no item is listed under it yet.
-    await doc.incrementalModify((old) => ({ ...old, locations: [...old.locations, location] }));
+    const updated = items.flatMap((item) => {
+      const location = locations.get(item.id);
+      return location ? [{ ...item, locations: [...item.locations, location] }] : [];
+    });
+    if (updated.length > 0) {
+      const { error } = await db.items.bulkUpsert(updated);
+      if (error.length > 0) throw new Error(`Could not list ${error.length} items under the copy`);
+    }
+    return store;
+  } catch (error) {
+    try {
+      await deleteStore(db, store.id);
+    } catch {
+      throw new CopyNotUndoneError(error);
+    }
+    throw error;
   }
-  return store;
 }
 
 export async function deleteStore(db: AppDatabase, id: string): Promise<void> {

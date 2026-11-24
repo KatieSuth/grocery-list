@@ -2,6 +2,7 @@ import { useLocalSearchParams, type Href } from 'expo-router';
 import { useState } from 'react';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
 
+import { BusyOverlay } from '@/components/busy-overlay';
 import { Button } from '@/components/button';
 import { DepartmentEditor } from '@/components/department-editor';
 import { EmptyState } from '@/components/empty-state';
@@ -9,7 +10,7 @@ import { Screen } from '@/components/screen';
 import { SwitchRow } from '@/components/switch-row';
 import { ErrorText, TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
-import { copyStore, saveStore } from '@/data/stores-repo';
+import { copyStore, CopyNotUndoneError, saveStore } from '@/data/stores-repo';
 import { useDatabase } from '@/db/database-provider';
 import {
   copyStoreDraft,
@@ -88,15 +89,19 @@ function StoreForm({ store, copySource, stores, items, backTo }: FormProps) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>();
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
-  const leave = useUnsavedChangesWarning(storeDraftChanged(draft, initial), 'store');
+  const leave = useUnsavedChangesWarning(storeDraftChanged(draft, initial), 'store', saving);
 
   const otherStores = stores.filter((s) => s.id !== store?.id);
   const deleteWithConfirm = useDeleteStore(items);
   const allErrors = validateStoreDraft(draft, otherStores);
   // When copying, say straight away if the name and location are already taken (the copy starts
   // out like its source, so this is easy to miss); other problems wait until Save, as usual.
-  const errors = submitted
-    ? allErrors
+  // Nothing to report while saving: the draft was checked when Save was tapped, and a copy's new
+  // store, saved before its items, would otherwise show up as a store with the same name.
+  const errors = saving
+    ? {}
+    : submitted
+      ? allErrors
     : copySource && normalizeText(draft.name)
       ? { name: allErrors.name, location: allErrors.location }
       : {};
@@ -115,8 +120,12 @@ function StoreForm({ store, copySource, stores, items, backTo }: FormProps) {
         await saveStore(db, draft, store?.id);
       }
       leave(backTo);
-    } catch {
-      setSaveError(`Could not ${copySource ? 'copy' : 'save'} this store. Please try again.`);
+    } catch (error) {
+      setSaveError(
+        error instanceof CopyNotUndoneError
+          ? `The copy was only partly saved, and couldn’t be undone. Check ${normalizeText(draft.name)} on the Stores tab.`
+          : `Could not ${copySource ? 'copy' : 'save'} this store. Please try again.`,
+      );
       setSaving(false);
     }
   };
@@ -147,7 +156,7 @@ function StoreForm({ store, copySource, stores, items, backTo }: FormProps) {
       scrollRef={scrollRef}
       footer={
         <>
-          <Button variant="secondary" label="Cancel" onPress={() => goBack(backTo)} />
+          <Button variant="secondary" label="Cancel" disabled={saving} onPress={() => goBack(backTo)} />
           <Button label="Save" disabled={saving} onPress={handleSave} />
         </>
       }>
@@ -185,8 +194,11 @@ function StoreForm({ store, copySource, stores, items, backTo }: FormProps) {
       />
       {copySource ? <CopyItemsSwitch source={copySource} items={items} value={copyItems} onChange={setCopyItems} /> : null}
       {saveError ? <ErrorText message={saveError} /> : null}
+      {/* Saving updates every item listed under the store (and copying lists them under the new one),
+          which can take a while: the form can't be left until it's done, so say so. */}
+      {saving ? <BusyOverlay message={copySource ? 'Copying store…' : 'Saving store…'} /> : null}
       {store ? (
-        <Button variant="danger" label="Delete store" onPress={() => deleteWithConfirm(store, () => leave(backTo))} />
+        <Button variant="danger" label="Delete store" disabled={saving} onPress={() => deleteWithConfirm(store, () => leave(backTo))} />
       ) : null}
     </Screen>
   );

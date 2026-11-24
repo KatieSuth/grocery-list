@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { storeLabel } from '@/domain/describe';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { PickerSheet } from '@/components/picker-sheet';
@@ -56,7 +57,7 @@ export function StoreDropdown({ stores, selected, onChoose, disabled }: Props) {
           key: store.id,
           title: store.name,
           details: store.location ? [store.location] : [],
-          accessibilityLabel: `${store.name}${store.location ? `, ${store.location}` : ''}${
+          accessibilityLabel: `${storeLabel(store)}${
             store.id === selected?.id ? ', current' : ''
           }`,
           current: store.id === selected?.id,

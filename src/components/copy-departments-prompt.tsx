@@ -1,4 +1,5 @@
 import { PickerSheet } from '@/components/picker-sheet';
+import { storeLabel } from '@/domain/describe';
 import type { Store } from '@/domain/types';
 
 type Props = {
@@ -21,7 +22,7 @@ export function CopyDepartmentsPrompt({ visible, stores, onChoose, onCancel }: P
           key: store.id,
           title: store.name,
           details: [...(store.location ? [store.location] : []), names.join(' → ')],
-          accessibilityLabel: `Copy from ${store.name}${store.location ? `, ${store.location}` : ''}`,
+          accessibilityLabel: `Copy from ${storeLabel(store)}`,
           accessibilityHint: `Departments: ${names.join(', ')}`,
         };
       })}

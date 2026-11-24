@@ -1,6 +1,13 @@
 import { firstValueFrom } from 'rxjs';
 
-import { addStoreDepartment, copyStore, deleteStore, observeStores, saveStore } from '@/data/stores-repo';
+import {
+  addStoreDepartment,
+  copyStore,
+  CopyNotUndoneError,
+  deleteStore,
+  observeStores,
+  saveStore,
+} from '@/data/stores-repo';
 import { copyStoreDraft } from '@/domain/store-draft';
 import { closeTestDatabases, createTestDatabase } from '@/test-utils/db';
 
@@ -168,5 +175,56 @@ describe('copyStore', () => {
     });
     expect(await locationsOf(db, 'kale')).toEqual([]);
     expect((await firstValueFrom(observeStores(db))).map((s) => s.location)).toEqual(['Elm St', 'Oak Ave']);
+  });
+
+  test('writes the items all at once', async () => {
+    const { db, source, copy, copyDraft } = await setUp();
+    const modify = jest.spyOn(db.items, 'bulkUpsert');
+    await copyStore(db, copyDraft, { sourceStoreId: source.id, departmentSources: copy.departmentSources, copyItems: true });
+    expect(modify).toHaveBeenCalledTimes(1);
+    expect(modify.mock.calls[0][0]).toHaveLength(1);
+  });
+
+  test.each([
+    ['refused', () => Promise.resolve({ success: [], error: [{ status: 409 }] })],
+    ['failing', () => Promise.reject(new Error('disk full'))],
+  ])('undoes the whole copy if writing the items is %s', async (_, write) => {
+    const { db, source, copy, copyDraft } = await setUp();
+    jest.spyOn(db.items, 'bulkUpsert').mockImplementation(write as never);
+    await expect(
+      copyStore(db, copyDraft, { sourceStoreId: source.id, departmentSources: copy.departmentSources, copyItems: true }),
+    ).rejects.toThrow();
+    expect((await firstValueFrom(observeStores(db))).map((s) => s.name)).toEqual([source.name]);
+    expect(await locationsOf(db, 'kale')).toEqual([{ storeId: source.id, departmentId: 'd1' }]);
+  });
+
+  test('says so if a failed copy can’t be undone either', async () => {
+    const { db, source, copy, copyDraft } = await setUp();
+    const failure = new Error('disk full');
+    jest.spyOn(db.items, 'bulkUpsert').mockImplementation(() => {
+      // Undoing it fails too.
+      jest.spyOn(db.stores, 'findOne').mockImplementation(() => {
+        throw new Error('still full');
+      });
+      return Promise.reject(failure);
+    });
+    const copying = copyStore(db, copyDraft, {
+      sourceStoreId: source.id,
+      departmentSources: copy.departmentSources,
+      copyItems: true,
+    });
+    await expect(copying).rejects.toBeInstanceOf(CopyNotUndoneError);
+    await expect(copying).rejects.toMatchObject({ cause: failure });
+  });
+
+  test('a copy with nothing to list writes no items', async () => {
+    const { db, source, copy } = await setUp();
+    const modify = jest.spyOn(db.items, 'bulkUpsert');
+    await copyStore(db, { name: 'Bare', location: '', departments: [] }, {
+      sourceStoreId: source.id,
+      departmentSources: copy.departmentSources,
+      copyItems: true,
+    });
+    expect(modify).not.toHaveBeenCalled();
   });
 });

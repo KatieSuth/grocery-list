@@ -1,4 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
+import { storeLabel } from '@/domain/describe';
 import { useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 
@@ -15,11 +16,10 @@ import {
   sortTripItems,
   TRIP_ITEM_SORT_LABELS,
   TRIP_ITEM_SORTS,
-  tripLocation,
   type TripItemSort,
 } from '@/domain/trip-history';
 import type { TripItem } from '@/domain/types';
-import { useStores, useTrips } from '@/hooks/use-data';
+import { useTrips } from '@/hooks/use-data';
 import { useTheme } from '@/hooks/use-theme';
 
 /** A department heading or an item, when the list is grouped by department. */
@@ -31,10 +31,9 @@ const countItems = (n: number) => (n === 1 ? '1 item' : `${n} items`);
 export default function TripDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const trips = useTrips();
-  const stores = useStores();
   const [sort, setSort] = useState<TripItemSort>('name');
   const [direction, setDirection] = useState<SortDirection>('asc');
-  if (!trips || !stores) return null;
+  if (!trips) return null;
 
   const trip = trips.find((t) => t.id === id);
   if (!trip) {
@@ -45,7 +44,7 @@ export default function TripDetailScreen() {
     );
   }
 
-  const location = tripLocation(trip, stores);
+  const location = trip.storeLocation;
   const byName = sort === 'name';
   const rows: Row[] = sortTripItems(trip.items, sort, direction).flatMap((group) => [
     ...(group.title === null ? [] : [{ type: 'heading' as const, key: `heading:${group.key}`, title: group.title }]),
@@ -66,7 +65,7 @@ export default function TripDetailScreen() {
             <View
               accessible
               accessibilityRole="header"
-              accessibilityLabel={`${trip.storeName}${location ? `, ${location}` : ''}. ${formatTripDateSpoken(trip.finishedAt)}. ${countItems(trip.items.length)} bought.`}>
+              accessibilityLabel={`${storeLabel({ name: trip.storeName, location })}. ${formatTripDateSpoken(trip.finishedAt)}. ${countItems(trip.items.length)} bought.`}>
               <ThemedText type="subtitle">{trip.storeName}</ThemedText>
               {location ? <ThemedText themeColor="textSecondary">{location}</ThemedText> : null}
               <ThemedText type="small" themeColor="textSecondary">

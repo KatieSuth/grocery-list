@@ -22,7 +22,8 @@ export default function StoresScreen() {
   const items = useItems();
   const deleteStore = useDeleteStore(items ?? []);
   const [menu, setMenu] = useState<{ store: Store; anchor: HostInstance | null } | null>(null);
-  if (!stores) return null;
+  // Wait for the items too: Delete says how many items are listed under the store.
+  if (!stores || !items) return null;
 
   const actions: StoreListActions = {
     onMenu: (store, anchor) => setMenu({ store, anchor }),

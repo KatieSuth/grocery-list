@@ -1,8 +1,9 @@
 import { nameKey, normalizeText } from '@/utils/text';
+import { storeLabel } from './describe';
 
 import type { FilterOption } from './item-filter';
 import type { SortDirection } from './item-sort';
-import type { Store, TripItem, TripRecord } from './types';
+import type { TripItem, TripRecord } from './types';
 
 /** The quick choices for which trips to show, by when they were finished. */
 export type RangePreset = '30d' | '90d' | '6m' | '1y';
@@ -85,29 +86,26 @@ function inRange(time: number, range: TripDateRange, now: number): boolean {
   return time >= from && time < addDays(to, 1);
 }
 
-/** The store's location for a trip: as it was then, or (for trips logged before that was saved) as it is now. */
-export function tripLocation(trip: TripRecord, stores: Store[]): string | undefined {
-  return trip.storeLocation ?? stores.find((s) => s.id === trip.storeId)?.location;
-}
 
 const compareText = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' });
 
 /**
  * One option per store that has a trip in the log, including stores deleted since, labeled
- * "Corner Market, Main St" from its most recent trip. Ordered like stores everywhere: by name,
+ * "Corner Market, Main St" from its most recent trip (just "Corner Market" if no location was
+ * saved with it: the store's location now is never used). Ordered like stores everywhere: by name,
  * then location (none first).
  */
-export function getTripStoreOptions(trips: TripRecord[], stores: Store[]): FilterOption[] {
+export function getTripStoreOptions(trips: TripRecord[]): FilterOption[] {
   const byStore = new Map<string, { name: string; location?: string }>();
   // Trips are newest first, so the first one seen for a store is the latest.
   for (const trip of trips) {
     if (!byStore.has(trip.storeId)) {
-      byStore.set(trip.storeId, { name: trip.storeName, location: tripLocation(trip, stores) });
+      byStore.set(trip.storeId, { name: trip.storeName, location: trip.storeLocation });
     }
   }
   return [...byStore.entries()]
     .sort(([, a], [, b]) => compareText(a.name, b.name) || compareText(a.location ?? '', b.location ?? ''))
-    .map(([key, { name, location }]) => ({ key, label: location ? `${name}, ${location}` : name }));
+    .map(([key, { name, location }]) => ({ key, label: storeLabel({ name, location }) }));
 }
 
 /** Drops selected stores that no longer have trips in the log. */

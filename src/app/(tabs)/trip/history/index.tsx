@@ -23,10 +23,9 @@ import {
   PRESET_LABELS,
   pruneTripFilter,
   rangeDays,
-  tripLocation,
   type TripDateRange,
 } from '@/domain/trip-history';
-import { useStores, useTrips } from '@/hooks/use-data';
+import { useTrips } from '@/hooks/use-data';
 import { normalizeText } from '@/utils/text';
 
 const countTrips = (n: number) => (n === 1 ? '1 trip' : `${n} trips`);
@@ -44,15 +43,14 @@ function describeRange(range: TripDateRange, now: number): string {
  */
 export default function TripHistoryScreen() {
   const trips = useTrips();
-  const stores = useStores();
   const [rawFilter, setFilter] = useState(EMPTY_TRIP_FILTER);
   const [panelOpen, setPanelOpen] = useState(false);
   // Date ranges count back from today: refreshed whenever the screen is shown, so they stay right across days.
   const [now, setNow] = useState(Date.now);
   useFocusEffect(useCallback(() => setNow(Date.now()), []));
-  if (!trips || !stores) return null;
+  if (!trips) return null;
 
-  const storeOptions = getTripStoreOptions(trips, stores);
+  const storeOptions = getTripStoreOptions(trips);
   // Ignore selected stores whose trips have since been deleted.
   const filter = pruneTripFilter(rawFilter, storeOptions);
   const filterCount = activeTripFilterCount(filter);
@@ -134,7 +132,7 @@ export default function TripHistoryScreen() {
         renderItem={({ item: trip }) => (
           <Card
             title={trip.storeName}
-            subtitle={tripLocation(trip, stores)}
+            subtitle={trip.storeLocation}
             detail={formatTripDate(trip.finishedAt)}
             spokenDetail={formatTripDateSpoken(trip.finishedAt)}
             accessibilityHint="Shows the items bought on this trip"

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { storeLabel } from '@/domain/describe';
 import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
@@ -99,7 +100,7 @@ export function StoreLocationPicker({
             <Pressable
               accessibilityRole="checkbox"
               aria-checked={selected}
-              accessibilityLabel={store.location ? `${store.name}, ${store.location}` : store.name}
+              accessibilityLabel={storeLabel(store)}
               onPress={() => {
                 Keyboard.dismiss();
                 onToggleStore(store.id);

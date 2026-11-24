@@ -64,7 +64,7 @@ const TRIPS: TripRecord[] = [
     finishedAt: LAST_MONTH,
     items: [{ itemId: 'peas', name: 'Peas', department: 'Frozen' }],
   },
-  // Logged before locations were saved: shows the store's current one.
+  // No location saved with it: none is shown, though the store has one now.
   {
     id: 'older',
     storeId: 'corner',
@@ -107,7 +107,7 @@ const card = (place: string, time: number) => `${place}. ${formatTripDateSpoken(
 
 const RECENT_CARD = card('Corner Market, Main St', RECENT);
 const LAST_MONTH_CARD = card('Big Box', LAST_MONTH);
-const OLDER_CARD = card('Corner Market, Elm St', OLDER);
+const OLDER_CARD = card('Corner Market', OLDER);
 const LONG_AGO_CARD = card('Aldi', LONG_AGO);
 
 async function openHistory(trips?: TripRecord[]) {

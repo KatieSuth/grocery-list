@@ -15,11 +15,10 @@ import {
   rangeDays,
   sortTripItems,
   startOfDay,
-  tripLocation,
   utcDayToLocalDay,
   type TripFilter,
 } from '@/domain/trip-history';
-import type { Store, TripItem, TripRecord } from '@/domain/types';
+import type { TripItem, TripRecord } from '@/domain/types';
 
 /** Local time, so the tests don't depend on the machine's time zone. */
 const at = (year: number, month: number, day: number, hour = 0, minute = 0) =>
@@ -37,14 +36,6 @@ const trip = (id: string, finishedAt: number, extra: Partial<TripRecord> = {}): 
   finishedAt,
   items: [{ itemId: 'apples', name: 'Apples', department: 'Produce' }],
   ...extra,
-});
-
-const store = (id: string, name: string, location?: string): Store => ({
-  id,
-  name,
-  ...(location ? { location } : {}),
-  departments: [],
-  createdAt: 1,
 });
 
 describe('date ranges', () => {
@@ -139,13 +130,6 @@ describe('filtering trips', () => {
 });
 
 describe('stores', () => {
-  test("a trip's location is the one saved with it, or else the store's current one", () => {
-    const stores = [store('corner', 'Corner Market', 'Elm St')];
-    expect(tripLocation(trip('t', 1, { storeLocation: 'Main St' }), stores)).toBe('Main St');
-    expect(tripLocation(trip('t', 1), stores)).toBe('Elm St');
-    expect(tripLocation(trip('t', 1, { storeId: 'gone' }), stores)).toBeUndefined();
-  });
-
   test('one option per store in the log, from its latest trip, ordered by name then location', () => {
     const trips = [
       trip('t1', 5, { storeId: 'k2', storeName: 'Kroger', storeLocation: 'Main St' }),
@@ -156,9 +140,10 @@ describe('stores', () => {
       trip('t5', 1, { storeId: 'gone', storeName: 'Aldi' }),
       trip('t6', 0, { storeId: 'k3', storeName: 'Kroger', storeLocation: 'Elm St' }),
     ];
-    expect(getTripStoreOptions(trips, [store('corner', 'Corner Market', 'Elm St')])).toEqual([
+    // Only the location saved with a trip is used, never the store's location now.
+    expect(getTripStoreOptions(trips)).toEqual([
       { key: 'gone', label: 'Aldi' },
-      { key: 'corner', label: 'Corner Market, Elm St' },
+      { key: 'corner', label: 'Corner Market' },
       { key: 'k1', label: 'kroger' },
       { key: 'k3', label: 'Kroger, Elm St' },
       { key: 'k2', label: 'Kroger, Main St' },

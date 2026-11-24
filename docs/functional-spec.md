@@ -153,6 +153,11 @@ The first screen on a new install.
 
 Two stores can share a name as long as their locations differ (e.g. two Krogers on different streets).
 
+**While saving** (any mode)
+- Cancel, Delete store, Back and swipe-back do nothing until the save is written; Back doesn't ask "Leave without saving?" either. The form then closes as usual.
+- If saving takes more than a moment (it updates every item listed under the store), a spinner covers the screen: "Saving store…" (or "Copying store…") with "Please keep the app open until this finishes.", read aloud.
+- No validation messages are shown while saving.
+
 **Edit mode only**
 - The form opens with the store's current values.
 - A **Delete store** button asks for confirmation: "Delete <name>?" / "2 items will no longer be listed under this store." (or "No items are listed under this store.") The options are Cancel and Delete. Delete removes the store and returns to the Stores screen. (In a web browser, this is the browser's own OK/Cancel dialog. The same applies to deleting items.)
@@ -168,6 +173,8 @@ Two stores can share a name as long as their locations differ (e.g. two Krogers 
   - A renamed department keeps its items.
 - The name and location can't match an existing store's (including the store being copied). The message (see **Validation**) appears as soon as a typed name and location match, not only after Save, and Save refuses until they differ.
 - There's no Delete store button. If the source store no longer exists, the form shows "Store not found". If it's deleted while the form is open, the copy can still be saved, without items.
+- **While saving:** as for any store save, the form can't be left until the copy is saved (see **While saving** under the store form); the spinner reads "Copying store…".
+- **All or nothing:** the new store is saved first, then every item listing in one write. If that fails, the new store is deleted again (with any listings already written for it), the form stays open with "Could not copy this store. Please try again." and nothing has changed. If even deleting it fails, the form says "The copy was only partly saved, and couldn’t be undone. Check Kroger on the Stores tab." The storage has no true transactions: if the phone kills the app in the moment between the two writes, the copy is left saved with no items, as if Copy items were off.
 
 ### 4.3 Items ("Your items")
 
@@ -311,7 +318,7 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
 **Trip history**
 - A clock icon at the top right of the Shopping trip screen ("Trip history") opens the log of finished trips. It stays on the Trip tab, so the tab bar stays visible; back returns to the trip.
 - Each trip is a card showing the store's name, its location (if any) and when the trip was finished: "Corner Market" / "Main St" / "Sun, Nov 23, 2026, 4:12 PM". Newest first. Items aren't shown on the list.
-  - The store's name and location are as they were when the trip was finished. Trips logged before the location was saved show the store's current location, or none if the store has since been deleted.
+  - The store's name and location are as they were when the trip was finished. A trip with no location saved (the store had none, or it was logged before locations were saved) shows none, even if the store has one now: a location is never guessed.
   - Trips still being finished (an interrupted Finish) aren't listed until they're completed.
 - A count under the search box says what's shown: "2 trips, last 90 days", or "1 trip bought “ham”, last 90 days" while searching.
 - **Search** ("Search items or brands") shows only trips that bought an item whose name or brand contains the text, ignoring case and extra spaces. It applies within the filters.
@@ -409,7 +416,7 @@ The same store configuration as setup:
 - an **Add a store** button at the top,
 - the list of stores with their department order,
 - tap a store to edit or delete it (§4.2),
-- **long-press** a store for a small menu of options, shown just under it (or above it, near the bottom of the screen). The list dims a little behind it. Setup's store list has no menu.
+- **long-press** a store for a small menu of options, shown just under it (or above it, near the bottom of the screen). The list dims a little behind it. Setup's store list has no menu. Choosing an option closes the menu first (on iOS, the option runs once the menu has finished closing, so Delete's confirmation can appear). The Stores tab waits until items have loaded, so Delete's item count is always right.
   | Option | Result |
   | --- | --- |
   | Edit | The same as tapping the store: opens its Store form. |

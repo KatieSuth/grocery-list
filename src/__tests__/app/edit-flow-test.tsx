@@ -111,6 +111,31 @@ test('deleting a store asks for confirmation and removes it from items', async (
   expect(await db.stores.count().exec()).toBe(1);
 });
 
+test('while an edit is being saved, the form can’t be left or deleted, and says it’s saving', async () => {
+  const save = storesRepo.saveStore;
+  let finish: () => void = () => {};
+  jest.spyOn(storesRepo, 'saveStore').mockImplementation(async (...args) => {
+    await new Promise<void>((resolve) => (finish = resolve));
+    return save(...args);
+  });
+  const alert = jest.spyOn(Alert, 'alert');
+  const db = await renderApp({ seed });
+  await press(/^Corner Market, Main St\./);
+  await type('Store name', 'Corner Shop');
+  await press('Save');
+
+  expect(await screen.findByLabelText(/^Saving store… Please keep the app open/)).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'Delete store' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+  await act(() => router.back());
+  expect(screen).toHavePathnameWithParams('/setup/store-form?id=s1');
+  expect(alert).not.toHaveBeenCalled();
+
+  await act(async () => finish());
+  await waitFor(async () => expect((await db.stores.findOne('s1').exec())?.name).toBe('Corner Shop'));
+  expect(screen).toHavePathname('/setup');
+});
+
 test('editing an item', async () => {
   const db = await renderApp({ seed });
 

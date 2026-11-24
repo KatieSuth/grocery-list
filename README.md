@@ -150,7 +150,7 @@ src/
     run-write.ts          runWrite(): a database write that tells the user if it fails
     accessibility-focus.ts  Move the screen reader to a view (.web.ts: DOM focus)
     menu-position.ts      Where a dropdown menu goes: under its row, or above it
-  components/             Shared UI (Button, TextField, Screen, Card, SwitchRow, StatusText, StoreActionsMenu, editors…)
+  components/             Shared UI (Button, TextField, Screen, Card, SwitchRow, StatusText, StoreActionsMenu, BusyOverlay, editors…)
   constants/theme.ts      Colors (light/dark, with contrast checked by a test), spacing, chip tap area
   test-utils/             Test helpers (not shipped)
   __tests__/              All tests, mirroring src/

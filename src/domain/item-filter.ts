@@ -1,4 +1,5 @@
 import { nameKey, normalizeText } from '@/utils/text';
+import { storeLabel } from './describe';
 
 import type { Item, ListEntry, Store } from './types';
 
@@ -62,7 +63,7 @@ function distinct(labels: string[]): FilterOption[] {
  */
 export function getFilterOptions(items: Item[], stores: Store[]): FilterOptions {
   return {
-    stores: stores.map((s) => ({ key: s.id, label: s.location ? `${s.name}, ${s.location}` : s.name })),
+    stores: stores.map((s) => ({ key: s.id, label: storeLabel(s) })),
     departments: distinct(stores.flatMap((s) => s.departments.map((d) => d.name))),
     brands: distinct(items.flatMap((i) => (i.brand ? [i.brand] : []))),
   };

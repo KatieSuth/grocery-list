@@ -2,6 +2,7 @@ import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { useEffect, useRef, useState } from 'react';
 import {
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   useWindowDimensions,
@@ -77,6 +78,10 @@ function Menu({ store, anchor, onEdit, onCopy, onDelete, onClose }: Props & { st
   const [rect, setRect] = useState<WindowRect>();
   const [height, setHeight] = useState<number>();
   const firstItem = useRef<HostInstance>(null);
+  // On iOS, the option chosen while the menu closes (see choose). A ref, so the Modal's
+  // onDismiss sees it whichever render that handler came from.
+  const chosen = useRef<Action['key']>(undefined);
+  const [closing, setClosing] = useState(false);
 
   useEffect(() => {
     let current = true;
@@ -107,12 +112,27 @@ function Menu({ store, anchor, onEdit, onCopy, onDelete, onClose }: Props & { st
     if (anchor) moveAccessibilityFocus(anchor);
   };
 
-  const choose = (action: Action['key']) => {
+  const run = (action: Action['key']) => {
     ({ edit: onEdit, copy: onCopy, delete: onDelete })[action](store);
   };
 
+  // iOS drops an alert (Delete's confirmation) shown while a modal is still closing, so there the
+  // menu closes first and the option runs once it's gone. Elsewhere it runs straight away.
+  const choose = (action: Action['key']) => {
+    if (Platform.OS !== 'ios') return run(action);
+    chosen.current = action;
+    setClosing(true);
+  };
+
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={dismiss}>
+    <Modal
+      visible={!closing}
+      transparent
+      animationType="fade"
+      onRequestClose={dismiss}
+      onDismiss={() => {
+        if (chosen.current) run(chosen.current);
+      }}>
       <View style={styles.fill}>
         {/* Tapping outside the menu closes it. Screen readers use Back or the escape gesture instead. */}
         <Pressable
