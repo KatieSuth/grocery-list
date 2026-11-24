@@ -1,7 +1,8 @@
 import { nameKey, normalizeText } from '@/utils/text';
 import { storeLabel } from './describe';
+import { describeTags } from './tags';
 
-import type { FilterOption } from './item-filter';
+import { distinct, type FilterOption } from './item-filter';
 import type { SortDirection } from './item-sort';
 import type { TripItem, TripRecord } from './types';
 
@@ -32,11 +33,13 @@ export type TripFilter = {
   range: TripDateRange;
   /** Selected store ids. */
   storeIds: string[];
+  /** Selected tag keys (see nameKey), matched against the tags items had when bought. */
+  tags: string[];
 };
 
 export const DEFAULT_RANGE: TripDateRange = { preset: DEFAULT_PRESET };
 
-export const EMPTY_TRIP_FILTER: TripFilter = { query: '', range: DEFAULT_RANGE, storeIds: [] };
+export const EMPTY_TRIP_FILTER: TripFilter = { query: '', range: DEFAULT_RANGE, storeIds: [], tags: [] };
 
 /** Local midnight at the start of the day `time` falls on. */
 export function startOfDay(time: number): number {
@@ -109,13 +112,24 @@ export function getTripStoreOptions(trips: TripRecord[]): FilterOption[] {
 }
 
 /** Drops selected stores that no longer have trips in the log. */
-export function pruneTripFilter(filter: TripFilter, storeOptions: FilterOption[]): TripFilter {
-  return { ...filter, storeIds: filter.storeIds.filter((id) => storeOptions.some((o) => o.key === id)) };
+/**
+ * One option per tag on an item in the log, as it was when bought (ignoring case and spacing).
+ * Trips logged before tags existed add none.
+ */
+export function getTripTagOptions(trips: TripRecord[]): FilterOption[] {
+  return distinct(trips.flatMap((trip) => trip.items.flatMap((item) => item.tags ?? [])));
 }
 
-/** Number of filters that differ from the defaults (not counting the search): each store, and the dates. */
+/** Drops selected stores and tags that no longer have trips. */
+export function pruneTripFilter(filter: TripFilter, storeOptions: FilterOption[], tagOptions: FilterOption[]): TripFilter {
+  const keep = (selected: string[], available: FilterOption[]) =>
+    selected.filter((key) => available.some((o) => o.key === key));
+  return { ...filter, storeIds: keep(filter.storeIds, storeOptions), tags: keep(filter.tags, tagOptions) };
+}
+
+/** Number of filters that differ from the defaults (not counting the search): each store and tag, and the dates. */
 export function activeTripFilterCount(filter: TripFilter): number {
-  return filter.storeIds.length + (isDefaultRange(filter.range) ? 0 : 1);
+  return filter.storeIds.length + filter.tags.length + (isDefaultRange(filter.range) ? 0 : 1);
 }
 
 export function isDefaultRange(range: TripDateRange): boolean {
@@ -131,16 +145,19 @@ function boughtMatching(trip: TripRecord, query: string): boolean {
 
 /**
  * Trips finished within the date range, at any of the selected stores (or any store, if none is
- * selected), that bought an item whose name or brand contains the search. Order is kept.
+ * selected), that bought an item whose name or brand contains the search, and (if tags are
+ * selected) an item that had any of them when it was bought. Order is kept.
  */
 export function applyTripFilter(trips: TripRecord[], filter: TripFilter, now: number): TripRecord[] {
   const query = nameKey(filter.query);
   const storeIds = new Set(filter.storeIds);
+  const tags = new Set(filter.tags);
   return trips.filter(
     (trip) =>
       inRange(trip.finishedAt, filter.range, now) &&
       (storeIds.size === 0 || storeIds.has(trip.storeId)) &&
-      (!query || boughtMatching(trip, query)),
+      (!query || boughtMatching(trip, query)) &&
+      (tags.size === 0 || trip.items.some((item) => (item.tags ?? []).some((tag) => tags.has(nameKey(tag))))),
   );
 }
 
@@ -208,9 +225,9 @@ export function sortTripItems(items: TripItem[], sort: TripItemSort, direction: 
   return sorted;
 }
 
-/** "Ham, Acme, 1 lb, Deli": everything shown for an item, as screen readers should say it. */
+/** "Ham, Acme, 1 lb, Deli, Tags: Work": everything shown for an item, as screen readers should say it. */
 export function describeTripItemSpoken(item: TripItem, withDepartment: boolean): string {
-  return [item.name, item.brand, item.quantity, withDepartment ? item.department : undefined]
+  return [item.name, item.brand, item.quantity, withDepartment ? item.department : undefined, describeTags(item.tags).spoken]
     .filter((part) => part)
     .join(', ');
 }

@@ -18,12 +18,14 @@ import {
   emptyStoreDraft,
   hasErrors,
   removedDepartmentsInUse,
+  type StoreDraft,
   storeDraftChanged,
   storeToDraft,
   validateStoreDraft,
 } from '@/domain/store-draft';
 import { storeLabel } from '@/domain/describe';
 import { MAX_NAME_LENGTH } from '@/domain/names';
+import { addPendingDepartment } from '@/domain/departments';
 import type { Item, Store } from '@/domain/types';
 import { useItems, useStores } from '@/hooks/use-data';
 import { useDeleteStore, type DeleteStore } from '@/hooks/use-delete-store';
@@ -108,10 +110,18 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>();
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  /** What's typed in the New department field but not added yet, and its error (see DepartmentEditor). */
+  const [newDepartment, setNewDepartment] = useState('');
+  const [departmentAddError, setDepartmentAddError] = useState<string>();
   const deleting = deletion?.deleting ?? false;
   // Saving or deleting: the form can't be left (or changed) until it's written.
   const busy = saving || deleting;
-  const leave = useUnsavedChangesWarning(storeDraftChanged(draft, initial), 'store', busy);
+  const leave = useUnsavedChangesWarning(
+    // A department typed but not added yet counts too.
+    storeDraftChanged(draft, initial) || !!normalizeText(newDepartment),
+    'store',
+    busy,
+  );
 
   const otherStores = stores.filter((s) => s.id !== store?.id);
   const allErrors = validateStoreDraft(draft, otherStores);
@@ -127,24 +137,24 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
       ? { name: allErrors.name, location: allErrors.location }
       : {};
 
-  const save = async () => {
+  const save = async (toSave: StoreDraft) => {
     setSaving(true);
     setSaveError(undefined);
     try {
       if (copySource) {
-        await copyStore(db, draft, {
+        await copyStore(db, toSave, {
           sourceStoreId: copySource.id,
           departmentSources: start.departmentSources,
           copyItems,
         });
       } else {
-        await saveStore(db, draft, store?.id);
+        await saveStore(db, toSave, store?.id);
       }
       leave(backTo);
     } catch (error) {
       setSaveError(
         error instanceof CopyNotUndoneError
-          ? `The copy was only partly saved, and couldn’t be undone. Check ${normalizeText(draft.name)} on the Stores tab.`
+          ? `The copy was only partly saved, and couldn’t be undone. Check ${normalizeText(toSave.name)} on the Stores tab.`
           : `Could not ${copySource ? 'copy' : 'save'} this store. Please try again.`,
       );
       setSaving(false);
@@ -153,22 +163,35 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
 
   const handleSave = () => {
     setSubmitted(true);
-    if (hasErrors(validateStoreDraft(draft, otherStores))) return;
-    const removed = store ? removedDepartmentsInUse(store, draft, items) : undefined;
+    // A department typed but not added yet is added now, rather than being lost.
+    const pending = addPendingDepartment(draft.departments, newDepartment, stores);
+    if (!pending.ok) {
+      setDepartmentAddError(pending.error);
+      return;
+    }
+    const current = { ...draft, departments: pending.departments };
+    setDraft(current);
+    setNewDepartment('');
+    confirmAndSave(current);
+  };
+
+  const confirmAndSave = (toSave: StoreDraft) => {
+    if (hasErrors(validateStoreDraft(toSave, otherStores))) return;
+    const removed = store ? removedDepartmentsInUse(store, toSave, items) : undefined;
     if (!removed || removed.itemCount === 0) {
-      void save();
+      void save(toSave);
       return;
     }
     // Removing a department takes its items out of this store; make sure that's meant.
-    const readded = removed.names.some((name) => draft.departments.some((d) => sameName(d.name, name)));
+    const readded = removed.names.some((name) => toSave.departments.some((d) => sameName(d.name, name)));
     confirmDestructive({
       title: 'Remove departments with items?',
       message:
-        `${countItems(removed.itemCount)} in ${removed.names.join(', ')} will no longer be listed under ${normalizeText(draft.name)}.` +
+        `${countItems(removed.itemCount)} in ${removed.names.join(', ')} will no longer be listed under ${normalizeText(toSave.name)}.` +
         (readded ? ' A department added back with the same name starts out empty; its items aren’t moved to it.' : ''),
       confirmLabel: 'Remove and save',
       cancelLabel: 'Keep editing',
-      onConfirm: () => void save(),
+      onConfirm: () => void save(toSave),
     });
   };
 
@@ -212,6 +235,10 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
         knownStores={stores}
         currentStoreId={store?.id}
         scrollableRef={scrollRef}
+        newName={newDepartment}
+        onNewNameChange={setNewDepartment}
+        addError={departmentAddError}
+        onAddErrorChange={setDepartmentAddError}
       />
       {copySource ? <CopyItemsSwitch source={copySource} items={items} value={copyItems} onChange={setCopyItems} /> : null}
       {saveError ? <ErrorText message={saveError} /> : null}

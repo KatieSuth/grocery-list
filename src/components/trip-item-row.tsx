@@ -4,6 +4,7 @@ import { CheckboxBox } from '@/components/checkbox-box';
 import { pressOpacity } from '@/components/press-feedback';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
+import { describeTags } from '@/domain/tags';
 import type { TripRow } from '@/domain/trip';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -16,11 +17,12 @@ type Props = {
 export function TripItemRow({ row: { item, entry, inCart }, onToggle }: Props) {
   const theme = useTheme();
   const details = [item.brand, entry.quantity].filter(Boolean).join(' · ');
+  const tags = describeTags(item.tags);
   return (
     <Pressable
       accessibilityRole="checkbox"
       aria-checked={inCart}
-      accessibilityLabel={[item.name, item.brand, entry.quantity].filter(Boolean).join(', ')}
+      accessibilityLabel={[item.name, item.brand, entry.quantity, tags.spoken].filter(Boolean).join(', ')}
       onPress={onToggle}
       style={({ pressed }) => [
         styles.row,
@@ -32,6 +34,11 @@ export function TripItemRow({ row: { item, entry, inCart }, onToggle }: Props) {
         {details ? (
           <ThemedText type="small" themeColor="textSecondary" style={inCart && styles.done}>
             {details}
+          </ThemedText>
+        ) : null}
+        {tags.shown ? (
+          <ThemedText type="small" themeColor="textSecondary" style={inCart && styles.done}>
+            {tags.shown}
           </ThemedText>
         ) : null}
       </View>

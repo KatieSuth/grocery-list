@@ -5,12 +5,13 @@ import { createId } from '@/utils/id';
 import { nameKey } from '@/utils/text';
 
 import { checkName, MAX_NAME_LENGTH } from './names';
+import { checkTag, MAX_TAG_LENGTH, MAX_TAGS_PER_ITEM, splitTagCell, TAG_SEPARATOR } from './tags';
 
 import type { Department, Item, ItemLocation, Store } from './types';
 
 /*
  * Importing stores, departments and items from a CSV file: "Store, Item name, Department, Brand,
- * Location". Brand and Location (the store's) are optional.
+ * Location, Tags". Brand, Location (the store's) and Tags (several separated by ";") are optional.
  *
  * The file comes from outside the app, so it's treated as hostile: its size, row count, field
  * lengths and characters are all bounded, it's parsed as plain text into arrays of strings
@@ -41,6 +42,8 @@ export type ImportRow = {
   brand: string;
   /** The store's location, when the file gives one. */
   location?: string;
+  /** The item's tags from this row (checked, tidied, no repeats); empty for none. */
+  tags: string[];
 };
 
 export type ImportError = {
@@ -51,8 +54,10 @@ export type ImportError = {
 
 export type ParseImportResult = { ok: true; rows: ImportRow[] } | { ok: false; errors: ImportError[] };
 
-const COLUMNS = ['Store', 'Item name', 'Department', 'Brand', 'Location'] as const;
-const OPTIONAL_COLUMNS: readonly string[] = ['Brand', 'Location'];
+const COLUMNS = ['Store', 'Item name', 'Department', 'Brand', 'Location', 'Tags'] as const;
+const OPTIONAL_COLUMNS: readonly string[] = ['Brand', 'Location', 'Tags'];
+/** Longest Tags cell: every tag an item can have, at full length, with separators. */
+const MAX_TAGS_CELL_LENGTH = MAX_TAGS_PER_ITEM * (MAX_TAG_LENGTH + 2);
 
 /** Shortens text quoted back to the user, so a hostile file can't flood an alert. */
 export function quote(value: string): string {
@@ -78,13 +83,14 @@ export function prepareImportText(text: string): { ok: true; text: string } | { 
 }
 
 function isHeader(cells: string[]): boolean {
-  const [store, item, department, brand = '', location = ''] = cells.map(nameKey);
+  const [store, item, department, brand = '', location = '', tags = ''] = cells.map(nameKey);
   return (
     store === 'store' &&
     (item === 'item name' || item === 'item') &&
     department === 'department' &&
     (brand === 'brand' || brand === '') &&
-    (location === 'location' || location === 'store location' || location === '')
+    (location === 'location' || location === 'store location' || location === '') &&
+    (tags === 'tags' || tags === '')
   );
 }
 
@@ -92,6 +98,26 @@ function isHeader(cells: string[]): boolean {
 function checkField(raw: string, column: (typeof COLUMNS)[number]): string | ImportError {
   const result = checkName(raw, column, { required: !OPTIONAL_COLUMNS.includes(column) });
   return result.ok ? result.value : { message: result.error };
+}
+
+/**
+ * Problems with a Tags cell ("Work; Patient"), or its tags: each checked like a tag typed in the
+ * app, repeats (ignoring case and spacing) dropped. The whole cell is checked for hidden
+ * characters first, since tidying the spacing would hide some of them.
+ */
+function checkTagsCell(raw: string): string[] | ImportError[] {
+  const cell = checkName(raw, 'Tags', { required: false, maxLength: MAX_TAGS_CELL_LENGTH });
+  if (!cell.ok) return [{ message: cell.error }];
+  const tags: string[] = [];
+  const errors: ImportError[] = [];
+  for (const piece of splitTagCell(cell.value)) {
+    const tag = checkTag(piece);
+    if (!tag.ok) errors.push({ message: `${quote(piece)}: ${tag.error}` });
+    else if (!tags.some((t) => nameKey(t) === nameKey(tag.value))) tags.push(tag.value);
+  }
+  if (errors.length > 0) return errors;
+  if (tags.length > MAX_TAGS_PER_ITEM) return [{ message: `An item can have up to ${MAX_TAGS_PER_ITEM} tags.` }];
+  return tags;
 }
 
 /** Reads the CSV's rows. Every problem is collected, so the user can fix them all at once. */
@@ -138,18 +164,25 @@ export function parseImportCsv(text: string): ParseImportResult {
       break;
     }
     if (cells.length > COLUMNS.length) {
-      errors.push({ row, message: 'There are more than 5 columns. Use: Store, Item name, Department, Brand, Location.' });
+      errors.push({
+        row,
+        message: `There are more than ${COLUMNS.length} columns. Use: ${COLUMNS.join(', ')} (several tags separated by “${TAG_SEPARATOR}”).`,
+      });
       continue;
     }
 
-    const values = COLUMNS.map((column, i) => checkField(cells[i] ?? '', column));
-    const problems = values.filter((v): v is ImportError => typeof v !== 'string');
+    const values = COLUMNS.slice(0, -1).map((column, i) => checkField(cells[i] ?? '', column));
+    const tags = checkTagsCell(cells[COLUMNS.length - 1] ?? '');
+    const problems = [
+      ...values.filter((v): v is ImportError => typeof v !== 'string'),
+      ...tags.filter((t): t is ImportError => typeof t !== 'string'),
+    ];
     if (problems.length > 0) {
       errors.push(...problems.map((p) => ({ row, message: p.message })));
       continue;
     }
     const [store, name, department, brand, location] = values as string[];
-    rows.push({ row, store, name, department, brand, ...(location ? { location } : {}) });
+    rows.push({ row, store, name, department, brand, ...(location ? { location } : {}), tags: tags as string[] });
   }
 
   if (errors.length > 0) return { ok: false, errors };
@@ -165,6 +198,8 @@ export type ImportCounts = {
   updatedItems: number;
   /** Existing stores without a location that get the one in the file. */
   locatedStores: number;
+  /** Existing items that get tags they don't have yet. */
+  taggedItems: number;
   /** Rows already in the app (or repeated in the file). */
   skipped: number;
 };
@@ -179,6 +214,8 @@ export type ImportPlan = {
   newItems: Item[];
   /** Locations to add to existing items, by item id. */
   locationAdds: Map<string, ItemLocation[]>;
+  /** Tags to add to existing items, by item id (only ever added, never removed). */
+  tagAdds: Map<string, string[]>;
   counts: ImportCounts;
 };
 
@@ -215,8 +252,9 @@ function matchStore(row: ImportRow, stores: Store[]): Store | ImportError | unde
  * Works out what importing `rows` would change, without changing anything. Names are matched
  * ignoring case and spacing, and existing spellings are kept. Stores are matched by name and
  * location (see matchStore). Stores and departments that don't exist yet are added; an item
- * that's already at the store in the same department is skipped. An item can be in only one
- * department per store, so a row that would put it in a second one is an error.
+ * that's already at the store in the same department is skipped (unless the row gives it new
+ * tags). An item can be in only one department per store, so a row that would put it in a second
+ * one is an error. Tags are only ever added to an item, keeping a spelling already used.
  */
 export function planImport(rows: ImportRow[], stores: Store[], items: Item[], now = Date.now()): PlanImportResult {
   const errors: ImportError[] = [];
@@ -233,7 +271,25 @@ export function planImport(rows: ImportRow[], stores: Store[], items: Item[], no
   const storeLocations = new Map<string, string>();
   const newItems: Item[] = [];
   const locationAdds = new Map<string, ItemLocation[]>();
+  const tagAdds = new Map<string, string[]>();
   const newItemIds = new Set<string>();
+  /** The spelling to use for each tag (by nameKey): the app's first, then the file's. */
+  const tagSpellings = new Map<string, string>();
+  for (const item of items) {
+    for (const tag of item.tags ?? []) if (!tagSpellings.has(nameKey(tag))) tagSpellings.set(nameKey(tag), tag);
+  }
+  /** Adds a row's tags to an item (a working copy), returning those it didn't have yet. */
+  const mergeTags = (item: Item, tags: string[]): string[] => {
+    const added: string[] = [];
+    for (const raw of tags) {
+      const tag = tagSpellings.get(nameKey(raw)) ?? raw;
+      tagSpellings.set(nameKey(tag), tag);
+      if ((item.tags ?? []).some((t) => nameKey(t) === nameKey(tag))) continue;
+      item.tags = [...(item.tags ?? []), tag];
+      added.push(tag);
+    }
+    return added;
+  };
   /** Where each location added by this file came from, to explain conflicts within the file. */
   const rowOfLocation = new Map<string, number>();
   let skipped = 0;
@@ -284,6 +340,7 @@ export function planImport(rows: ImportRow[], stores: Store[], items: Item[], no
         locations: [location],
         createdAt: now + order++,
       };
+      mergeTags(created, row.tags);
       itemsByKey.set(key, created);
       newItems.push(created);
       newItemIds.add(created.id);
@@ -291,10 +348,16 @@ export function planImport(rows: ImportRow[], stores: Store[], items: Item[], no
       continue;
     }
 
+    const addedTags = mergeTags(item, row.tags);
+    if (addedTags.length > 0 && !newItemIds.has(item.id)) {
+      tagAdds.set(item.id, [...(tagAdds.get(item.id) ?? []), ...addedTags]);
+    }
+
     const existing = item.locations.find((l) => l.storeId === store.id);
     if (existing) {
       if (existing.departmentId === department.id) {
-        skipped += 1;
+        // Already there; a row that only adds tags isn't skipped.
+        if (addedTags.length === 0) skipped += 1;
         continue;
       }
       const otherName = store.departments.find((d) => d.id === existing.departmentId)?.name ?? 'another department';
@@ -324,6 +387,11 @@ export function planImport(rows: ImportRow[], stores: Store[], items: Item[], no
       errors.push({ message: `${quote(store.name)} would have more than ${MAX_DEPARTMENTS_PER_STORE} departments.` });
     }
   }
+  for (const item of itemsByKey.values()) {
+    if ((item.tags?.length ?? 0) > MAX_TAGS_PER_ITEM) {
+      errors.push({ message: `${quote(item.name)} would have more than ${MAX_TAGS_PER_ITEM} tags.` });
+    }
+  }
   if (errors.length > 0) return { ok: false, errors };
 
   return {
@@ -334,12 +402,14 @@ export function planImport(rows: ImportRow[], stores: Store[], items: Item[], no
       storeLocations,
       newItems,
       locationAdds,
+      tagAdds,
       counts: {
         newStores: newStores.length,
         newDepartments,
         newItems: newItems.length,
         updatedItems: locationAdds.size,
         locatedStores: storeLocations.size,
+        taggedItems: tagAdds.size,
         skipped,
       },
     },
@@ -347,17 +417,25 @@ export function planImport(rows: ImportRow[], stores: Store[], items: Item[], no
 }
 
 /** True when importing would change nothing (every row is already in the app). */
-export function isEmptyImport({ newStores, newDepartments, newItems, updatedItems, locatedStores }: ImportCounts): boolean {
-  return newStores + newDepartments + newItems + updatedItems + locatedStores === 0;
+export function isEmptyImport({
+  newStores,
+  newDepartments,
+  newItems,
+  updatedItems,
+  locatedStores,
+  taggedItems,
+}: ImportCounts): boolean {
+  return newStores + newDepartments + newItems + updatedItems + locatedStores + taggedItems === 0;
 }
 
-function changes({ newStores, newDepartments, newItems, updatedItems, locatedStores }: ImportCounts): string[] {
+function changes({ newStores, newDepartments, newItems, updatedItems, locatedStores, taggedItems }: ImportCounts): string[] {
   return [
     ...(newItems > 0 ? [plural(newItems, 'new item')] : []),
     ...(updatedItems > 0 ? [`${plural(updatedItems, 'existing item')} at another store`] : []),
     ...(newStores > 0 ? [plural(newStores, 'new store')] : []),
     ...(newDepartments > 0 ? [plural(newDepartments, 'new department')] : []),
     ...(locatedStores > 0 ? [`a location for ${plural(locatedStores, 'existing store')}`] : []),
+    ...(taggedItems > 0 ? [`tags for ${plural(taggedItems, 'existing item')}`] : []),
   ];
 }
 

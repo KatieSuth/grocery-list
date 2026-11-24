@@ -95,7 +95,7 @@ test('importing the same file twice changes nothing the second time', async () =
   const before = await json(db);
 
   const again = await planFor(db, csv);
-  expect(again.counts).toEqual({ newStores: 0, newDepartments: 0, newItems: 0, updatedItems: 0, locatedStores: 0, skipped: 3 });
+  expect(again.counts).toEqual({ newStores: 0, newDepartments: 0, newItems: 0, updatedItems: 0, locatedStores: 0, taggedItems: 0, skipped: 3 });
   await applyImportPlan(db, again);
   expect(await json(db)).toEqual(before);
 });
@@ -122,6 +122,33 @@ test('changes made after planning aren’t overwritten or duplicated', async () 
     { storeId: 's1', departmentId: 'd1' },
     { storeId: 's2', departmentId: 'd3' },
   ]);
+});
+
+test('tags are added to an item that has none', async () => {
+  const db = await createTestDatabase();
+  await seed(db);
+  await applyImportPlan(db, await planFor(db, 'Kroger,Milk,Dairy,,,Work'));
+  expect((await json(db)).items[0].tags).toEqual(['Work']);
+});
+
+test('tags are added to items, alongside any added since planning', async () => {
+  const db = await createTestDatabase();
+  await seed(db);
+  const plan = await planFor(db, 'Kroger,Milk,Dairy,,,Work;Patient\nKroger,Bread,Dairy,,,Work');
+  expect(plan.counts).toMatchObject({ taggedItems: 1, newItems: 1, skipped: 0 });
+  // Meanwhile, Milk is tagged "patient" in the app.
+  await db.items.findOne('i1').patch({ tags: ['patient'] });
+  await applyImportPlan(db, plan);
+  await applyImportPlan(db, { ...plan, newStores: [], newItems: [] });
+  const { items } = await json(db);
+  expect(items.map((i) => [i.name, i.tags])).toEqual([
+    ['Milk', ['patient', 'Work']],
+    ['Bread', ['Work']],
+  ]);
+
+  const itemPlan = await planFor(db, 'Kroger,Milk,Dairy,,,Weekly');
+  await db.items.findOne('i1').remove();
+  await expect(applyImportPlan(db, itemPlan)).rejects.toThrow('An item changed during the import');
 });
 
 test('a store or item deleted after planning stops the import with an error', async () => {

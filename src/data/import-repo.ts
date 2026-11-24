@@ -1,6 +1,7 @@
 import type { AppDatabase } from '@/db/database';
 import type { ImportPlan } from '@/domain/csv-import';
 import type { Item, Store } from '@/domain/types';
+import { sameName } from '@/utils/text';
 
 /** The stores (in the user's order) and items an import is checked against. */
 export async function loadImportContext(db: AppDatabase): Promise<{ stores: Store[]; items: Item[] }> {
@@ -43,6 +44,16 @@ export async function applyImportPlan(db: AppDatabase, plan: ImportPlan): Promis
 
   if (plan.newItems.length > 0) {
     throwOnErrors('items', (await db.items.bulkInsert(plan.newItems)).error);
+  }
+  for (const [itemId, tags] of plan.tagAdds) {
+    const doc = await db.items.findOne(itemId).exec();
+    if (!doc) throw new Error('An item changed during the import');
+    // Only adds tags; any added since the plan was made (in any case) are kept, not repeated.
+    await doc.incrementalModify((old) => {
+      const current = old.tags ?? [];
+      const added = tags.filter((t) => !current.some((c) => sameName(c, t)));
+      return added.length > 0 ? { ...old, tags: [...current, ...added] } : old;
+    });
   }
   for (const [itemId, locations] of plan.locationAdds) {
     const doc = await db.items.findOne(itemId).exec();

@@ -8,6 +8,7 @@ import type { Item, ListEntry, Store, TripRecord } from '@/domain/types';
 
 import {
   addedOptionalFields,
+  itemMigrations,
   itemSchema,
   listEntrySchema,
   settingsMigrations,
@@ -57,7 +58,7 @@ export async function createAppDatabase(
   });
   await db.addCollections({
     stores: { schema: storeSchema },
-    items: { schema: itemSchema, migrationStrategies: addedOptionalFields },
+    items: { schema: itemSchema, migrationStrategies: itemMigrations },
     listEntries: { schema: listEntrySchema, migrationStrategies: addedOptionalFields },
     settings: { schema: settingsSchema, migrationStrategies: settingsMigrations },
     trips: { schema: tripSchema, migrationStrategies: tripMigrations },

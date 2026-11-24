@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { CheckboxBox } from '@/components/checkbox-box';
 import { pressOpacity } from '@/components/press-feedback';
 import { ThemedText } from '@/components/themed-text';
+import { describeTags } from '@/domain/tags';
 import { Spacing } from '@/constants/theme';
 import { QUANTITY_MAX_LENGTH } from '@/domain/quantity';
 import type { Item, ListEntry } from '@/domain/types';
@@ -42,6 +43,7 @@ export function MasterItemRow({
 }: Props) {
   const theme = useTheme();
   const checked = !!entry;
+  const tags = describeTags(item.tags);
   return (
     <View style={[styles.row, { backgroundColor: theme.backgroundElement }]}>
       <Pressable
@@ -58,7 +60,9 @@ export function MasterItemRow({
         <Pressable
           accessibilityRole="button"
           // Screen readers read this label instead of the text inside, so it says everything shown.
-          accessibilityLabel={`${item.brand ? `${item.name}, ${item.brand}` : item.name}. ${whereToFindSpoken}.${
+          accessibilityLabel={`${item.brand ? `${item.name}, ${item.brand}` : item.name}.${
+            tags.spoken ? ` ${tags.spoken}.` : ''
+          } ${whereToFindSpoken}.${
             lastBought ? ` ${lastBought}.` : ''
           }`}
           accessibilityHint="Edit this item"
@@ -69,6 +73,11 @@ export function MasterItemRow({
             {item.brand ? (
               <ThemedText type="small" themeColor="textSecondary">
                 {item.brand}
+              </ThemedText>
+            ) : null}
+            {tags.shown ? (
+              <ThemedText type="small" themeColor="textSecondary">
+                {tags.shown}
               </ThemedText>
             ) : null}
             <ThemedText type="small" themeColor="textSecondary">

@@ -1,4 +1,4 @@
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useState, type ComponentRef, type Ref } from 'react';
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
 import { SpaceBelowFocusedFieldContext } from '@/components/space-below-focused-field';
@@ -16,6 +16,8 @@ type Props = Omit<TextInputProps, 'style'> & {
    * above the keyboard with it while it's focused.
    */
   extraSpaceBelow?: number;
+  /** The text box, e.g. to move the screen reader to it. */
+  ref?: Ref<ComponentRef<typeof TextInput>>;
 };
 
 export function TextField({ label, error, optional, extraSpaceBelow = 0, onFocus, onBlur, ...rest }: Props) {

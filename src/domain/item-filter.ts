@@ -16,11 +16,13 @@ export type ItemFilter = {
   departments: string[];
   /** Selected brand keys (see nameKey). */
   brands: string[];
+  /** Selected tag keys (see nameKey). */
+  tags: string[];
   /** Checked state to show. */
   checked: CheckedFilter;
 };
 
-export const EMPTY_FILTER: ItemFilter = { query: '', storeIds: [], departments: [], brands: [], checked: 'all' };
+export const EMPTY_FILTER: ItemFilter = { query: '', storeIds: [], departments: [], brands: [], tags: [], checked: 'all' };
 
 export type FilterOption = { key: string; label: string };
 
@@ -28,6 +30,7 @@ export type FilterOptions = {
   stores: FilterOption[];
   departments: FilterOption[];
   brands: FilterOption[];
+  tags: FilterOption[];
 };
 
 const startsUppercase = (s: string) => s[0] !== s[0].toLocaleLowerCase();
@@ -36,7 +39,7 @@ const startsUppercase = (s: string) => s[0] !== s[0].toLocaleLowerCase();
  * One option per distinct value (ignoring case and spacing), sorted by label. The label is the
  * most common spelling; on a tie, one starting with a capital letter ("Acme" over "acme").
  */
-function distinct(labels: string[]): FilterOption[] {
+export function distinct(labels: string[]): FilterOption[] {
   const spellings = new Map<string, Map<string, number>>();
   for (const raw of labels) {
     const label = normalizeText(raw);
@@ -58,18 +61,19 @@ function distinct(labels: string[]): FilterOption[] {
 /**
  * What the user can filter by: every store (in store order, labelled with its location so
  * stores with the same name can be told apart), every department name across all
- * stores, and every brand across all items. Departments and brands appear once each, however
- * many stores or items share them (ignoring case and spacing).
+ * stores, and every brand and tag across all items. Departments, brands and tags appear once
+ * each, however many stores or items share them (ignoring case and spacing).
  */
 export function getFilterOptions(items: Item[], stores: Store[]): FilterOptions {
   return {
     stores: stores.map((s) => ({ key: s.id, label: storeLabel(s) })),
     departments: distinct(stores.flatMap((s) => s.departments.map((d) => d.name))),
     brands: distinct(items.flatMap((i) => (i.brand ? [i.brand] : []))),
+    tags: distinct(items.flatMap((i) => i.tags ?? [])),
   };
 }
 
-/** Drops selections whose store, department or brand no longer exists. */
+/** Drops selections whose store, department, brand or tag no longer exists. */
 export function pruneFilter(filter: ItemFilter, options: FilterOptions): ItemFilter {
   const keep = (selected: string[], available: FilterOption[]) =>
     selected.filter((key) => available.some((o) => o.key === key));
@@ -78,6 +82,7 @@ export function pruneFilter(filter: ItemFilter, options: FilterOptions): ItemFil
     storeIds: keep(filter.storeIds, options.stores),
     departments: keep(filter.departments, options.departments),
     brands: keep(filter.brands, options.brands),
+    tags: keep(filter.tags, options.tags),
     checked: filter.checked,
   };
 }
@@ -85,7 +90,11 @@ export function pruneFilter(filter: ItemFilter, options: FilterOptions): ItemFil
 /** Number of selected filter options (not counting the search text). Checked or unchecked counts as one. */
 export function activeFilterCount(filter: ItemFilter): number {
   return (
-    filter.storeIds.length + filter.departments.length + filter.brands.length + (filter.checked === 'all' ? 0 : 1)
+    filter.storeIds.length +
+    filter.departments.length +
+    filter.brands.length +
+    filter.tags.length +
+    (filter.checked === 'all' ? 0 : 1)
   );
 }
 
@@ -117,6 +126,7 @@ export function applyItemFilter(
   const storeIds = new Set(filter.storeIds);
   const departments = new Set(filter.departments);
   const brands = new Set(filter.brands);
+  const tags = new Set(filter.tags);
 
   const departmentKey = (storeId: string, departmentId: string) => {
     const dept = stores.find((s) => s.id === storeId)?.departments.find((d) => d.id === departmentId);
@@ -127,6 +137,7 @@ export function applyItemFilter(
     if (filter.checked !== 'all' && !!entries[item.id] !== (filter.checked === 'checked')) return false;
     if (query && !nameKey(item.name).includes(query)) return false;
     if (brands.size > 0 && !(item.brand && brands.has(nameKey(item.brand)))) return false;
+    if (tags.size > 0 && !(item.tags ?? []).some((tag) => tags.has(nameKey(tag)))) return false;
     if (storeIds.size === 0 && departments.size === 0) return true;
     return item.locations.some(
       (loc) =>

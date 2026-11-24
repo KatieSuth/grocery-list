@@ -18,6 +18,7 @@ import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
   storeOptions: FilterOption[];
+  tagOptions: FilterOption[];
   filter: TripFilter;
   onChange: (filter: TripFilter) => void;
   now: number;
@@ -32,9 +33,9 @@ const RANGE_CHOICES: { value: RangeChoice; label: string; spoken: string }[] = [
 
 /**
  * Which trips to show: finished within a date range (a preset, or custom From and To days, never
- * after today), and at which stores.
+ * after today), at which stores, and with items that had which tags when they were bought.
  */
-export function TripFilterPanel({ storeOptions, filter, onChange, now }: Props) {
+export function TripFilterPanel({ storeOptions, tagOptions, filter, onChange, now }: Props) {
   const theme = useTheme();
   const today = startOfDay(now);
   const { from, to } = rangeDays(filter.range, now);
@@ -74,6 +75,13 @@ export function TripFilterPanel({ storeOptions, filter, onChange, now }: Props) 
         options={storeOptions}
         selected={filter.storeIds}
         onToggle={(key) => onChange({ ...filter, storeIds: toggleKey(filter.storeIds, key) })}
+      />
+      <FilterGroup
+        title="Tags"
+        empty="No trips with tagged items yet."
+        options={tagOptions}
+        selected={filter.tags}
+        onToggle={(key) => onChange({ ...filter, tags: toggleKey(filter.tags, key) })}
       />
     </View>
   );

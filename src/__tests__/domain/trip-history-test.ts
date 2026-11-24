@@ -9,6 +9,7 @@ import {
   formatTripDate,
   formatTripDateSpoken,
   getTripStoreOptions,
+  getTripTagOptions,
   isDefaultRange,
   localDayToUtcDay,
   pruneTripFilter,
@@ -87,11 +88,15 @@ describe('filtering trips', () => {
   const trips = [
     trip('today', at(2026, 11, 23, 9), {
       items: [
-        { itemId: 'ham', name: 'Ham', brand: 'Acme Foods', department: 'Deli' },
+        { itemId: 'ham', name: 'Ham', brand: 'Acme Foods', department: 'Deli', tags: ['Work', 'Patient'] },
         { itemId: 'peas', name: 'Peas', department: 'Frozen' },
       ],
     }),
-    trip('first-day', at(2026, 8, 25, 0, 0), { storeId: 'bigbox', storeName: 'Big Box' }),
+    trip('first-day', at(2026, 8, 25, 0, 0), {
+      storeId: 'bigbox',
+      storeName: 'Big Box',
+      items: [{ itemId: 'apples', name: 'Apples', department: 'Produce', tags: ['work '] }],
+    }),
     trip('too-old', at(2026, 8, 24, 23, 59)),
   ];
   const filter = (f: Partial<TripFilter>) =>
@@ -122,8 +127,25 @@ describe('filtering trips', () => {
     expect(filter({ query: '   ' })).toEqual(['today', 'first-day']);
   });
 
-  test('counts each store and a changed date range as filters', () => {
+  test('by tag: a trip that bought an item with any of the selected tags at the time', () => {
+    expect(filter({ tags: ['work'] })).toEqual(['today', 'first-day']);
+    expect(filter({ tags: ['patient'] })).toEqual(['today']);
+    expect(filter({ tags: ['patient'], storeIds: ['bigbox'] })).toEqual([]);
+    // Trips with no tagged items (like those logged before tags existed) never match.
+    expect(filter({ tags: ['work'], range: { preset: 'custom', from: at(2026, 8, 24), to: at(2026, 8, 24) } })).toEqual([]);
+  });
+
+  test('tag options come from the tags saved with trips', () => {
+    expect(getTripTagOptions(trips)).toEqual([
+      { key: 'patient', label: 'Patient' },
+      { key: 'work', label: 'Work' },
+    ]);
+    expect(getTripTagOptions([])).toEqual([]);
+  });
+
+  test('counts each store and tag, and a changed date range, as filters', () => {
     expect(activeTripFilterCount(EMPTY_TRIP_FILTER)).toBe(0);
+    expect(activeTripFilterCount({ ...EMPTY_TRIP_FILTER, tags: ['work', 'patient'], storeIds: ['a'] })).toBe(3);
     expect(activeTripFilterCount({ ...EMPTY_TRIP_FILTER, query: 'ham', storeIds: ['a', 'b'] })).toBe(2);
     expect(activeTripFilterCount({ ...EMPTY_TRIP_FILTER, range: { preset: '1y' }, storeIds: ['a'] })).toBe(2);
   });
@@ -150,9 +172,13 @@ describe('stores', () => {
     ]);
   });
 
-  test('selected stores with no trips left are dropped', () => {
-    const pruned = pruneTripFilter({ ...EMPTY_TRIP_FILTER, query: 'x', storeIds: ['a', 'b'] }, [{ key: 'b', label: 'B' }]);
-    expect(pruned).toEqual({ ...EMPTY_TRIP_FILTER, query: 'x', storeIds: ['b'] });
+  test('selected stores and tags with no trips left are dropped', () => {
+    const pruned = pruneTripFilter(
+      { ...EMPTY_TRIP_FILTER, query: 'x', storeIds: ['a', 'b'], tags: ['work', 'gone'] },
+      [{ key: 'b', label: 'B' }],
+      [{ key: 'work', label: 'Work' }],
+    );
+    expect(pruned).toEqual({ ...EMPTY_TRIP_FILTER, query: 'x', storeIds: ['b'], tags: ['work'] });
   });
 });
 
@@ -201,5 +227,6 @@ describe("a trip's items", () => {
     expect(describeTripItemSpoken(items[1], true)).toBe('Ham, Acme, 1 lb, Deli');
     expect(describeTripItemSpoken(items[1], false)).toBe('Ham, Acme, 1 lb');
     expect(describeTripItemSpoken(items[3], true)).toBe('Apples, Produce');
+    expect(describeTripItemSpoken({ ...items[3], tags: ['Work', 'Patient'] }, false)).toBe('Apples, Tags: Work, Patient');
   });
 });

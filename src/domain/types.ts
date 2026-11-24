@@ -24,6 +24,8 @@ export type Item = {
   brand?: string;
   /** Where the item can be found: one department per store. */
   locations: ItemLocation[];
+  /** The user's own labels, e.g. "Work" or "Temporary", in the order added. Absent when none. */
+  tags?: string[];
   createdAt: number;
   /** When it was last bought (a finished trip that included it). Kept here so lists needn't read the trip log. */
   lastBoughtAt?: number;
@@ -54,6 +56,8 @@ export type TripItem = {
   quantity?: string;
   /** The department it was in at that store. */
   department: string;
+  /** Its tags at the time. Absent when it had none, or for trips logged before tags existed. */
+  tags?: string[];
 };
 
 /** A finished store visit: what was bought, where and when. */

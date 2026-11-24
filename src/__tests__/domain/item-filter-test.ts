@@ -32,18 +32,25 @@ const stores: Store[] = [
   },
 ];
 
-const item = (id: string, name: string, brand: string | undefined, locations: [string, string][]): Item => ({
+const item = (
+  id: string,
+  name: string,
+  brand: string | undefined,
+  locations: [string, string][],
+  tags?: string[],
+): Item => ({
   id,
   name,
   ...(brand ? { brand } : {}),
   locations: locations.map(([storeId, departmentId]) => ({ storeId, departmentId })),
+  ...(tags ? { tags } : {}),
   createdAt: 1,
 });
 
 const items = [
-  item('milk', 'Whole Milk', 'Acme', [['corner', 'c-deli']]),
-  item('ham', 'Ham', 'acme', [['bigbox', 'b-deli']]),
-  item('peas', 'Peas', 'Green Giant', [['bigbox', 'b-frozen']]),
+  item('milk', 'Whole Milk', 'Acme', [['corner', 'c-deli']], ['Work']),
+  item('ham', 'Ham', 'acme', [['bigbox', 'b-deli']], ['work ', 'Patient']),
+  item('peas', 'Peas', 'Green Giant', [['bigbox', 'b-frozen']], ['Temporary']),
   item('apples', 'Apples', undefined, [
     ['corner', 'c-produce'],
     ['bigbox', 'b-frozen'],
@@ -77,11 +84,16 @@ describe('getFilterOptions', () => {
         { key: 'acme', label: 'Acme' },
         { key: 'green giant', label: 'Green Giant' },
       ],
+      tags: [
+        { key: 'patient', label: 'Patient' },
+        { key: 'temporary', label: 'Temporary' },
+        { key: 'work', label: 'Work' },
+      ],
     });
   });
 
   test('is empty when there is nothing yet', () => {
-    expect(getFilterOptions([], [])).toEqual({ stores: [], departments: [], brands: [] });
+    expect(getFilterOptions([], [])).toEqual({ stores: [], departments: [], brands: [], tags: [] });
   });
 });
 
@@ -141,6 +153,24 @@ describe('applyItemFilter', () => {
   });
 });
 
+describe('tags', () => {
+  test('one option per tag, whatever its case or spacing', () => {
+    expect(getFilterOptions(items, stores).tags).toEqual([
+      { key: 'patient', label: 'Patient' },
+      { key: 'temporary', label: 'Temporary' },
+      { key: 'work', label: 'Work' },
+    ]);
+  });
+
+  test('any selected tag matches, and tags are combined with the other filters with AND', () => {
+    expect(ids({ tags: ['work'] })).toEqual(['milk', 'ham']);
+    expect(ids({ tags: ['patient', 'temporary'] })).toEqual(['ham', 'peas']);
+    expect(ids({ tags: ['work'], storeIds: ['bigbox'] })).toEqual(['ham']);
+    // Items without tags don't match a tag filter.
+    expect(ids({ tags: ['work'], query: 'bread' })).toEqual([]);
+  });
+});
+
 test('pruneFilter drops selections that no longer exist, keeping the search', () => {
   const options = getFilterOptions(items, stores);
   expect(
@@ -150,18 +180,26 @@ test('pruneFilter drops selections that no longer exist, keeping the search', ()
         storeIds: ['corner', 'gone'],
         departments: ['deli', 'bakery'],
         brands: ['acme', 'old brand'],
+        tags: ['work', 'old tag'],
         checked: 'unchecked',
       },
       options,
     ),
-  ).toEqual({ query: 'x', storeIds: ['corner'], departments: ['deli'], brands: ['acme'], checked: 'unchecked' });
+  ).toEqual({
+    query: 'x',
+    storeIds: ['corner'],
+    departments: ['deli'],
+    brands: ['acme'],
+    tags: ['work'],
+    checked: 'unchecked',
+  });
 });
 
 test('activeFilterCount and hasSearchOrFilters', () => {
   expect(activeFilterCount(EMPTY_FILTER)).toBe(0);
   expect(
-    activeFilterCount({ query: 'x', storeIds: ['a'], departments: ['b', 'c'], brands: ['d'], checked: 'all' }),
-  ).toBe(4);
+    activeFilterCount({ query: 'x', storeIds: ['a'], departments: ['b', 'c'], brands: ['d'], tags: ['e'], checked: 'all' }),
+  ).toBe(5);
   expect(activeFilterCount({ ...EMPTY_FILTER, checked: 'checked' })).toBe(1);
   expect(activeFilterCount({ ...EMPTY_FILTER, checked: 'unchecked', brands: ['d'] })).toBe(2);
   expect(hasSearchOrFilters(EMPTY_FILTER)).toBe(false);
@@ -196,5 +234,6 @@ test('blank names never become options', () => {
     stores: [{ key: 's', label: 'S' }],
     departments: [],
     brands: [],
+    tags: [],
   });
 });

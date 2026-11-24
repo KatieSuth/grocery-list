@@ -55,6 +55,7 @@ async function logCart(db: AppDatabase, storeId: string): Promise<TripRecord | n
         ...(item.brand ? { brand: item.brand } : {}),
         ...(entry.quantity ? { quantity: entry.quantity } : {}),
         department: section.department.name,
+        ...(item.tags?.length ? { tags: [...item.tags] } : {}),
       })),
   );
   if (bought.length === 0) return null;

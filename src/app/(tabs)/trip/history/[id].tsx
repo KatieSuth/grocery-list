@@ -1,5 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { storeLabel } from '@/domain/describe';
+import { describeTags } from '@/domain/tags';
 import { useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 
@@ -108,10 +109,11 @@ export default function TripDetailScreen() {
   );
 }
 
-/** One item bought: name, then brand, quantity and (when not grouped by it) department. */
+/** One item bought: name, then brand, quantity and (when not grouped by it) department, then its tags at the time. */
 function TripItemLine({ item, withDepartment }: { item: TripItem; withDepartment: boolean }) {
   const theme = useTheme();
   const details = [item.brand, item.quantity, withDepartment ? item.department : undefined].filter((d) => d);
+  const tags = describeTags(item.tags).shown;
   return (
     <View
       accessible
@@ -122,6 +124,11 @@ function TripItemLine({ item, withDepartment }: { item: TripItem; withDepartment
       {details.length > 0 ? (
         <ThemedText type="small" themeColor="textSecondary">
           {details.join(' · ')}
+        </ThemedText>
+      ) : null}
+      {tags ? (
+        <ThemedText type="small" themeColor="textSecondary">
+          {tags}
         </ThemedText>
       ) : null}
     </View>

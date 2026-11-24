@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, type PressableProps } from 'react-native';
+import type { Ref } from 'react';
+import { Pressable, StyleSheet, type HostInstance, type PressableProps } from 'react-native';
 
 import { pressOpacity } from '@/components/press-feedback';
 import { ThemedText } from '@/components/themed-text';
@@ -11,6 +12,8 @@ type Props = Omit<PressableProps, 'children' | 'style'> & {
   label: string;
   variant?: ButtonVariant;
   compact?: boolean;
+  /** E.g. to move the screen reader to it. */
+  ref?: Ref<HostInstance>;
 };
 
 export function Button({ label, variant = 'primary', compact, disabled, ...rest }: Props) {

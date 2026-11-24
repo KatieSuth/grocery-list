@@ -26,8 +26,8 @@ const CHECKED_CHOICES: { value: CheckedFilter; label: string; spoken: string }[]
 ];
 
 /**
- * How the master list is sorted, then the checked state, store, department and brand options for
- * narrowing it. The store, department and brand groups can be collapsed.
+ * How the master list is sorted, then the checked state, store, department, brand and tag options
+ * for narrowing it. Those groups can be collapsed.
  */
 export function FilterPanel({ options, filter, onChange, sort, direction, onChangeSort, onChangeDirection }: Props) {
   const theme = useTheme();
@@ -65,6 +65,13 @@ export function FilterPanel({ options, filter, onChange, sort, direction, onChan
         options={options.brands}
         selected={filter.brands}
         onToggle={(key) => onChange({ ...filter, brands: toggleKey(filter.brands, key) })}
+      />
+      <FilterGroup
+        title="Tags"
+        empty="No items have tags yet."
+        options={options.tags}
+        selected={filter.tags}
+        onToggle={(key) => onChange({ ...filter, tags: toggleKey(filter.tags, key) })}
       />
     </View>
   );

@@ -20,6 +20,7 @@ import {
   formatTripDate,
   formatTripDateSpoken,
   getTripStoreOptions,
+  getTripTagOptions,
   PRESET_LABELS,
   pruneTripFilter,
   rangeDays,
@@ -51,8 +52,9 @@ export default function TripHistoryScreen() {
   if (!trips) return null;
 
   const storeOptions = getTripStoreOptions(trips);
-  // Ignore selected stores whose trips have since been deleted.
-  const filter = pruneTripFilter(rawFilter, storeOptions);
+  const tagOptions = getTripTagOptions(trips);
+  // Ignore selected stores and tags whose trips have since been deleted.
+  const filter = pruneTripFilter(rawFilter, storeOptions, tagOptions);
   const filterCount = activeTripFilterCount(filter);
   const searching = !!normalizeText(filter.query);
   const visible = applyTripFilter(trips, filter, now);
@@ -86,7 +88,13 @@ export default function TripHistoryScreen() {
             </View>
 
             {panelOpen ? (
-              <TripFilterPanel storeOptions={storeOptions} filter={filter} onChange={setFilter} now={now} />
+              <TripFilterPanel
+                storeOptions={storeOptions}
+                tagOptions={tagOptions}
+                filter={filter}
+                onChange={setFilter}
+                now={now}
+              />
             ) : null}
 
             {filterCount > 0 ? (

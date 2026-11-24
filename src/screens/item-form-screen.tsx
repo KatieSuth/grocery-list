@@ -11,6 +11,7 @@ import {
 } from "@/components/store-location-picker";
 import { ErrorText, TextField } from "@/components/text-field";
 import { SwitchRow } from "@/components/switch-row";
+import { TagEditor } from "@/components/tag-editor";
 import { deleteItem, saveItem } from "@/data/items-repo";
 import { setChecked } from "@/data/list-repo";
 import { addStoreDepartment } from "@/data/stores-repo";
@@ -28,13 +29,14 @@ import {
 } from "@/domain/item-draft";
 import { hasErrors } from "@/domain/store-draft";
 import { MAX_NAME_LENGTH } from "@/domain/names";
+import { addPendingTag, knownTags } from "@/domain/tags";
 import type { Item, Store } from "@/domain/types";
 import { useItems, useStores } from "@/hooks/use-data";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 import { confirmAction, confirmDestructive } from "@/utils/confirm";
 import { goBack } from "@/utils/navigation";
 import { runWrite } from "@/utils/run-write";
-import { sameName } from "@/utils/text";
+import { normalizeText, sameName } from "@/utils/text";
 
 type Props = {
   /** Where Save, Cancel and Delete return to. */
@@ -116,10 +118,17 @@ function ItemForm({
    * added because it's needed right now. Kept as chosen across "Add more".
    */
   const [needed, setNeeded] = useState(true);
+  /** What's typed in the New tag field but not added yet, and its error (see TagEditor). */
+  const [newTag, setNewTag] = useState("");
+  const [tagError, setTagError] = useState<string>();
+  /** Changed by "Add more", so the tag section starts afresh for the next item. */
+  const [tagEditorKey, setTagEditorKey] = useState(0);
   const leave = useUnsavedChangesWarning(
-    itemDraftChanged(draft, initial),
+    // A tag typed but not added yet counts too.
+    itemDraftChanged(draft, initial) || !!normalizeText(newTag),
     "item",
   );
+  const otherItems = items.filter((i) => i.id !== item?.id);
 
   const errors = submitted ? validateItemDraft(draft, stores) : {};
 
@@ -127,9 +136,22 @@ function ItemForm({
   const save = async (): Promise<Item | null> => {
     setSubmitted(true);
     setMessage(undefined);
-    if (hasErrors(validateItemDraft(draft, stores))) return null;
+    // A tag typed but not added yet is added now, rather than being lost.
+    const pending = addPendingTag(
+      draft.tags,
+      newTag,
+      knownTags(otherItems).map((t) => t.name),
+    );
+    if (!pending.ok) {
+      setTagError(pending.error);
+      return null;
+    }
+    const current = { ...draft, tags: pending.tags };
+    setDraft(current);
+    setNewTag("");
+    if (hasErrors(validateItemDraft(current, stores))) return null;
     // Two items with the same name and brand can be meant, but usually aren't.
-    const duplicate = findDuplicateItem(draft, items, item?.id);
+    const duplicate = findDuplicateItem(current, items, item?.id);
     if (duplicate && !(await confirmSavingDuplicate(duplicate))) return null;
     setSaving(true);
     setSaveError(undefined);
@@ -137,9 +159,10 @@ function ItemForm({
       const saved = await saveItem(
         db,
         {
-          name: draft.name,
-          brand: draft.brand,
-          locations: draftToLocations(draft, stores),
+          name: current.name,
+          brand: current.brand,
+          locations: draftToLocations(current, stores),
+          tags: current.tags,
         },
         item?.id,
       );
@@ -162,13 +185,15 @@ function ItemForm({
     const saved = await save();
     if (!saved) return;
     setDraft(emptyItemDraft());
+    setTagError(undefined);
+    setTagEditorKey((k) => k + 1);
     setSubmitted(false);
     setMessage(`Saved “${saved.name}”. Add another, or tap Continue.`);
   };
 
   const handleContinue = async () => {
     // Nothing entered (e.g. right after "Add more"): just go back.
-    if (!item && isItemDraftBlank(draft)) {
+    if (!item && isItemDraftBlank(draft) && !normalizeText(newTag)) {
       leave(backTo);
       return;
     }
@@ -299,6 +324,16 @@ function ItemForm({
           message="Go back and add a store first, so you can say where to find this item."
         />
       )}
+      <TagEditor
+        key={tagEditorKey}
+        tags={draft.tags}
+        onChange={(tags) => setDraft((d) => ({ ...d, tags }))}
+        newTag={newTag}
+        onNewTagChange={setNewTag}
+        error={tagError}
+        onErrorChange={setTagError}
+        otherItems={otherItems}
+      />
       {saveError ? <ErrorText message={saveError} /> : null}
       {item ? (
         <Button

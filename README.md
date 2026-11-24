@@ -4,7 +4,7 @@ An Expo app for iOS and Android that keeps your grocery items organized by store
 
 Built so far:
 - the first-run **setup flow**: add stores and departments, then the items you usually buy and where to find them;
-- the **main app**, with four tabs: Items (the master list and home screen, with checkboxes, free-text quantities, search, filters, sorting and "last bought"), Trip (the shopping trip: pick a store, check items into the cart in department order, finish to log them as bought; a history icon opens past trips, searchable by item or brand and filterable by dates and store), Stores (store configuration; long-press a store to edit, copy or delete it, and a copy can also list the source store's items), and Settings (light/dark mode, the Items tab's default sort, Import from CSV, Delete all data).
+- the **main app**, with four tabs: Items (the master list and home screen, with checkboxes, free-text quantities, optional tags, search, filters, sorting and "last bought"), Trip (the shopping trip: pick a store, check items into the cart in department order, finish to log them as bought; a history icon opens past trips, searchable by item or brand and filterable by dates, store and tag), Stores (store configuration; long-press a store to edit, copy or delete it, and a copy can also list the source store's items), and Settings (light/dark mode, the Items tab's default sort, Import from CSV, Delete all data).
 
 See the [functional specification](docs/functional-spec.md) for screen-by-screen behavior.
 
@@ -104,15 +104,16 @@ src/
   domain/                 Pure logic: no React, no database
     types.ts              Store, Department, Item, ItemLocation, ListEntry, TripRecord
     departments.ts        Add/remove/move/copy, suggestions from other stores
+    tags.ts               Item tags: rules, add/remove, suggestions from other items, CSV cell splitting, display text
     store-draft.ts        Store form state + validation (incl. same name and location), changes, removed departments in use, copying a store (copyStoreDraft, copiedLocations)
     item-draft.ts         Item form state + validation, changes, duplicate items, location pruning
     store-sort.ts         Store order everywhere: A–Z by name, then location
     describe.ts           "Store · Dept" display text, and its spoken form ("Dept at Store"); storeLabel ("Kroger, Main St")
     quantity.ts           Free-text quantity cleanup
-    item-filter.ts        Master-list search + checked/store/department/brand filters
+    item-filter.ts        Master-list search + checked/store/department/brand/tag filters
     item-sort.ts          Master-list sort: by name, department or last bought; either direction
     trip.ts               Trip list: checked items at a store, by department in walking order
-    trip-history.ts       Trip log: date ranges, store options, search, item sort, date text
+    trip-history.ts       Trip log: date ranges, store and tag options, search, item sort, date text
     last-bought.ts        "Last bought yesterday" text
     appearance.ts         System / Light / Dark choice and labels
     csv-import.ts         CSV import: parse + validate the file (papaparse), plan the changes, messages
@@ -136,6 +137,7 @@ src/
   hooks/
     use-data.ts           useStores(), useItems(), useListEntries(), useSetupComplete(), useTripSettings(), useColorSchemeChoice(), useItemSortChoice(), useTrips()
     use-delete-store.ts   Delete a store after asking (store form and the Stores tab's menu)
+    use-focus-after-remove.ts  Keeps the screen reader's place when a tag or department is removed with ✕
     use-unsaved-changes-warning.ts  Asks before a form with changes is closed (usePreventRemove)
     use-delayed-quantity-save.ts    Saves quantities once typing pauses (and on close / backgrounding)
     use-announcement.ts   Reads a message aloud on iOS (Android uses live regions)
@@ -150,7 +152,7 @@ src/
     run-write.ts          runWrite(): a database write that tells the user if it fails
     accessibility-focus.ts  Move the screen reader to a view (.web.ts: DOM focus)
     menu-position.ts      Where a dropdown menu goes: under its row, or above it
-  components/             Shared UI (Button, TextField, Screen, Card, SwitchRow, StatusText, StoreActionsMenu, BusyOverlay, editors…)
+  components/             Shared UI (Button, TextField, Screen, Card, SwitchRow, StatusText, StoreActionsMenu, BusyOverlay, TagEditor, editors…)
   constants/theme.ts      Colors (light/dark, with contrast checked by a test), spacing, chip tap area
   test-utils/             Test helpers (not shipped)
   __tests__/              All tests, mirroring src/
@@ -221,10 +223,10 @@ Five RxDB collections:
 | Collection | Version | Document | Notes |
 | --- | --- | --- | --- |
 | `stores` | 0 | `{ id, name, location?, departments: [{ id, name }], createdAt }` | Departments are embedded and ordered. Indexed on `createdAt`. |
-| `items` | 1 | `{ id, name, brand?, locations: [{ storeId, departmentId }], createdAt, lastBoughtAt? }` | Locations reference store and department ids. `lastBoughtAt` is set when a trip that included the item is finished, so the master list never reads the trip log. |
+| `items` | 2 | `{ id, name, brand?, locations: [{ storeId, departmentId }], tags?, createdAt, lastBoughtAt? }` | Locations reference store and department ids. `tags` (v2) are the user's labels, in the order added. `lastBoughtAt` is set when a trip that included the item is finished, so the master list never reads the trip log. |
 | `listEntries` | 1 | `{ itemId, quantity?, checkedAt, inCartAt? }` | One per **checked** item; primary key is the item id. Unchecking deletes it, so a quantity never outlives its check. `inCartAt` marks it as checked off on the current trip. Deleting an item deletes its entry. |
 | `settings` | 3 | `{ id: 'app', setupComplete, tripStoreId?, tripReversed?, colorScheme?, itemSort?, itemSortDirection? }` | Single document. Only change it through `settings-repo.ts`, which patches it. An `upsert` would wipe the other fields. |
-| `trips` | 1 | `{ id, storeId, storeName, finishedAt, items: [{ itemId, name, brand?, quantity?, department }], pending? }` | The trip log: one document per finished trip. Names are copied so the record survives renames and deletions. `pending` is set only while a trip is being finished. Indexed on `finishedAt`. |
+| `trips` | 3 | `{ id, storeId, storeName, storeLocation?, finishedAt, items: [{ itemId, name, brand?, quantity?, department, tags? }], pending? }` | The trip log: one document per finished trip. Names, the store's location (v2) and items' tags (v3) are copied so the record survives renames and deletions. `pending` is set only while a trip is being finished. Indexed on `finishedAt`. |
 
 IDs come from RxDB's `randomToken(16)`. Timestamps are epoch milliseconds.
 
@@ -264,7 +266,7 @@ Development builds also enable RxDB dev-mode and wrap storage in **z-schema vali
 
 ### CSV import
 
-Settings → Import from CSV reads a "Store, Item name, Department, Brand, Location" file (Brand and the store's Location optional). The file is untrusted input, so:
+Settings → Import from CSV reads a "Store, Item name, Department, Brand, Location, Tags" file (Brand, the store's Location and Tags optional; several tags separated by ";", only ever added to items). The file is untrusted input, so:
 
 - **Picking** uses `expo-document-picker` (the system picker; no storage permission). On **Android** the picker returns a one-time `content://` link that `expo-file-system` reads directly, with nothing copied. The picker's cache copy can't be used there, because Expo Go's file sandbox doesn't allow reading the cache folder it lands in, so the file looks missing. On **iOS** the copy is needed to read the file, and it's deleted afterwards, but only if it's in the app's cache. The size is checked before reading: an empty or unknown size is refused, and so is anything over 1 MB. On web, the browser's `File` is read instead.
 - **Parsing** uses papaparse on the string only: `header: false` (arrays, so file contents never become object keys), `dynamicTyping: false`, a fixed `,` delimiter, and no workers or downloads. Quote errors reject the file.

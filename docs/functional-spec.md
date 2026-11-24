@@ -1,6 +1,6 @@
 # Grocery List: Functional Specification
 
-**Status:** Setup flow, all four main tabs (including Settings), the shopping trip, the trip history and copying stores are built.
+**Status:** Setup flow, all four main tabs (including Settings), the shopping trip, the trip history, copying stores and item tags are built.
 **Last updated:** 2026-11-23
 
 This document describes what the app does from the user's point of view: screens, fields, rules, and behavior. For how it's built, see the [README](../README.md).
@@ -123,6 +123,8 @@ The first screen on a new install.
 - **New department** field with an **Add** button. Pressing the keyboard's Done key also adds.
   - A blank name shows "Enter a department name."
   - A name already in the list (ignoring case and extra spaces) shows "\"<name>\" is already in the list."
+  - A name typed but not added when **Save** is tapped is added first (with the same spelling rule), so it isn't lost; if it can't be (e.g. hidden characters), its message shows and nothing is saved. A name that's already in the list is just dropped. Typed text also counts as an unsaved change.
+  - After **✕** removes a department, the screen reader moves to the next department's ✕, or to New department if it was the last.
 - **Suggestions from other stores.** As the user types in New department, matching department names from their saved stores appear under the field, headed "From your stores, tap to fill in:".
   - Each suggestion shows the name and the stores that use it, e.g. "Bakery · Corner Market, Big Box". A name used by several stores appears **once**, listing all of them.
   - Matching ignores case and extra spaces, and finds the text anywhere in the name ("bar" finds "Kombucha Bar").
@@ -211,6 +213,7 @@ Two stores can share a name as long as their locations differ (e.g. two Krogers 
 | Brand/Distinguisher | No | Placeholder "e.g. 'Organic Valley,' '3-pack,' etc." |
 | Needed | — | New items only. A switch, **on** by default: "Check it on your list when it’s saved." When on, saving also checks the item on the master list (no quantity), as if its checkbox were tapped. The choice is kept across **Add more**. If the item saves but can't be checked: "Bread was saved, but couldn’t be checked on your list. Check it on the Items tab." |
 | Where to find it | At least one store, each with a department | See below. |
+| Tags | No | After Where to find it. See below. |
 
 **Where to find it**
 - Every store is listed with a checkbox, in the same order as the Stores screen.
@@ -222,6 +225,18 @@ Two stores can share a name as long as their locations differ (e.g. two Krogers 
   - A blank name shows "Enter a department name." If saving fails: "Could not add the department. Please try again."
   - The department stays on the store even if the item is then cancelled.
 - If no stores exist, the form shows "Go back and add a store first, so you can say where to find this item."
+
+**Tags** (optional)
+- Labels for the item, for whatever helps: who or what it's for (Work, Patient, Self) or a reminder (Temporary). Shown after Where to find it, under a **Tags (optional)** heading: "Label items by need or anything else, e.g. Work, Patient, Temporary."
+- The item's tags are shown as chips, in the order added, each with a **✕** ("Remove tag Work").
+- A **New tag** field with **Add** ("Add tag"); the keyboard's Done adds too. While typing, up to 5 tags from the user's other items that contain the text are offered ("Tags on your other items, tap to add:"), those starting with it first, then the most used; each shows how many items use it. Tapping one adds it at once.
+- A typed tag that matches one used on another item (ignoring case and spacing) takes that spelling: "work" becomes "Work".
+- Adding or removing says so: "Added tag Work." / "Removed tag Work."
+- Rules: up to 40 characters, the name rules (§ Names), no ";" (it separates tags in an imported file), up to 20 per item, and no repeats (ignoring case and spacing). Messages: "Enter a tag.", "“Work” is already added.", "An item can have up to 20 tags.", "A tag can’t contain “;”."
+- A tag typed but not added when the item is saved (Save, Continue or Add more) is added first, so it isn't lost; if it can't be, its message shows and nothing is saved. One that's already added is just dropped. Typed text also counts as an unsaved change.
+- **Add more** starts the next item with no tags, an empty New tag field and no note.
+- After **✕** removes a tag, the screen reader moves to the next tag's ✕, or to New tag if it was the last.
+- Tags don't affect the duplicate check (same name and brand).
 
 **Validation** (shown after the first save attempt)
 | Rule | Message |
@@ -273,7 +288,7 @@ After setup, the app has four tabs along the bottom:
 
 **What to get**
 - Every **checked** item from the master list that has a department at the chosen store, grouped under **department headings in the store's walking order**. Items are A–Z within each department. Departments with nothing to get are left out.
-- Each row shows a checkbox, the item name, and its brand and quantity if any (e.g. "Acme · 1 lb"). The quantity is read-only here; it's set on the Items tab.
+- Each row shows a checkbox, the item name, its brand and quantity if any (e.g. "Acme · 1 lb"), and its tags if any ("Work · Patient"). The quantity is read-only here; it's set on the Items tab.
 - A summary line: "1 of 3 in cart", or "Nothing to get here".
 - Below the list: "2 checked items aren't sold at Corner Market." when some checked items have no department there.
 - With nothing to get: "Nothing to get at Corner Market" / "Check items on the Items tab that are sold here, and they'll show up in department order."
@@ -322,16 +337,17 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
   - Trips still being finished (an interrupted Finish) aren't listed until they're completed.
 - A count under the search box says what's shown: "2 trips, last 90 days", or "1 trip bought “ham”, last 90 days" while searching.
 - **Search** ("Search items or brands") shows only trips that bought an item whose name or brand contains the text, ignoring case and extra spaces. It applies within the filters.
-- **Filter button** next to the search box opens a panel; it's highlighted, with a badge, while filters differ from the defaults (each selected store counts as one, and dates other than the last 90 days count as one). "Clear filters" goes back to the defaults and keeps the search.
+- **Filter button** next to the search box opens a panel; it's highlighted, with a badge, while filters differ from the defaults (each selected store and tag counts as one, and dates other than the last 90 days count as one). "Clear filters" goes back to the defaults and keeps the search.
   - **Dates:** Last 30 days, **Last 90 days** (the default), Last 6 months, Last year, or Custom. There's no "all time". Presets count back from today, including today.
   - **Custom** starts with the dates that were shown, as **From** and **To** fields that open the phone's calendar (on the web, the browser's date field). From can't be after To, and To can't be after today; days outside that are greyed out. Both days are included in full.
   - **Stores:** one option per store that has a trip in the log (including stores deleted since), labelled with its location, e.g. "Corner Market, Main St". Any selected store matches.
+  - **Tags:** one option per tag saved with the log's items, as they were when bought (finishing a trip saves each item's tags). A trip matches if it bought an item that had any selected tag at the time. Tags added to an item later don't change past trips, and trips finished before tags existed never match. With none: "No trips with tagged items yet."
 - With no trips at all: "No trips yet" / "When you finish a shopping trip, it's listed here with the store and the date." With none matching: "No matching trips", and a **Clear search and filters** button.
 - Filters and search reset when the screen is closed.
 
 **A past trip**
 - Tapping a trip opens its page: store, location, date and time, and the number of items, then everything bought on that trip.
-- Each item shows its name, then brand, quantity and department as they were at the time ("Ham" / "Acme · 1 lb · Deli").
+- Each item shows its name, then brand, quantity and department as they were at the time ("Ham" / "Acme · 1 lb · Deli"), then its tags at the time ("Work · Patient").
 - **Sort by:** **Name** (the default) or Department. **Order:** **A–Z** (the default) or Z–A.
   - By department: one heading per department (ignoring case), items by name under each; the department isn't repeated on the items. Z–A reverses both the departments and the items.
   - The sort isn't remembered; each trip opens by name, A–Z.
@@ -343,7 +359,7 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
 - At the top: a **search box** with a **sort and filter button** to its right (§ Search and filters, § Sorting below), then an **Add an item** button, which opens the Item form (§4.4).
 - Every item, in the default sort chosen in Settings (by name, A–Z, unless changed; § Sorting). Each row shows:
   - a **checkbox** on the left,
-  - the item name, brand (if any), and where to find it ("Corner Market · Deli", or "No store selected"),
+  - the item name, brand (if any), tags (if any, "Work · Patient"), and where to find it ("Corner Market · Deli", or "No store selected"),
   - "Last bought today", "yesterday", "3 days ago" (under a week), or a date ("Nov 3"; "Dec 25, 2025" if not this year), once the item has been in a finished trip,
   - while checked, a **quantity** field.
 - With no items: "No items yet" and a suggestion.
@@ -351,13 +367,14 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
 **Search and filters**
 - **Search** ("Search items") narrows the list as the user types. It matches anywhere in the item **name**, ignoring case and extra spaces ("mil" finds "Whole Milk"). It doesn't search brands.
 - An **✕** in the search box clears the search.
-- The **sort and filter button** (a filter icon) opens and closes one panel. From the top, it has the sort choices (**Sort by** and **Order**, § Sorting), then four groups of filter options:
+- The **sort and filter button** (a filter icon) opens and closes one panel. From the top, it has the sort choices (**Sort by** and **Order**, § Sorting), then five groups of filter options:
   - **Show:** **All**, **Checked** or **Unchecked** items; exactly one is picked, All by default. Checked or Unchecked counts as one filter. While Unchecked is picked, checking an item takes it off the list (and Checked, the other way round).
   - **Stores:** every store, in store order, with its location when it has one ("Kroger, Main St"), so stores with the same name can be told apart.
   - **Departments:** every department name across all stores, alphabetical. A name used by several stores (e.g. Deli) appears **once** and matches that department in every store.
   - **Brands:** every brand across all items, alphabetical, **once** each. "Acme" and "acme" count as one brand. The label is the most common spelling; on a tie, the one starting with a capital letter.
-  - Show is always open. Stores, Departments and Brands are **collapsible**: tap a group's heading to show or hide its options. They start collapsed each time the panel opens, except a group with options picked, which starts open. A collapsed group with picks says how many ("2 on"). Collapsing a group keeps its picks.
-  - A group with nothing in it says so ("No stores yet.", "No departments yet.", "No items have a brand yet.").
+  - **Tags:** every tag across all items, alphabetical, **once** each, spelled like Brands. An item matches if it has any selected tag.
+  - Show is always open. Stores, Departments, Brands and Tags are **collapsible**: tap a group's heading to show or hide its options. They start collapsed each time the panel opens, except a group with options picked, which starts open. A collapsed group with picks says how many ("2 on"). Collapsing a group keeps its picks.
+  - A group with nothing in it says so ("No stores yet.", "No departments yet.", "No items have a brand yet.", "No items have tags yet.").
 - **Combining:**
   - Options picked within a group widen the list: Deli *or* Bakery.
   - Picks in different groups, and the search, narrow it: an Acme item *and* in the Deli.
@@ -367,7 +384,7 @@ On the web, the questions use the browser's own OK/Cancel dialog, so the button 
   - A "N filter(s) on" line with a **Clear filters** button appears, even with the panel closed. Clear filters removes all picks (and sets Show back to All) but keeps the search text.
 - While searching or filtering, "Showing X of Y items" appears.
 - If nothing matches: "No matching items", with a **Clear search and filters** button.
-- Picks for a store, department or brand that has since been deleted are dropped automatically.
+- Picks for a store, department, brand or tag that has since been deleted are dropped automatically.
 - Search and filters are not saved; they reset when the app restarts.
 
 **Sorting**
@@ -496,11 +513,12 @@ With no stores: "No stores yet."
 **Trips**
 - Checking off on the trip, the Reverse order switch and the chosen store save immediately.
 - Finishing a trip saves the log record, the last-bought dates and the unchecks.
-- The trip log is kept indefinitely. Deleting an item or store later doesn't change past records, which keep the names (and, from 2026-11-23, the store's location) as they were.
+- The trip log is kept indefinitely. Deleting an item or store later doesn't change past records, which keep the names (and, from 2026-11-23, the store's location and the items' tags) as they were.
 
 **Importing a CSV file**
-- Columns, in order: Store, Item name, Department, Brand, Location. Brand and Location (the store's) may be empty or left out. Extra empty cells at the end of a row are ignored; more than five columns is an error.
-- The first row is skipped if it's a header (Store, Item name or Item, Department, and optionally Brand and Location or Store location, in any case). Blank rows are skipped.
+- Columns, in order: Store, Item name, Department, Brand, Location, Tags. Brand, Location (the store's) and Tags may be empty or left out. Extra empty cells at the end of a row are ignored; more than six columns is an error.
+- The first row is skipped if it's a header (Store, Item name or Item, Department, and optionally Brand, Location or Store location, and Tags, in any case). Blank rows are skipped.
+- **Tags:** several in one cell, separated by ";" (`"Work; Patient"`). Empty pieces and repeats are ignored. Each tag follows the tag rules (§4.4 Tags), and an item can't end up with more than 20. Tags are only ever **added** to an item, never removed; a tag already used in the app keeps its spelling, and an item on several rows gets the tags from all of them. A row that only adds tags to an item already at that store and department isn't skipped: the question before importing says "…tags for 1 existing item".
 - Values are text only and are cleaned up like typed names. Commas, quotes and line breaks work inside quoted values (`"Bread, sourdough"`); a quote inside a quoted value is doubled (`""`).
 - Names are matched ignoring case and spacing, and existing spellings are kept.
   - Stores are matched by name **and location**. A row with a location means the store with that name and location. A row without one means the only store with that name; if several stores share the name, the row is an error asking for its location.
@@ -541,6 +559,7 @@ With no stores: "No stores yet."
 - Text grows with the system text size. The filter-count badge grows too, up to 1.5×, so it doesn't cover the filter icon; department position numbers widen for "10" and up; the ✓ in checkboxes stays sized to its box.
 - Trip history: the clock icon is a 48-point "Trip history" button ("Shows your past shopping trips"). Each trip card is one button that says everything it shows with nothing abbreviated: "Corner Market, Main St. Sunday, November 23, 2026 at 4:12 PM." ("Shows the items bought on this trip"). The filter button says the dates and how many filters are on: "Filter trips, last 90 days, 1 filter on". Date choices are radio buttons; the custom From and To fields announce their day ("From, August 25, 2026", "Opens a calendar to choose the day") and use the platform's own accessible calendar. The trip count ("2 trips, last 90 days") is read aloud when it changes.
 - Stores tab: each store says "Edit this store. Long-press for more options." TalkBack's actions menu and VoiceOver's actions rotor also offer **More options**, **Copy store** and **Delete store** on each store, so no long-press gesture is needed. The long-press menu is announced as "Options for Kroger, Main St"; the screen reader moves to its first option, and each option names the store: "Edit Kroger, Main St", "Copy Kroger, Main St", "Delete Kroger, Main St". Options are 48 points tall, and their icons aren't read. Closing the menu returns the screen reader to the store.
+- Tags: "Tags (optional)" is a heading on the item form. Each tag's ✕ is a button named for the tag ("Remove tag Work"), with the chip 48 points tall; each suggestion is a 48-point button ("Add tag Work", "Used on 3 items."). Adding or removing a tag is read aloud ("Added tag Work."). Rows say their tags after the name and brand: "Ham, Acme. Tags: Work, Patient. …" on the Items tab, "Ham, Acme, 1 lb, Tags: Work" on the trip, and "Ham, Deli, Tags: Work" on a past trip.
 - On Copy store, "Copy items from Kroger, Main St" is one switch, announced with its state and description. The duplicate name and location message is read aloud as soon as it appears.
 - A past trip's summary (store, location, date, number of items) is a heading, as are the Sort by / Order sections and the department headings. Each item is read as one line: "Ham, Acme, 1 lb, Deli".
 - Follows the system light/dark setting unless Light or Dark is chosen in Settings.

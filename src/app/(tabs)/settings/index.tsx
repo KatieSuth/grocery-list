@@ -181,7 +181,7 @@ export default function SettingsScreen() {
           />
         </View>
         <ThemedText type="small" themeColor="textSecondary">
-          Columns: Store, Item name, Department, Brand (optional), Location (optional, the store’s). A header row is fine.
+          Columns: Store, Item name, Department, Brand (optional), Location (optional, the store’s), Tags (optional, several separated by “;”). A header row is fine.
           New stores and departments are added, and items already in your list are skipped. Give a location when two
           stores share a name.
         </ThemedText>

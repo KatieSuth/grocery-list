@@ -9,6 +9,8 @@ export type ItemInput = {
   name: string;
   brand: string;
   locations: ItemLocation[];
+  /** Absent or empty: no tags. */
+  tags?: string[];
 };
 
 /** All items, alphabetical by name. */
@@ -22,12 +24,14 @@ export function observeItems(db: AppDatabase): Observable<Item[]> {
   );
 }
 
-function fromInput(input: ItemInput): Pick<Item, 'name' | 'brand' | 'locations'> {
+function fromInput(input: ItemInput): Pick<Item, 'name' | 'brand' | 'locations' | 'tags'> {
   const brand = normalizeText(input.brand);
+  const tags = (input.tags ?? []).map(normalizeText).filter((t) => t);
   return {
     name: normalizeText(input.name),
     ...(brand ? { brand } : {}),
     locations: input.locations.map((l) => ({ storeId: l.storeId, departmentId: l.departmentId })),
+    ...(tags.length > 0 ? { tags } : {}),
   };
 }
 
@@ -40,7 +44,7 @@ export async function saveItem(db: AppDatabase, input: ItemInput, id?: string): 
     return doc.toMutableJSON();
   }
   const doc = await existing.incrementalModify((old) => {
-    const { brand: _drop, ...rest } = old;
+    const { brand: _brand, tags: _tags, ...rest } = old;
     return { ...rest, ...fields };
   });
   return doc.toMutableJSON();

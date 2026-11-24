@@ -302,6 +302,42 @@ test('the master list can be searched and filtered', async ({ page }) => {
   expect(problems).toEqual([]);
 });
 
+test('items can be tagged, with suggestions, and the list filtered by tag', async ({ page }) => {
+  const problems = watchConsole(page);
+  await setUpOneStoreAndItem(page);
+
+  // Tag Milk "Work".
+  await page.getByRole('button', { name: /^Milk\. / }).click();
+  await page.getByLabel('New tag').fill('Work');
+  await button(page, 'Add tag').click();
+  await expect(button(page, 'Remove tag Work')).toBeVisible();
+  await button(page, 'Save').click();
+  await expect(page.getByRole('button', { name: /^Milk\. Tags: Work\. / })).toBeVisible();
+
+  // A second item: Work is suggested while typing; tag it "Patient" instead, with Enter.
+  await button(page, 'Add an item').click();
+  await page.getByLabel('Item name').fill('Bagels');
+  await page.getByRole('switch', { name: 'Needed' }).click();
+  await page.getByRole('checkbox', { name: 'Corner Market' }).click();
+  await page.getByRole('radio', { name: 'Bakery in Corner Market' }).click();
+  await page.getByLabel('New tag').fill('w');
+  await expect(button(page, 'Add tag Work')).toBeVisible();
+  await page.getByLabel('New tag').fill('Patient');
+  await page.getByLabel('New tag').press('Enter');
+  await expect(button(page, 'Remove tag Patient')).toBeVisible();
+  await button(page, 'Continue').click();
+  await expect(page.getByRole('button', { name: /^Bagels\. Tags: Patient\. / })).toBeVisible();
+
+  // Filter by tag.
+  await button(page, 'Sort and filter, by name, A to Z').click();
+  await button(page, 'Tags').click();
+  await page.getByRole('checkbox', { name: 'Tags: Patient' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Milk' })).toHaveCount(0);
+  await expect(page.getByRole('checkbox', { name: 'Bagels' })).toBeVisible();
+
+  expect(problems).toEqual([]);
+});
+
 test('an item in two departments shows under both, sharing its check and quantity', async ({ page }) => {
   const problems = watchConsole(page);
   await setUpOneStoreAndItem(page);

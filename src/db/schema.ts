@@ -56,7 +56,7 @@ export const storeSchema: RxJsonSchema<Store> = {
 
 export const itemSchema: RxJsonSchema<Item> = {
   title: 'item',
-  version: 1,
+  version: 2,
   primaryKey: 'id',
   type: 'object',
   properties: {
@@ -74,6 +74,7 @@ export const itemSchema: RxJsonSchema<Item> = {
         required: ['storeId', 'departmentId'],
       },
     },
+    tags: { type: 'array', items: { type: 'string' } },
     createdAt: timestamp,
     lastBoughtAt: timestamp,
   },
@@ -114,7 +115,7 @@ export const settingsSchema: RxJsonSchema<SettingsDoc> = {
 
 export const tripSchema: RxJsonSchema<TripRecord> = {
   title: 'trip',
-  version: 2,
+  version: 3,
   primaryKey: 'id',
   type: 'object',
   properties: {
@@ -133,6 +134,7 @@ export const tripSchema: RxJsonSchema<TripRecord> = {
           brand: { type: 'string' },
           quantity: { type: 'string' },
           department: { type: 'string' },
+          tags: { type: 'array', items: { type: 'string' } },
         },
         required: ['itemId', 'name', 'department'],
       },
@@ -146,13 +148,16 @@ export const tripSchema: RxJsonSchema<TripRecord> = {
 const unchanged = <T>(doc: T) => doc;
 
 /**
- * Version 1 of items, list entries, settings and trips only added optional fields, so version-0
+ * Version 1 of list entries only added optional fields, so version-0
  * documents are valid as they are.
  */
 export const addedOptionalFields = { 1: unchanged };
 
-/** Trips version 2 only added the optional storeLocation. */
-export const tripMigrations = { 1: unchanged, 2: unchanged };
+/** Items version 2 only added the optional tags. */
+export const itemMigrations = { 1: unchanged, 2: unchanged };
+
+/** Trips version 2 only added the optional storeLocation, and version 3 the items' optional tags. */
+export const tripMigrations = { 1: unchanged, 2: unchanged, 3: unchanged };
 
 /** Settings version 2 only added the optional colorScheme. */
 export const settingsMigrations = { 1: unchanged, 2: unchanged, 3: unchanged };

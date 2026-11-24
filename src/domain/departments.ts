@@ -22,6 +22,25 @@ export function addDepartment(departments: Department[], rawName: string): AddDe
   return { ok: true, departments: [...departments, { id: createId(), name }] };
 }
 
+/**
+ * Adds a typed department name, reusing the spelling of a department with that name at another
+ * of `knownStores` (as the editor's Add does).
+ */
+export function addDepartmentFromStores(departments: Department[], rawName: string, knownStores: Store[]): AddDepartmentResult {
+  const known = suggestDepartments(rawName, knownStores, departments).find((s) => sameName(s.name, rawName));
+  return addDepartment(departments, known?.name ?? rawName);
+}
+
+/**
+ * For saving: adds what's still typed in the New department field (`pending`) as if Add had been
+ * tapped, so it isn't lost. Nothing typed, or a name already in the list, changes nothing; other
+ * problems are returned, so the form can say so instead of saving.
+ */
+export function addPendingDepartment(departments: Department[], pending: string, knownStores: Store[]): AddDepartmentResult {
+  if (!normalizeText(pending) || departments.some((d) => sameName(d.name, pending))) return { ok: true, departments };
+  return addDepartmentFromStores(departments, pending, knownStores);
+}
+
 export function removeDepartment(departments: Department[], id: string): Department[] {
   return departments.filter((d) => d.id !== id);
 }

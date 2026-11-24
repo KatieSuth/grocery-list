@@ -12,6 +12,8 @@ export type ItemDraft = {
    * department id, or null when the store is selected but no department is picked yet.
    */
   selections: Record<string, string | null>;
+  /** The item's tags, in the order added (see tags.ts). */
+  tags: string[];
 };
 
 export type ItemDraftErrors = {
@@ -23,7 +25,7 @@ export type ItemDraftErrors = {
 };
 
 export function emptyItemDraft(): ItemDraft {
-  return { name: '', brand: '', selections: {} };
+  return { name: '', brand: '', selections: {}, tags: [] };
 }
 
 export function itemToDraft(item: Item): ItemDraft {
@@ -31,7 +33,7 @@ export function itemToDraft(item: Item): ItemDraft {
   for (const loc of item.locations) {
     selections[loc.storeId] = loc.departmentId;
   }
-  return { name: item.name, brand: item.brand ?? '', selections };
+  return { name: item.name, brand: item.brand ?? '', selections, tags: [...(item.tags ?? [])] };
 }
 
 export function toggleStore(draft: ItemDraft, storeId: string): ItemDraft {
@@ -52,7 +54,8 @@ export function isItemDraftBlank(draft: ItemDraft): boolean {
   return (
     !normalizeText(draft.name) &&
     !normalizeText(draft.brand) &&
-    Object.keys(draft.selections).length === 0
+    Object.keys(draft.selections).length === 0 &&
+    draft.tags.length === 0
   );
 }
 
@@ -112,6 +115,8 @@ export function itemDraftChanged(draft: ItemDraft, initial: ItemDraft): boolean 
   return (
     draft.name !== initial.name ||
     draft.brand !== initial.brand ||
+    draft.tags.length !== initial.tags.length ||
+    draft.tags.some((tag, i) => tag !== initial.tags[i]) ||
     stores.length !== Object.keys(initial.selections).length ||
     stores.some((id) => !(id in initial.selections) || draft.selections[id] !== initial.selections[id])
   );

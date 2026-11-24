@@ -110,7 +110,7 @@ test('a trip log from before pending trips is migrated', async () => {
 
   const old = await openOldDatabase('pendingtrips', storage, {
     stores: { schema: storeSchema },
-    items: { schema: itemSchema, migrationStrategies: { 1: keep } },
+    items: { schema: itemSchema, migrationStrategies: { 1: keep, 2: keep } },
     listEntries: { schema: listEntrySchema, migrationStrategies: { 1: keep } },
     settings: { schema: olderVersion(settingsSchema, 1, ['colorScheme']), migrationStrategies: { 1: keep } },
     trips: { schema: version0(tripSchema, ['pending']) },
@@ -131,7 +131,7 @@ test("a trip log from before stores' locations were saved is migrated, keeping i
 
   const old = await openOldDatabase('prelocation', storage, {
     stores: { schema: storeSchema },
-    items: { schema: itemSchema, migrationStrategies: { 1: keep } },
+    items: { schema: itemSchema, migrationStrategies: { 1: keep, 2: keep } },
     listEntries: { schema: listEntrySchema, migrationStrategies: { 1: keep } },
     settings: { schema: settingsSchema, migrationStrategies: { 1: keep, 2: keep, 3: keep } },
     trips: { schema: olderVersion(tripSchema, 1, ['storeLocation']), migrationStrategies: { 1: keep } },
@@ -155,10 +155,10 @@ test('settings from before the appearance choice are migrated, keeping the trip 
 
   const old = await openOldDatabase('precolorscheme', storage, {
     stores: { schema: storeSchema },
-    items: { schema: itemSchema, migrationStrategies: { 1: keep } },
+    items: { schema: itemSchema, migrationStrategies: { 1: keep, 2: keep } },
     listEntries: { schema: listEntrySchema, migrationStrategies: { 1: keep } },
     settings: { schema: olderVersion(settingsSchema, 1, ['colorScheme']), migrationStrategies: { 1: keep } },
-    trips: { schema: tripSchema, migrationStrategies: { 1: keep, 2: keep } },
+    trips: { schema: tripSchema, migrationStrategies: { 1: keep, 2: keep, 3: keep } },
   });
   const settings = { id: 'app', setupComplete: true, tripStoreId: 's1', tripReversed: true };
   await old.settings.insert(settings);
@@ -179,13 +179,13 @@ test('settings from before the default sort are migrated, keeping everything', a
 
   const old = await openOldDatabase('presort', storage, {
     stores: { schema: storeSchema },
-    items: { schema: itemSchema, migrationStrategies: { 1: keep } },
+    items: { schema: itemSchema, migrationStrategies: { 1: keep, 2: keep } },
     listEntries: { schema: listEntrySchema, migrationStrategies: { 1: keep } },
     settings: {
       schema: olderVersion(settingsSchema, 2, ['itemSort', 'itemSortDirection']),
       migrationStrategies: { 1: keep, 2: keep },
     },
-    trips: { schema: tripSchema, migrationStrategies: { 1: keep, 2: keep } },
+    trips: { schema: tripSchema, migrationStrategies: { 1: keep, 2: keep, 3: keep } },
   });
   const settings = { id: 'app', setupComplete: true, tripStoreId: 's1', tripReversed: true, colorScheme: 'dark' };
   await old.settings.insert(settings);
@@ -196,5 +196,38 @@ test('settings from before the default sort are migrated, keeping everything', a
   expect(doc?.toJSON()).toEqual(settings);
   await doc?.incrementalPatch({ itemSort: 'lastBought', itemSortDirection: 'desc' });
   expect((await db.settings.findOne('app').exec())?.itemSort).toBe('lastBought');
+  await db.close();
+});
+
+test('items and trips from before tags are migrated, keeping everything', async () => {
+  const { itemSchema, listEntrySchema, settingsSchema, storeSchema, tripSchema } = jest.requireActual('@/db/schema');
+  const { createAppDatabase } = jest.requireActual('@/db/database');
+  const storage = getRxStorageMemory();
+
+  // Trips version 2: trip items had no tags.
+  const tripItems = tripSchema.properties.items;
+  const { tags: _tags, ...tripItemFields } = tripItems.items.properties;
+  const tripsV2 = {
+    ...olderVersion(tripSchema, 2, []),
+    properties: { ...tripSchema.properties, items: { ...tripItems, items: { ...tripItems.items, properties: tripItemFields } } },
+  };
+  const old = await openOldDatabase('pretags', storage, {
+    stores: { schema: storeSchema },
+    items: { schema: olderVersion(itemSchema, 1, ['tags']), migrationStrategies: { 1: keep } },
+    listEntries: { schema: listEntrySchema, migrationStrategies: { 1: keep } },
+    settings: { schema: settingsSchema, migrationStrategies: { 1: keep, 2: keep, 3: keep } },
+    trips: { schema: tripsV2, migrationStrategies: { 1: keep, 2: keep } },
+  });
+  const item = { id: 'i1', name: 'Milk', locations: [], createdAt: 1 };
+  const trip = { id: 't1', storeId: 's1', storeName: 'Shop', finishedAt: 5, items: [{ itemId: 'i1', name: 'Milk', department: 'Deli' }] };
+  await old.items.insert(item);
+  await old.trips.insert(trip);
+  await old.close();
+
+  const db = await createAppDatabase('pretags', { storage });
+  expect((await db.items.findOne('i1').exec())?.toJSON()).toEqual(item);
+  expect((await db.trips.findOne('t1').exec())?.toJSON()).toEqual(trip);
+  await (await db.items.findOne('i1').exec())?.incrementalPatch({ tags: ['Work'] });
+  expect((await db.items.findOne('i1').exec())?.tags).toEqual(['Work']);
   await db.close();
 });

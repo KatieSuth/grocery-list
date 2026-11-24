@@ -21,16 +21,20 @@ export type NameCheck = { ok: true; value: string } | { ok: false; error: string
 
 /**
  * Checks a name and tidies its spacing. `label` starts the error messages, e.g. "Store name".
- * Optional names may be blank; required ones may not.
+ * Optional names may be blank; required ones may not. `maxLength` defaults to MAX_NAME_LENGTH.
  */
-export function checkName(raw: string, label: string, { required }: { required: boolean }): NameCheck {
+export function checkName(
+  raw: string,
+  label: string,
+  { required, maxLength = MAX_NAME_LENGTH }: { required: boolean; maxLength?: number },
+): NameCheck {
   if (FORBIDDEN_CHARACTERS.test(raw)) {
     return { ok: false, error: `${label} contains hidden or control characters, which aren’t allowed.` };
   }
   const value = normalizeText(raw);
   if (required && !value) return { ok: false, error: `${label} is empty.` };
-  if (value.length > MAX_NAME_LENGTH) {
-    return { ok: false, error: `${label} is longer than ${MAX_NAME_LENGTH} characters.` };
+  if (value.length > maxLength) {
+    return { ok: false, error: `${label} is longer than ${maxLength} characters.` };
   }
   return { ok: true, value };
 }

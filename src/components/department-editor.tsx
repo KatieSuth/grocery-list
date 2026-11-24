@@ -11,7 +11,7 @@ import { ErrorText, TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import {
-  addDepartment,
+  addDepartmentFromStores,
   copyDepartments,
   moveDepartment,
   removeDepartment,
@@ -19,7 +19,8 @@ import {
 } from '@/domain/departments';
 import { MAX_NAME_LENGTH } from '@/domain/names';
 import type { Department, Store } from '@/domain/types';
-import { normalizeText, sameName } from '@/utils/text';
+import { normalizeText } from '@/utils/text';
+import { useFocusAfterRemove } from '@/hooks/use-focus-after-remove';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
@@ -32,13 +33,31 @@ type Props = {
   currentStoreId?: string;
   /** The scroll view around the editor, so dragging near its edge scrolls it. */
   scrollableRef?: SortableGridProps<Department>['scrollableRef'];
+  /**
+   * What's typed in the New department field, and its error. Kept by the form, so saving can add
+   * a department that was typed but not added yet (see addPendingDepartment), or say why it can't.
+   */
+  newName: string;
+  onNewNameChange: (text: string) => void;
+  addError: string | undefined;
+  onAddErrorChange: (error: string | undefined) => void;
 };
 
 /** Ordered department list: reorder, remove, and add departments (with suggestions from other stores). */
-export function DepartmentEditor({ departments, onChange, error, knownStores, currentStoreId, scrollableRef }: Props) {
+export function DepartmentEditor({
+  departments,
+  onChange,
+  error,
+  knownStores,
+  currentStoreId,
+  scrollableRef,
+  newName,
+  onNewNameChange: setNewName,
+  addError,
+  onAddErrorChange: setAddError,
+}: Props) {
   const theme = useTheme();
-  const [newName, setNewName] = useState('');
-  const [addError, setAddError] = useState<string>();
+  const { removeButtonRef, fieldRef, removed } = useFocusAfterRemove();
   const [choosingCopySource, setChoosingCopySource] = useState(false);
   const [copyNote, setCopyNote] = useState<string>();
   const [suggestionsHeight, setSuggestionsHeight] = useState(0);
@@ -71,8 +90,9 @@ export function DepartmentEditor({ departments, onChange, error, knownStores, cu
     setAddError(undefined);
   };
 
-  const add = (name: string) => {
-    const result = addDepartment(departments, name);
+  // Reuses the existing spelling when the typed name matches one from another store.
+  const handleAdd = () => {
+    const result = addDepartmentFromStores(departments, newName, knownStores);
     if (!result.ok) {
       setAddError(result.error);
       return;
@@ -81,9 +101,6 @@ export function DepartmentEditor({ departments, onChange, error, knownStores, cu
     setNewName('');
     setAddError(undefined);
   };
-
-  // Reuse the existing spelling when the typed name matches one from another store.
-  const handleAdd = () => add(suggestions.find((s) => sameName(s.name, newName))?.name ?? newName);
 
   return (
     <View style={styles.container}>
@@ -145,11 +162,18 @@ export function DepartmentEditor({ departments, onChange, error, knownStores, cu
               </ThemedText>
               <ThemedText style={styles.name}>{dept.name}</ThemedText>
               <Button
+                ref={removeButtonRef(dept.id)}
                 compact
                 variant="ghost"
                 label="✕"
                 accessibilityLabel={`Remove ${dept.name}`}
-                onPress={() => onChange(removeDepartment(departments, dept.id))}
+                onPress={() => {
+                  removed(
+                    departments.map((d) => d.id),
+                    index,
+                  );
+                  onChange(removeDepartment(departments, dept.id));
+                }}
               />
             </View>
           )}
@@ -188,6 +212,7 @@ export function DepartmentEditor({ departments, onChange, error, knownStores, cu
       <View style={styles.addRow}>
         <View style={styles.flex}>
           <TextField
+            ref={fieldRef}
             label="New department"
             placeholder="e.g. Bakery"
             value={newName}

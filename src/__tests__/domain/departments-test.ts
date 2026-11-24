@@ -1,5 +1,7 @@
 import {
   addDepartment,
+  addDepartmentFromStores,
+  addPendingDepartment,
   copyDepartments,
   moveDepartment,
   removeDepartment,
@@ -94,4 +96,25 @@ test('department names follow the shared name rules', () => {
     error: 'Department name contains hidden or control characters, which aren’t allowed.',
   });
   expect(addDepartment([], 'x'.repeat(101))).toEqual({ ok: false, error: 'Department name is longer than 100 characters.' });
+});
+
+describe('adding a typed name', () => {
+  const stores = [{ id: 's', name: 'Corner Market', departments: [{ id: 'x', name: 'Frozen Foods' }], createdAt: 1 }];
+
+  test('reuses the spelling from another store', () => {
+    const result = addDepartmentFromStores([], ' frozen   foods ', stores);
+    expect(result).toEqual({ ok: true, departments: [{ id: expect.any(String), name: 'Frozen Foods' }] });
+    expect(addDepartmentFromStores([], 'Bakery', stores)).toMatchObject({ ok: true, departments: [{ name: 'Bakery' }] });
+  });
+
+  test('when saving, a name still being typed is added; blank or already listed changes nothing', () => {
+    const departments = [{ id: 'd', name: 'Deli' }];
+    expect(addPendingDepartment(departments, 'frozen foods', stores)).toMatchObject({
+      ok: true,
+      departments: [{ name: 'Deli' }, { name: 'Frozen Foods' }],
+    });
+    expect(addPendingDepartment(departments, ' ', stores)).toEqual({ ok: true, departments });
+    expect(addPendingDepartment(departments, 'DELI', stores)).toEqual({ ok: true, departments });
+    expect(addPendingDepartment(departments, 'Deli\u202E2', stores)).toMatchObject({ ok: false });
+  });
 });

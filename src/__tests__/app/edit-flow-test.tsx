@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { act, cleanup, fireEvent, screen, waitFor, within } from 'expo-router/testing-library';
-import { Alert } from 'react-native';
+import { AccessibilityInfo, Alert } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import type { AppDatabase } from '@/db/database';
@@ -283,6 +283,49 @@ test('adding a duplicate or blank department shows an error', async () => {
   expect(screen.queryByText('Enter a department name.')).toBeNull();
   await fireEvent(screen.getByLabelText('New department'), 'submitEditing');
   expect(await screen.findByText('"produce" is already in the list.')).toBeOnTheScreen();
+});
+
+test('a department typed but not added is saved too, or blocks saving if it can’t be', async () => {
+  const db = await renderApp({ seed });
+  await press(/^Corner Market, Main St\./);
+  await type('New department', 'Deli\u202E');
+  await press('Save');
+  expect(await screen.findByText(/hidden or control characters/)).toBeOnTheScreen();
+  expect(screen).toHavePathnameWithParams('/setup/store-form?id=s1');
+
+  // Big Box spells it "Frozen", so that spelling is kept.
+  await type('New department', ' frozen ');
+  await press('Save');
+  await waitFor(() => expect(screen).toHavePathname('/setup'));
+  expect((await db.stores.findOne('s1').exec())?.toJSON().departments.map((d) => d.name)).toEqual([
+    'Produce',
+    'Deli',
+    'Frozen',
+  ]);
+});
+
+test('a department typed but not added counts as an unsaved change', async () => {
+  const alert = answerAlertWith('Keep editing');
+  await renderApp({ seed });
+  await press(/^Corner Market, Main St\./);
+  await type('New department', 'Bakery');
+  await press('Cancel');
+  expect(alert).toHaveBeenCalledWith('Leave without saving?', expect.stringContaining('store'), expect.any(Array));
+});
+
+test('after a department is removed, the screen reader moves to the next one, or to the field after the last', async () => {
+  const focus = jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent').mockImplementation(() => {});
+  await renderApp({ seed });
+  await press(/^Corner Market, Main St\./);
+  const focused = () => {
+    const [target, event] = focus.mock.calls.at(-1) ?? [];
+    expect(event).toBe('focus');
+    return String((target as unknown as { props?: Record<string, unknown> })?.props?.accessibilityLabel);
+  };
+  await press('Remove Produce');
+  expect(focused()).toBe('Remove Deli');
+  await press('Remove Deli');
+  expect(focused()).toBe('New department');
 });
 
 test('typing a new department suggests ones from other stores; tapping fills it in', async () => {
