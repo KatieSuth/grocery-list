@@ -25,19 +25,36 @@ function fromDraft(draft: StoreDraft): Pick<Store, 'name' | 'location' | 'depart
   };
 }
 
+/** New departments at a store for some of its items: item id → department id. */
+export type Reassignments = Record<string, string>;
+
 /**
  * Removes item locations that point at stores or departments that no longer exist (or, with
- * `leaving`, at that store, which is about to be deleted), in a single write. Returns the items
- * as they were before, so the change can be undone.
+ * `leaving`, at that store, which is about to be deleted), in a single write. With `reassign`,
+ * an item whose department at that store no longer exists is moved to its chosen one first, in
+ * the same write. Returns the items as they were before, so the change can be undone.
  */
-async function pruneItemLocations(db: AppDatabase, leaving?: string): Promise<Item[]> {
+async function pruneItemLocations(
+  db: AppDatabase,
+  { leaving, reassign }: { leaving?: string; reassign?: { storeId: string; departments: Reassignments } } = {},
+): Promise<Item[]> {
   const stores = (await db.stores.find().exec()).map((d) => d.toMutableJSON()).filter((s) => s.id !== leaving);
   const items = (await db.items.find().exec()).map((d) => d.toMutableJSON());
+  const departmentExists = (storeId: string, departmentId: string) =>
+    stores.some((s) => s.id === storeId && s.departments.some((d) => d.id === departmentId));
   const before: Item[] = [];
   const pruned: Item[] = [];
   for (const item of items) {
-    const locations = pruneLocations(item.locations, stores);
-    if (locations.length === item.locations.length) continue;
+    const chosen = reassign?.departments[item.id];
+    const moved = item.locations.map((l) =>
+      chosen && l.storeId === reassign?.storeId && !departmentExists(l.storeId, l.departmentId)
+        ? { storeId: l.storeId, departmentId: chosen }
+        : l,
+    );
+    const locations = pruneLocations(moved, stores);
+    const changed =
+      locations.length !== item.locations.length || locations.some((l, i) => l.departmentId !== item.locations[i].departmentId);
+    if (!changed) continue;
     before.push(item);
     pruned.push({ ...item, locations });
   }
@@ -51,19 +68,30 @@ async function bulkUpsertItems(db: AppDatabase, items: Item[]): Promise<void> {
   if (error.length > 0) throw new Error(`Could not save ${error.length} items`);
 }
 
-/** Creates a store, or updates the store with `id`. Returns the saved store. */
-export async function saveStore(db: AppDatabase, draft: StoreDraft, id?: string): Promise<Store> {
+/**
+ * Creates a store, or updates the store with `id`. Returns the saved store. Items in departments
+ * the update removes lose this store, except those in `reassign`, which move to their chosen
+ * department (one the draft keeps or adds). If updating the items fails, the store is put back
+ * as it was.
+ */
+export async function saveStore(db: AppDatabase, draft: StoreDraft, id?: string, reassign?: Reassignments): Promise<Store> {
   const fields = fromDraft(draft);
   const existing = id ? await db.stores.findOne(id).exec() : null;
   if (!existing) {
     const doc = await db.stores.insert({ id: id ?? createId(), createdAt: Date.now(), ...fields });
     return doc.toMutableJSON();
   }
+  const before = existing.toMutableJSON();
   const doc = await existing.incrementalModify((old) => {
     const { location: _drop, ...rest } = old;
     return { ...rest, ...fields };
   });
-  await pruneItemLocations(db);
+  try {
+    await pruneItemLocations(db, reassign && { reassign: { storeId: doc.id, departments: reassign } });
+  } catch (error) {
+    await doc.incrementalModify(() => before);
+    throw error;
+  }
   return doc.toMutableJSON();
 }
 
@@ -128,7 +156,7 @@ export async function copyStore(
  * fails, the items are put back as they were.
  */
 export async function deleteStore(db: AppDatabase, id: string): Promise<void> {
-  const before = await pruneItemLocations(db, id);
+  const before = await pruneItemLocations(db, { leaving: id });
   try {
     await db.stores.findOne(id).remove();
   } catch (error) {

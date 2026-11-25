@@ -26,6 +26,8 @@ type Props = {
   onCancel: () => void;
   /** Spoken label for Cancel, saying what's being cancelled. */
   cancelAccessibilityLabel: string;
+  /** iOS only: called once the sheet has finished closing (see Modal's onDismiss). */
+  onDismiss?: () => void;
 };
 
 /** A dialog that asks the user to pick one of several options, or cancel. */
@@ -37,10 +39,11 @@ export function PickerSheet({
   onChoose,
   onCancel,
   cancelAccessibilityLabel,
+  onDismiss,
 }: Props) {
   const theme = useTheme();
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel} onDismiss={onDismiss}>
       <View style={styles.backdrop}>
         <View
           accessibilityViewIsModal
@@ -65,6 +68,7 @@ export function PickerSheet({
                 accessibilityRole="button"
                 accessibilityLabel={option.accessibilityLabel}
                 accessibilityHint={option.accessibilityHint}
+                accessibilityState={{ selected: !!option.current }}
                 onPress={() => onChoose(option.key)}
                 style={({ pressed }) => [
                   styles.choice,

@@ -12,11 +12,23 @@ import { goBack } from '@/utils/navigation';
  * `what` names the thing being edited, e.g. "store". While `busy` (a save is being written), the
  * form can't be left at all, so the save isn't cut short or left to finish unseen. Returns
  * `leave`, which closes the form without asking: for after it has been saved or deleted.
+ *
+ * `onLeaveAttempt`, when given, is called instead of asking: for a step within the form (e.g.
+ * reassigning items) where Back means going back to the form, not leaving it.
  */
-export function useUnsavedChangesWarning(unsaved: boolean, what: string, busy = false): (backTo: Href) => void {
+export function useUnsavedChangesWarning(
+  unsaved: boolean,
+  what: string,
+  busy = false,
+  onLeaveAttempt?: () => void,
+): (backTo: Href) => void {
   const [leaving, setLeaving] = useState(false);
-  const disablePrevention = usePreventRemove((unsaved || busy) && !leaving, ({ repeat }) => {
+  const disablePrevention = usePreventRemove((unsaved || busy || !!onLeaveAttempt) && !leaving, ({ repeat }) => {
     if (busy) return;
+    if (onLeaveAttempt) {
+      onLeaveAttempt();
+      return;
+    }
     confirmDestructive({
       title: 'Leave without saving?',
       message: `This ${what} hasn’t been saved. If you leave now, your changes will be lost.`,

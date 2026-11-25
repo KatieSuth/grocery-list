@@ -59,7 +59,7 @@ async function seed(db: AppDatabase) {
 }
 
 test('editing a store updates it and removes item locations for deleted departments', async () => {
-  const alert = answerAlertWith('Remove and save');
+  const alert = answerAlertWith('Continue');
   const db = await renderApp({ seed });
 
   await press(/^Corner Market, Main St\./);
@@ -76,12 +76,10 @@ test('editing a store updates it and removes item locations for deleted departme
   await press('Remove Deli');
   await press('Save');
 
-  // Milk is in the Deli, so removing it asks first.
-  expect(alert).toHaveBeenCalledWith(
-    'Remove departments with items?',
-    '1 item in Deli will no longer be listed under Corner Mkt.',
-    expect.any(Array),
-  );
+  // Milk is in the Deli, so it can be given a new department first; here it isn't.
+  expect(await screen.findByRole('header', { name: 'Reassign 1 item from Deli' })).toBeOnTheScreen();
+  await press('Reassign Items & Delete Department');
+  expect(alert).toHaveBeenCalledWith('1 item isn’t reassigned', expect.stringContaining('Corner Market'), expect.any(Array));
   expect(await screen.findByText('Corner Mkt')).toBeOnTheScreen();
   const store = await db.stores.findOne('s1').exec();
   expect(store?.toJSON()).toMatchObject({ name: 'Corner Mkt', departments: [{ id: 'd1', name: 'Produce' }] });
@@ -399,8 +397,7 @@ test('adding a typed name that matches another store reuses its spelling', async
   expect(await screen.findByRole('button', { name: 'Remove Bulk Bins' })).toBeOnTheScreen();
 });
 
-test('removing departments with items asks first; keeping editing saves nothing', async () => {
-  const alert = answerAlertWith('Keep editing');
+test('removing departments with items offers to reassign them first; cancelling saves nothing', async () => {
   const db = await renderApp({ seed });
   await press(/^Corner Market, Main St\./);
 
@@ -410,13 +407,12 @@ test('removing departments with items asks first; keeping editing saves nothing'
   await addDepartments('Deli');
   await press('Save');
 
-  // Deli was added back, but as a new, empty department.
-  expect(alert).toHaveBeenCalledWith(
-    'Remove departments with items?',
-    '1 item in Deli will no longer be listed under Corner Market. A department added back with the same name starts out empty; its items aren’t moved to it.',
-    expect.any(Array),
-  );
+  // Deli was added back as a new, empty department, so Milk can be put in it.
+  expect(await screen.findByRole('header', { name: 'Reassign 1 item from Deli' })).toBeOnTheScreen();
+  await press('Cancel, back to the store');
   expect(screen).toHavePathnameWithParams('/setup/store-form?id=s1');
+  // Still the edited form, with nothing saved.
+  expect(screen.queryByRole('button', { name: 'Remove Produce' })).toBeNull();
   expect((await db.stores.findOne('s1').exec())?.departments).toHaveLength(2);
 });
 

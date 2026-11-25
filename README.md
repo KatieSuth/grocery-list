@@ -105,7 +105,7 @@ src/
     types.ts              Store, Department, Item, ItemLocation, ListEntry, TripRecord
     departments.ts        Add/remove/move/copy, suggestions from other stores
     tags.ts               Item tags: rules, add/remove, suggestions from other items, CSV cell splitting, display text
-    store-draft.ts        Store form state + validation (incl. same name and location), changes, removed departments in use, copying a store (copyStoreDraft, copiedLocations)
+    store-draft.ts        Store form state + validation (incl. same name and location), changes, departments to reassign before removing, copying a store (copyStoreDraft, copiedLocations)
     item-draft.ts         Item form state + validation, changes, duplicate items, location pruning
     store-sort.ts         Store order everywhere: A–Z by name, then location
     describe.ts           "Store · Dept" display text, and its spoken form ("Dept at Store"); storeLabel ("Kroger, Main St")
@@ -119,7 +119,7 @@ src/
     csv-import.ts         CSV import: parse + validate the file (papaparse), plan the changes, messages
     names.ts              The name rules (length, forbidden characters) shared by the forms and the import
   data/                   Repositories: the only code that touches collections
-    stores-repo.ts        observe (A–Z) / save / copy / delete stores (+ prune items), add a department from the item form
+    stores-repo.ts        observe (A–Z) / save (+ reassign items, prune, roll back) / copy / delete stores, add a department from the item form
     items-repo.ts         observe / save / delete items
     list-repo.ts          check / uncheck items, set quantity, cart marks
     settings-repo.ts      setupComplete flag, trip store + reverse order, appearance, items' default sort
@@ -152,7 +152,7 @@ src/
     run-write.ts          runWrite(): a database write that tells the user if it fails
     accessibility-focus.ts  Move the screen reader to a view (.web.ts: DOM focus)
     menu-position.ts      Where a dropdown menu goes: under its row, or above it
-  components/             Shared UI (Button, TextField, Screen, Card, SwitchRow, StatusText, StoreActionsMenu, BusyOverlay, TagEditor, editors…)
+  components/             Shared UI (Button, TextField, Screen, Card, SwitchRow, StatusText, StoreActionsMenu, BusyOverlay, TagEditor, ReassignDepartments, editors…)
   constants/theme.ts      Colors (light/dark, with contrast checked by a test), spacing, chip tap area
   test-utils/             Test helpers (not shipped)
   __tests__/              All tests, mirroring src/

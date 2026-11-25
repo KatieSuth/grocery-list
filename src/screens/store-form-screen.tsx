@@ -1,8 +1,10 @@
-import { useLocalSearchParams, type Href } from 'expo-router';
-import { useState } from 'react';
+import { Stack, useLocalSearchParams, type Href } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import type { HostInstance } from 'react-native';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
 
 import { BusyOverlay } from '@/components/busy-overlay';
+import { ReassignDepartments } from '@/components/reassign-departments';
 import { Button } from '@/components/button';
 import { DepartmentEditor } from '@/components/department-editor';
 import { EmptyState } from '@/components/empty-state';
@@ -10,14 +12,15 @@ import { Screen } from '@/components/screen';
 import { SwitchRow } from '@/components/switch-row';
 import { ErrorText, TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
-import { copyStore, CopyNotUndoneError, saveStore } from '@/data/stores-repo';
+import { copyStore, CopyNotUndoneError, saveStore, type Reassignments } from '@/data/stores-repo';
 import { useDatabase } from '@/db/database-provider';
 import {
   copyStoreDraft,
   countItemsAtStore,
   emptyStoreDraft,
   hasErrors,
-  removedDepartmentsInUse,
+  departmentsToReassign,
+  type DepartmentToReassign,
   type StoreDraft,
   storeDraftChanged,
   storeToDraft,
@@ -26,13 +29,14 @@ import {
 import { storeLabel } from '@/domain/describe';
 import { MAX_NAME_LENGTH } from '@/domain/names';
 import { addPendingDepartment } from '@/domain/departments';
-import type { Item, Store } from '@/domain/types';
+import type { Department, Item, Store } from '@/domain/types';
 import { useItems, useStores } from '@/hooks/use-data';
 import { useDeleteStore, type DeleteStore } from '@/hooks/use-delete-store';
 import { useUnsavedChangesWarning } from '@/hooks/use-unsaved-changes-warning';
-import { confirmDestructive } from '@/utils/confirm';
 import { goBack } from '@/utils/navigation';
-import { normalizeText, sameName } from '@/utils/text';
+import { moveAccessibilityFocus } from '@/utils/accessibility-focus';
+import { STORE_FORM_TITLES } from '@/utils/form-title';
+import { normalizeText } from '@/utils/text';
 
 type Props = {
   /** Where Save, Cancel and Delete return to. */
@@ -113,15 +117,41 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
   /** What's typed in the New department field but not added yet, and its error (see DepartmentEditor). */
   const [newDepartment, setNewDepartment] = useState('');
   const [departmentAddError, setDepartmentAddError] = useState<string>();
+  /**
+   * Set while choosing new departments for the items in departments being removed (see
+   * ReassignDepartments): those departments and items, and the draft as it was when Save was
+   * tapped. The choices and any departments added there are kept here too, so a failed save
+   * keeps them.
+   */
+  const [reassigning, setReassigning] = useState<{ groups: DepartmentToReassign[]; draft: StoreDraft }>();
+  const [choices, setChoices] = useState<Record<string, string | undefined>>({});
+  const [addedDepartments, setAddedDepartments] = useState<Department[]>([]);
+  const saveButton = useRef<HostInstance>(null);
+  const [backToForm, setBackToForm] = useState<object>();
   const deleting = deletion?.deleting ?? false;
   // Saving or deleting: the form can't be left (or changed) until it's written.
   const busy = saving || deleting;
+
+  /** Back to the form, as it was: nothing saved, and departments added while reassigning dropped. */
+  const cancelReassigning = () => {
+    setReassigning(undefined);
+    setChoices({});
+    setAddedDepartments([]);
+    setSaveError(undefined);
+    setBackToForm({});
+  };
   const leave = useUnsavedChangesWarning(
     // A department typed but not added yet counts too.
     storeDraftChanged(draft, initial) || !!normalizeText(newDepartment),
     'store',
     busy,
+    // While reassigning, Back goes back to the form.
+    reassigning ? cancelReassigning : undefined,
   );
+  // Back on the form after reassigning: put the screen reader back on Save.
+  useEffect(() => {
+    if (backToForm && saveButton.current) moveAccessibilityFocus(saveButton.current);
+  }, [backToForm]);
 
   const otherStores = stores.filter((s) => s.id !== store?.id);
   const allErrors = validateStoreDraft(draft, otherStores);
@@ -137,7 +167,7 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
       ? { name: allErrors.name, location: allErrors.location }
       : {};
 
-  const save = async (toSave: StoreDraft) => {
+  const save = async (toSave: StoreDraft, reassign?: Reassignments) => {
     setSaving(true);
     setSaveError(undefined);
     try {
@@ -148,7 +178,7 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
           copyItems,
         });
       } else {
-        await saveStore(db, toSave, store?.id);
+        await saveStore(db, toSave, store?.id, reassign);
       }
       leave(backTo);
     } catch (error) {
@@ -177,31 +207,69 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
 
   const confirmAndSave = (toSave: StoreDraft) => {
     if (hasErrors(validateStoreDraft(toSave, otherStores))) return;
-    const removed = store ? removedDepartmentsInUse(store, toSave, items) : undefined;
-    if (!removed || removed.itemCount === 0) {
+    // Removing departments that items are in: first choose new departments for those items.
+    const groups = store ? departmentsToReassign(store, toSave, items, stores) : [];
+    if (groups.length === 0) {
       void save(toSave);
       return;
     }
-    // Removing a department takes its items out of this store; make sure that's meant.
-    const readded = removed.names.some((name) => toSave.departments.some((d) => sameName(d.name, name)));
-    confirmDestructive({
-      title: 'Remove departments with items?',
-      message:
-        `${countItems(removed.itemCount)} in ${removed.names.join(', ')} will no longer be listed under ${normalizeText(toSave.name)}.` +
-        (readded ? ' A department added back with the same name starts out empty; its items aren’t moved to it.' : ''),
-      confirmLabel: 'Remove and save',
-      cancelLabel: 'Keep editing',
-      onConfirm: () => void save(toSave),
-    });
+    setChoices({});
+    setAddedDepartments([]);
+    setReassigning({ groups, draft: toSave });
   };
 
+  const overlays = (
+    <>
+      {/* Saving updates every item listed under the store (and copying lists them under the new one),
+          which can take a while: the form can't be left until it's done, so say so. */}
+      {saving ? <BusyOverlay message={copySource ? 'Copying store…' : 'Saving store…'} /> : null}
+      {deleting ? <BusyOverlay message="Deleting store…" /> : null}
+    </>
+  );
+  // Edit mode's title, or "Reassign items" while reassigning.
+  const title = store ? <Stack.Screen options={{ title: reassigning ? 'Reassign items' : STORE_FORM_TITLES.edit }} /> : null;
+
+  if (store && reassigning) {
+    const reassignments = Object.fromEntries(
+      Object.entries(choices).filter((entry): entry is [string, string] => !!entry[1]),
+    );
+    return (
+      <>
+        {title}
+        <ReassignDepartments
+          storeName={store.name}
+          groups={reassigning.groups}
+          departments={reassigning.draft.departments}
+          added={addedDepartments}
+          onAddedChange={setAddedDepartments}
+          choices={choices}
+          onChoicesChange={setChoices}
+          knownStores={stores}
+          saving={busy}
+          error={saveError}
+          onCancel={cancelReassigning}
+          onConfirm={() =>
+            void save(
+              // New departments go at the end of the store's order.
+              { ...reassigning.draft, departments: [...reassigning.draft.departments, ...addedDepartments] },
+              reassignments,
+            )
+          }
+        />
+        {overlays}
+      </>
+    );
+  }
+
   return (
+    <>
+    {title}
     <Screen
       scrollRef={scrollRef}
       footer={
         <>
           <Button variant="secondary" label="Cancel" disabled={busy} onPress={() => goBack(backTo)} />
-          <Button label="Save" disabled={busy} onPress={handleSave} />
+          <Button ref={saveButton} label="Save" disabled={busy} onPress={handleSave} />
         </>
       }>
       {copySource ? (
@@ -243,10 +311,6 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
       {copySource ? <CopyItemsSwitch source={copySource} items={items} value={copyItems} onChange={setCopyItems} /> : null}
       {saveError ? <ErrorText message={saveError} /> : null}
       {deletion?.error ? <ErrorText message={deletion.error} /> : null}
-      {/* Saving updates every item listed under the store (and copying lists them under the new one),
-          which can take a while: the form can't be left until it's done, so say so. */}
-      {saving ? <BusyOverlay message={copySource ? 'Copying store…' : 'Saving store…'} /> : null}
-      {deleting ? <BusyOverlay message="Deleting store…" /> : null}
       {store && deletion ? (
         <Button
           variant="danger"
@@ -256,6 +320,8 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
         />
       ) : null}
     </Screen>
+    {overlays}
+    </>
   );
 }
 

@@ -65,6 +65,60 @@ test('saveStore updates and prunes item locations for removed departments', asyn
   expect((await db.items.findOne('i2').exec())?.toJSON().locations).toEqual([{ storeId: store.id, departmentId: 'd1' }]);
 });
 
+describe('saveStore reassigning items', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  const setUp = async () => {
+    const db = await createTestDatabase();
+    const store = await saveStore(db, draft);
+    const other = await saveStore(db, { ...draft, name: 'Big Box' });
+    const add = (id: string, locations: { storeId: string; departmentId: string }[]) =>
+      db.items.insert({ id, name: id, locations, createdAt: 1 });
+    await add('ham', [{ storeId: store.id, departmentId: 'd2' }]);
+    await add('kale', [{ storeId: store.id, departmentId: 'd2' }, { storeId: other.id, departmentId: 'd1' }]);
+    await add('soup', [{ storeId: store.id, departmentId: 'd2' }]);
+    await add('pear', [{ storeId: store.id, departmentId: 'd1' }]);
+    return { db, store, other };
+  };
+  const locationsOf = async (db: Awaited<ReturnType<typeof createTestDatabase>>, id: string) =>
+    (await db.items.findOne(id).exec())?.toJSON().locations;
+
+  test('moves chosen items to their new departments, in one write; the rest lose the store', async () => {
+    const { db, store, other } = await setUp();
+    const write = jest.spyOn(db.items, 'bulkUpsert');
+    // Deli is removed; Bakery is new.
+    const bakery = { id: 'd9', name: 'Bakery' };
+    const saved = await saveStore(db, { ...draft, departments: [draft.departments[0], bakery] }, store.id, {
+      ham: 'd9',
+      kale: 'd1',
+      // Not in a removed department: left alone.
+      pear: 'd9',
+    });
+    expect(saved.departments).toEqual([draft.departments[0], bakery]);
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(await locationsOf(db, 'ham')).toEqual([{ storeId: store.id, departmentId: 'd9' }]);
+    expect(await locationsOf(db, 'kale')).toEqual([
+      { storeId: store.id, departmentId: 'd1' },
+      { storeId: other.id, departmentId: 'd1' },
+    ]);
+    expect(await locationsOf(db, 'soup')).toEqual([]);
+    expect(await locationsOf(db, 'pear')).toEqual([{ storeId: store.id, departmentId: 'd1' }]);
+  });
+
+  test('if the items can’t be updated, the store is put back as it was', async () => {
+    const { db, store } = await setUp();
+    jest.spyOn(db.items, 'bulkUpsert').mockRejectedValueOnce(new Error('disk full'));
+    await expect(
+      saveStore(db, { ...draft, name: 'Renamed', departments: [draft.departments[0]] }, store.id, { ham: 'd1' }),
+    ).rejects.toThrow('disk full');
+    expect((await db.stores.findOne(store.id).exec())?.toJSON()).toMatchObject({
+      name: 'Corner Market',
+      departments: draft.departments,
+    });
+    expect(await locationsOf(db, 'ham')).toEqual([{ storeId: store.id, departmentId: 'd2' }]);
+  });
+});
+
 test('deleteStore removes the store and its item locations', async () => {
   const db = await createTestDatabase();
   const a = await saveStore(db, draft);

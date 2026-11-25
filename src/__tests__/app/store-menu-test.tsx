@@ -272,6 +272,20 @@ test('copying a store with no items says so, and a failed save can be tried agai
   expect(screen).toHavePathname('/stores');
 });
 
+test('copying a store with one item says so', async () => {
+  await renderApp({
+    seed: async (db) => {
+      await seed(db);
+      await db.stores.insert({ id: 'o1', name: 'Corner', departments: [{ id: 'x', name: 'Aisle 1' }], createdAt: 3 });
+      await db.items.insert({ id: 'tea', name: 'Tea', locations: [{ storeId: 'o1', departmentId: 'x' }], createdAt: 5 });
+    },
+    initialUrl: '/store-form?copyFrom=o1',
+  });
+  expect((await screen.findByRole('switch', { name: 'Copy items from Corner' })).props.accessibilityHint).toMatch(
+    /^The 1 item listed under Corner /,
+  );
+});
+
 test('copying a store that no longer exists says so', async () => {
   await renderApp({ seed, initialUrl: '/store-form?copyFrom=gone' });
   expect(await screen.findByText('Store not found')).toBeOnTheScreen();

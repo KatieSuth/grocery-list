@@ -1,6 +1,7 @@
 import { createId } from '@/utils/id';
 import { nameKey, normalizeText, sameName } from '@/utils/text';
 
+import { storeLabel } from './describe';
 import { checkName } from './names';
 
 import type { Department, Item, ItemLocation, Store } from './types';
@@ -74,31 +75,46 @@ export function storeDraftChanged(draft: StoreDraft, initial: StoreDraft): boole
   );
 }
 
-export type RemovedDepartmentsInUse = {
-  /** Removed departments that items are in, in the store's order. */
-  names: string[];
-  /** How many items are in them, and so will no longer be listed under the store. */
-  itemCount: number;
-};
+/** An item in a department that saving would remove, and the other stores it's listed under. */
+export type ItemToReassign = { item: Item; otherStores: string[] };
+
+/** A department that saving would remove, with its items (A–Z). */
+export type DepartmentToReassign = { department: Department; items: ItemToReassign[] };
 
 /**
- * The departments saving `draft` would remove from `store` that items are still in. Those items
- * lose their place in this store. A department added back under the same name is a new, empty
- * one: items aren't moved to it.
+ * The departments saving `draft` would remove from `store` that items are in, in the store's
+ * order, each with its items A–Z and the other stores they're listed under (labelled "Kroger,
+ * Main St"), so the user can choose new departments for them before saving.
  */
-export function removedDepartmentsInUse(store: Store, draft: StoreDraft, items: Item[]): RemovedDepartmentsInUse {
+export function departmentsToReassign(store: Store, draft: StoreDraft, items: Item[], stores: Store[]): DepartmentToReassign[] {
   const kept = new Set(draft.departments.map((d) => d.id));
-  const removed = new Set(store.departments.filter((d) => !kept.has(d.id)).map((d) => d.id));
-  const used = new Set<string>();
-  let itemCount = 0;
-  for (const item of items) {
-    const loc = item.locations.find((l) => l.storeId === store.id);
-    if (loc && removed.has(loc.departmentId)) {
-      used.add(loc.departmentId);
-      itemCount += 1;
-    }
-  }
-  return { names: store.departments.filter((d) => used.has(d.id)).map((d) => d.name), itemCount };
+  const label = (id: string) => {
+    const other = stores.find((s) => s.id === id);
+    return other ? storeLabel(other) : undefined;
+  };
+  return store.departments
+    .filter((d) => !kept.has(d.id))
+    .map((department) => ({
+      department,
+      items: items
+        .filter((item) => item.locations.some((l) => l.storeId === store.id && l.departmentId === department.id))
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+        .map((item) => ({
+          item,
+          otherStores: item.locations
+            .filter((l) => l.storeId !== store.id)
+            .flatMap((l) => {
+              const name = label(l.storeId);
+              return name ? [name] : [];
+            }),
+        })),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+/** How many of the items to reassign have no new department chosen (`choices`: item id → department id). */
+export function unassignedCount(groups: DepartmentToReassign[], choices: Record<string, string | undefined>): number {
+  return groups.reduce((n, group) => n + group.items.filter(({ item }) => !choices[item.id]).length, 0);
 }
 
 /** How many items are listed under the store. */

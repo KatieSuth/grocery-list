@@ -338,6 +338,34 @@ test('items can be tagged, with suggestions, and the list filtered by tag', asyn
   expect(problems).toEqual([]);
 });
 
+test('removing a department with items lets them be moved to a new department first', async ({ page }) => {
+  const problems = watchConsole(page);
+  await setUpOneStoreAndItem(page);
+
+  await page.getByRole('tab', { name: 'Stores' }).click();
+  await page.getByRole('button', { name: /^Corner Market\./ }).click();
+  await button(page, 'Remove Deli').click();
+  await button(page, 'Save').click();
+
+  await expect(page.getByRole('heading', { name: 'Reassign 1 item from Deli' })).toBeVisible();
+  await expect(page.getByText('Only at Corner Market')).toBeVisible();
+  await page.getByRole('button', { name: 'Department at Corner Market for Milk: Select' }).click();
+  await button(page, 'New department…').click();
+  await page.getByLabel('Department name').fill('produce');
+  await expect(page.getByText('"produce" is already in the list.')).toBeVisible();
+  await page.getByLabel('Department name').fill('Dairy');
+  await button(page, 'Add department').click();
+  await expect(page.getByRole('button', { name: 'Department at Corner Market for Milk: Dairy' })).toBeVisible();
+  await button(page, 'Reassign Items & Delete Department').click();
+
+  // The new department went last.
+  await expect(page.getByText('Produce → Bakery → Frozen → Dairy')).toBeVisible();
+  await page.getByRole('tab', { name: 'Items' }).click();
+  await expect(page.getByText('Corner Market · Dairy')).toBeVisible();
+
+  expect(problems).toEqual([]);
+});
+
 test('an item in two departments shows under both, sharing its check and quantity', async ({ page }) => {
   const problems = watchConsole(page);
   await setUpOneStoreAndItem(page);

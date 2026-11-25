@@ -1,13 +1,14 @@
 import {
   copiedLocations,
   copyStoreDraft,
+  departmentsToReassign,
   countItemsAtStore,
   emptyStoreDraft,
   hasErrors,
-  removedDepartmentsInUse,
   storeDraftChanged,
   storeToDraft,
   validateStoreDraft,
+  unassignedCount,
 } from '@/domain/store-draft';
 import type { Item, Store } from '@/domain/types';
 
@@ -62,14 +63,6 @@ test('a store draft is changed by any edit to its name, location or departments'
   const [first, ...rest] = initial.departments;
   expect(storeDraftChanged({ ...initial, departments: [{ ...first, id: 'new' }, ...rest] }, initial)).toBe(true);
   expect(storeDraftChanged({ ...initial, departments: [{ ...first, name: 'Fruit' }, ...rest] }, initial)).toBe(true);
-});
-
-test('removedDepartmentsInUse names removed departments that items are in, in store order', () => {
-  const items = [item('apples', 'p'), item('ham', 'd'), item('salami', 'd'), item('elsewhere', 'd', 'other')];
-  const draft = { ...storeToDraft(shop), departments: [{ id: 'new', name: 'Deli' }] };
-  // Bakery was removed too, but nothing is in it.
-  expect(removedDepartmentsInUse(shop, draft, items)).toEqual({ names: ['Produce', 'Deli'], itemCount: 3 });
-  expect(removedDepartmentsInUse(shop, storeToDraft(shop), items)).toEqual({ names: [], itemCount: 0 });
 });
 
 test('countItemsAtStore counts items listed under the store', () => {
@@ -183,5 +176,51 @@ describe('copying a store', () => {
     const { draft, departmentSources } = copyStoreDraft(source);
     const edited = { ...draft, departments: [{ id: 'n', name: 'Delicatessen' }] };
     expect(copiedLocations(items, source, 'new', edited, departmentSources).size).toBe(0);
+  });
+});
+
+describe('departments to reassign', () => {
+  const kroger: Store = {
+    id: 'k',
+    name: 'Kroger',
+    departments: [
+      { id: 'prod', name: 'Produce' },
+      { id: 'deli', name: 'Deli' },
+      { id: 'bake', name: 'Bakery' },
+    ],
+    createdAt: 1,
+  };
+  const bigBox: Store = { id: 'b', name: 'Big Box', location: 'Main St', departments: [{ id: 'f', name: 'Frozen' }], createdAt: 2 };
+  const at = (...locations: [string, string][]) => locations.map(([storeId, departmentId]) => ({ storeId, departmentId }));
+  const items: Item[] = [
+    { id: 'soup', name: 'soup', locations: at(['k', 'deli']), createdAt: 1 },
+    { id: 'ham', name: 'Ham', locations: at(['k', 'deli'], ['b', 'f'], ['gone', 'x']), createdAt: 2 },
+    { id: 'rolls', name: 'Rolls', locations: at(['k', 'bake']), createdAt: 3 },
+    { id: 'kale', name: 'Kale', locations: at(['k', 'prod']), createdAt: 4 },
+    { id: 'peas', name: 'Peas', locations: at(['b', 'f']), createdAt: 5 },
+  ];
+
+  test('each removed department with items, in store order, with its items A–Z and their other stores', () => {
+    const draft = { name: 'Kroger', location: '', departments: [kroger.departments[0]] };
+    const groups = departmentsToReassign(kroger, draft, items, [kroger, bigBox]);
+    expect(groups.map((g) => [g.department.name, g.items.map((i) => [i.item.id, i.otherStores])])).toEqual([
+      [
+        'Deli',
+        [
+          ['ham', ['Big Box, Main St']],
+          ['soup', []],
+        ],
+      ],
+      ['Bakery', [['rolls', []]]],
+    ]);
+    expect(unassignedCount(groups, {})).toBe(3);
+    expect(unassignedCount(groups, { ham: 'prod', rolls: undefined })).toBe(2);
+  });
+
+  test('a removed department without items, and kept departments, are left out', () => {
+    const draft = { name: 'Kroger', location: '', departments: [kroger.departments[1], kroger.departments[2]] };
+    // Produce is removed, but Kale (its only item) isn't in this list.
+    const withoutKale = items.filter((i) => i.id !== 'kale');
+    expect(departmentsToReassign(kroger, draft, withoutKale, [kroger, bigBox])).toEqual([]);
   });
 });
