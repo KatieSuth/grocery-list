@@ -22,23 +22,56 @@ export function addDepartment(departments: Department[], rawName: string): AddDe
   return { ok: true, departments: [...departments, { id: createId(), name }] };
 }
 
+/** The message for a name that belongs to a department being removed in this edit. */
+export const beingRemovedError = (name: string) => `"${name}" is being removed. Cancel the removal instead.`;
+
 /**
  * Adds a typed department name, reusing the spelling of a department with that name at another
- * of `knownStores` (as the editor's Add does).
+ * of `knownStores` (as the editor's Add does). A name matching one of `removed` (departments
+ * removed in this edit, not yet saved) is refused: that department still exists until Save, so
+ * its removal is cancelled instead (see restoreDepartment).
  */
-export function addDepartmentFromStores(departments: Department[], rawName: string, knownStores: Store[]): AddDepartmentResult {
+export function addDepartmentFromStores(
+  departments: Department[],
+  rawName: string,
+  knownStores: Store[],
+  removed: Department[] = [],
+): AddDepartmentResult {
   const known = suggestDepartments(rawName, knownStores, departments).find((s) => sameName(s.name, rawName));
-  return addDepartment(departments, known?.name ?? rawName);
+  const result = addDepartment(departments, known?.name ?? rawName);
+  if (!result.ok) return result;
+  const removing = removed.find((d) => sameName(d.name, rawName));
+  return removing ? { ok: false, error: beingRemovedError(removing.name) } : result;
 }
 
 /**
  * For saving: adds what's still typed in the New department field (`pending`) as if Add had been
  * tapped, so it isn't lost. Nothing typed, or a name already in the list, changes nothing; other
- * problems are returned, so the form can say so instead of saving.
+ * problems (including a department being removed, see addDepartmentFromStores) are returned, so
+ * the form can say so instead of saving.
  */
-export function addPendingDepartment(departments: Department[], pending: string, knownStores: Store[]): AddDepartmentResult {
+export function addPendingDepartment(
+  departments: Department[],
+  pending: string,
+  knownStores: Store[],
+  removed: Department[] = [],
+): AddDepartmentResult {
   if (!normalizeText(pending) || departments.some((d) => sameName(d.name, pending))) return { ok: true, departments };
-  return addDepartmentFromStores(departments, pending, knownStores);
+  return addDepartmentFromStores(departments, pending, knownStores, removed);
+}
+
+/**
+ * Cancels a department's removal: puts it back (same id, so its items keep it) just after the
+ * last department still in the list that came before it in `original` (the store's order as
+ * saved), or first if none did.
+ */
+export function restoreDepartment(departments: Department[], department: Department, original: Department[]): Department[] {
+  const earlier = new Set(original.slice(0, original.findIndex((d) => d.id === department.id)).map((d) => d.id));
+  let at = 0;
+  departments.forEach((d, i) => {
+    if (earlier.has(d.id)) at = i + 1;
+  });
+  return [...departments.slice(0, at), department, ...departments.slice(at)];
 }
 
 export function removeDepartment(departments: Department[], id: string): Department[] {

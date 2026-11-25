@@ -105,6 +105,18 @@ describe('saveStore reassigning items', () => {
     expect(await locationsOf(db, 'pear')).toEqual([{ storeId: store.id, departmentId: 'd1' }]);
   });
 
+  test('if putting the store back fails too, the first error is the one reported', async () => {
+    const { db, store } = await setUp();
+    jest.spyOn(db.items, 'bulkUpsert').mockImplementationOnce(async () => {
+      // Putting the store back fails too.
+      jest.spyOn(db.stores.storageInstance, 'bulkWrite').mockRejectedValue(new Error('still full'));
+      throw new Error('disk full');
+    });
+    await expect(saveStore(db, { ...draft, departments: [draft.departments[0]] }, store.id, { ham: 'd1' })).rejects.toThrow(
+      'disk full',
+    );
+  });
+
   test('if the items can’t be updated, the store is put back as it was', async () => {
     const { db, store } = await setUp();
     jest.spyOn(db.items, 'bulkUpsert').mockRejectedValueOnce(new Error('disk full'));

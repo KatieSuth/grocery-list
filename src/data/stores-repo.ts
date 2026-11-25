@@ -89,7 +89,9 @@ export async function saveStore(db: AppDatabase, draft: StoreDraft, id?: string,
   try {
     await pruneItemLocations(db, reassign && { reassign: { storeId: doc.id, departments: reassign } });
   } catch (error) {
-    await doc.incrementalModify(() => before);
+    // Report what went wrong in the first place, even if putting the store back fails too (the
+    // items are then tidied up by the next save).
+    await doc.incrementalModify(() => before).catch(() => {});
     throw error;
   }
   return doc.toMutableJSON();

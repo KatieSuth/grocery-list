@@ -356,7 +356,7 @@ test('removing a department with items lets them be moved to a new department fi
   await page.getByLabel('Department name').fill('Dairy');
   await button(page, 'Add department').click();
   await expect(page.getByRole('button', { name: 'Department at Corner Market for Milk: Dairy' })).toBeVisible();
-  await button(page, 'Reassign Items & Delete Department').click();
+  await button(page, 'Reassign items and delete Deli').click();
 
   // The new department went last.
   await expect(page.getByText('Produce → Bakery → Frozen → Dairy')).toBeVisible();

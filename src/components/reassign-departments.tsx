@@ -17,7 +17,7 @@ import type { Department, Store } from '@/domain/types';
 import { useTheme } from '@/hooks/use-theme';
 import { moveAccessibilityFocus } from '@/utils/accessibility-focus';
 import { confirmDestructive } from '@/utils/confirm';
-import { normalizeText } from '@/utils/text';
+import { normalizeText, sameName } from '@/utils/text';
 
 type Props = {
   /** The store's name, as saved. */
@@ -34,6 +34,8 @@ type Props = {
   onChoicesChange: (choices: Record<string, string | undefined>) => void;
   /** All saved stores, so a typed name reuses the spelling used elsewhere. */
   knownStores: Store[];
+  /** The departments being removed: their names can't be used for new ones. */
+  removedDepartments: Department[];
   saving: boolean;
   /** Why the last save failed, if it did. */
   error?: string;
@@ -60,6 +62,7 @@ export function ReassignDepartments({
   choices,
   onChoicesChange,
   knownStores,
+  removedDepartments,
   saving,
   error,
   onCancel,
@@ -67,14 +70,18 @@ export function ReassignDepartments({
 }: Props) {
   const heading = useRef<HostInstance>(null);
   const fields = useRef(new Map<string, HostInstance>());
-  /** The item whose department list is open. */
+  /** The item whose department list is (or was last) open; kept while it closes, for its title. */
   const [choosingFor, setChoosingFor] = useState<ItemToReassign>();
+  const [listOpen, setListOpen] = useState(false);
   /** The item "New department…" was chosen for, while its dialog is (about to be) open. */
   const [newFor, setNewFor] = useState<ItemToReassign>();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  // Whether the list is closing to open the dialog (iOS). A ref, so the list's onDismiss sees it
-  // whichever render that handler came from.
+  /** The New department dialog: shown, or (on iOS) closing. */
+  const [dialog, setDialog] = useState<'open' | 'closing'>();
+  // What to do once the list or dialog has finished closing (iOS, where showing a dialog or moving
+  // the screen reader while a modal is still closing doesn't work). Refs, so the Modal's onDismiss
+  // sees them whichever render that handler came from.
   const openDialogOnDismiss = useRef(false);
+  const returnFocusOnDismiss = useRef<string | undefined>(undefined);
   const [note, setNote] = useState<string>();
   /** The item whose field the screen reader should move back to. */
   const [returnTo, setReturnTo] = useState<{ id: string }>();
@@ -93,22 +100,34 @@ export function ReassignDepartments({
     if (field) moveAccessibilityFocus(field);
   }, [returnTo]);
 
+  /** Moves the screen reader back to an item's field, once any closing modal has gone. */
+  const returnFocus = (id: string) => {
+    if (Platform.OS === 'ios') returnFocusOnDismiss.current = id;
+    else setReturnTo({ id });
+  };
+  /** A modal has finished closing (iOS): move the screen reader as was waiting (always set by then). */
+  const dismissed = () => {
+    setReturnTo({ id: returnFocusOnDismiss.current as string });
+    returnFocusOnDismiss.current = undefined;
+  };
+
   const choose = (item: ItemToReassign, key: string) => {
-    setChoosingFor(undefined);
+    setListOpen(false);
     if (key === NEW_DEPARTMENT) {
       setNewFor(item);
       // iOS can't show the dialog while the list is still closing; it opens once it's gone.
       if (Platform.OS === 'ios') openDialogOnDismiss.current = true;
-      else setDialogOpen(true);
+      else setDialog('open');
       return;
     }
     onChoicesChange({ ...choices, [item.item.id]: key });
-    setReturnTo({ id: item.item.id });
+    returnFocus(item.item.id);
   };
 
   const closeDialog = (department?: Department) => {
     const item = newFor as ItemToReassign;
-    setDialogOpen(false);
+    // On iOS the dialog stays until it has finished closing (see dismissed).
+    setDialog(Platform.OS === 'ios' ? 'closing' : undefined);
     setNewFor(undefined);
     if (department) {
       onAddedChange([...added, department]);
@@ -116,7 +135,7 @@ export function ReassignDepartments({
     }
     // Cancelled: back to "Select".
     onChoicesChange({ ...choices, [item.item.id]: department?.id });
-    setReturnTo({ id: item.item.id });
+    returnFocus(item.item.id);
   };
 
   const confirm = () => {
@@ -155,7 +174,9 @@ export function ReassignDepartments({
             onPress={onCancel}
           />
           <Button
-            label={`Reassign Items & Delete ${groups.length === 1 ? 'Department' : 'Departments'}`}
+            // Short enough for a phone's footer; the spoken label says which departments go.
+            label="Reassign items & delete"
+            accessibilityLabel={`Reassign items and delete ${joinList(names)}`}
             disabled={saving}
             onPress={confirm}
           />
@@ -188,8 +209,11 @@ export function ReassignDepartments({
               entry={entry}
               storeName={storeName}
               value={valueFor(entry)}
-              open={choosingFor?.item.id === entry.item.id}
-              onOpen={() => setChoosingFor(entry)}
+              open={listOpen && choosingFor?.item.id === entry.item.id}
+              onOpen={() => {
+                setChoosingFor(entry);
+                setListOpen(true);
+              }}
               fieldRef={(field) => {
                 if (field) fields.current.set(entry.item.id, field);
                 else fields.current.delete(entry.item.id);
@@ -200,8 +224,8 @@ export function ReassignDepartments({
       ))}
 
       <PickerSheet
-        visible={!!choosingFor}
-        title={choosingFor ? `Department for ${choosingFor.item.name}` : ''}
+        visible={listOpen}
+        title={`Department for ${choosingFor?.item.name ?? 'this item'}`}
         options={[
           ...options.map((d) => ({
             key: d.id,
@@ -218,22 +242,30 @@ export function ReassignDepartments({
         ]}
         onChoose={(key) => choose(choosingFor as ItemToReassign, key)}
         onCancel={() => {
-          const item = choosingFor as ItemToReassign;
-          setChoosingFor(undefined);
-          setReturnTo({ id: item.item.id });
+          setListOpen(false);
+          returnFocus((choosingFor as ItemToReassign).item.id);
         }}
         onDismiss={() => {
-          if (!openDialogOnDismiss.current) return;
-          openDialogOnDismiss.current = false;
-          setDialogOpen(true);
+          if (openDialogOnDismiss.current) {
+            openDialogOnDismiss.current = false;
+            setDialog('open');
+            return;
+          }
+          dismissed();
         }}
         cancelAccessibilityLabel={`Cancel choosing a department for ${choosingFor?.item.name ?? 'this item'}`}
       />
-      {dialogOpen ? (
+      {dialog ? (
         <DepartmentNameDialog
+          visible={dialog === 'open'}
+          onDismiss={() => {
+            setDialog(undefined);
+            dismissed();
+          }}
           storeName={storeName}
           departments={[...departments, ...added]}
           knownStores={knownStores}
+          removedDepartments={removedDepartments}
           onAdd={(department) => closeDialog(department)}
           onCancel={() => closeDialog()}
         />
@@ -297,20 +329,27 @@ function ItemRow({
 }
 
 /**
- * Asks for a new department's name, with the store form's rules: no name already in the list
- * (ignoring case and spacing), the name rules, and the spelling used at other stores. A problem
+ * Asks for a new department's name, with the store form's rules: no name already in the list or
+ * being removed (ignoring case and spacing), the name rules, and the spelling used at other stores. A problem
  * shows while typing; a blank name only once Add is tapped.
  */
 function DepartmentNameDialog({
+  visible,
+  onDismiss,
   storeName,
   departments,
   knownStores,
+  removedDepartments,
   onAdd,
   onCancel,
 }: {
+  visible: boolean;
+  /** iOS only: it has finished closing. */
+  onDismiss: () => void;
   storeName: string;
   departments: Department[];
   knownStores: Store[];
+  removedDepartments: Department[];
   onAdd: (department: Department) => void;
   onCancel: () => void;
 }) {
@@ -318,8 +357,15 @@ function DepartmentNameDialog({
   const field = useRef<ComponentRef<typeof TextInput>>(null);
   const [name, setName] = useState('');
   const [tried, setTried] = useState(false);
-  const result = addDepartmentFromStores(departments, name, knownStores);
-  const error = !result.ok && (tried || normalizeText(name)) ? result.error : undefined;
+  const result = addDepartmentFromStores(departments, name, knownStores, removedDepartments);
+  // A department being removed can't be re-created here; its removal is cancelled on the store form.
+  const removing = removedDepartments.find((d) => sameName(d.name, name));
+  const message = removing
+    ? `"${removing.name}" is being removed. To keep it, go back to the store and cancel the removal instead.`
+    : !result.ok
+      ? result.error
+      : undefined;
+  const error = message && (tried || normalizeText(name)) ? message : undefined;
 
   // Start the screen reader on the name field. (It's always shown.)
   useEffect(() => {
@@ -332,7 +378,7 @@ function DepartmentNameDialog({
   };
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel} onDismiss={onDismiss}>
       <View style={styles.backdrop}>
         <View
           accessibilityViewIsModal

@@ -78,8 +78,8 @@ test('editing a store updates it and removes item locations for deleted departme
 
   // Milk is in the Deli, so it can be given a new department first; here it isn't.
   expect(await screen.findByRole('header', { name: 'Reassign 1 item from Deli' })).toBeOnTheScreen();
-  await press('Reassign Items & Delete Department');
-  expect(alert).toHaveBeenCalledWith('1 item isn’t reassigned', expect.stringContaining('Corner Market'), expect.any(Array));
+  await press('Reassign items and delete Deli');
+  expect(alert).toHaveBeenCalledWith('1 item isn’t reassigned', expect.stringContaining('listed under Corner Mkt.'), expect.any(Array));
   expect(await screen.findByText('Corner Mkt')).toBeOnTheScreen();
   const store = await db.stores.findOne('s1').exec();
   expect(store?.toJSON()).toMatchObject({ name: 'Corner Mkt', departments: [{ id: 'd1', name: 'Produce' }] });
@@ -404,16 +404,46 @@ test('removing departments with items offers to reassign them first; cancelling 
   // Produce has no items: removing it alone wouldn't ask. Deli has Milk.
   await press('Remove Produce');
   await press('Remove Deli');
-  await addDepartments('Deli');
+  await addDepartments('Bakery');
   await press('Save');
 
-  // Deli was added back as a new, empty department, so Milk can be put in it.
   expect(await screen.findByRole('header', { name: 'Reassign 1 item from Deli' })).toBeOnTheScreen();
   await press('Cancel, back to the store');
   expect(screen).toHavePathnameWithParams('/setup/store-form?id=s1');
   // Still the edited form, with nothing saved.
   expect(screen.queryByRole('button', { name: 'Remove Produce' })).toBeNull();
   expect((await db.stores.findOne('s1').exec())?.departments).toHaveLength(2);
+});
+
+test('a department being removed can’t be added back as a new one; its removal can be cancelled instead', async () => {
+  const db = await renderApp({ seed });
+  await press(/^Corner Market, Main St\./);
+  await press('Remove Produce');
+  await press('Remove Deli');
+  await addDepartments('Bakery');
+
+  await type('New department', ' deli ');
+  await press('Add department');
+  expect(await screen.findByText('"Deli" is being removed. Cancel the removal instead.')).toBeOnTheScreen();
+  // Saving with it still typed is refused too.
+  await press('Save');
+  expect(screen).toHavePathnameWithParams('/setup/store-form?id=s1');
+  expect(screen.queryByRole('header', { name: /^Reassign/ })).toBeNull();
+
+  const cancel = screen.getByRole('button', { name: 'Cancel removal of Deli' });
+  expect(cancel).toHaveProp('accessibilityHint', 'Puts it back, with its items');
+  await fireEvent.press(cancel);
+  expect(screen.getByLabelText('New department')).toHaveDisplayValue('');
+  expect(screen.queryByText(/is being removed/)).toBeNull();
+  // Back in its place (Produce, before it, is still removed), with Milk still in it.
+  expect(screen.getAllByLabelText(/^Reorder /).map((el) => el.props.accessibilityLabel)).toEqual([
+    'Reorder Deli, position 1 of 2',
+    'Reorder Bakery, position 2 of 2',
+  ]);
+  await press('Save');
+  await waitFor(() => expect(screen).toHavePathname('/setup'));
+  expect((await db.stores.findOne('s1').exec())?.toJSON().departments.map((d) => d.name)).toEqual(['Deli', 'Bakery']);
+  expect((await db.items.findOne('i1').exec())?.toJSON().locations).toContainEqual({ storeId: 's1', departmentId: 'd2' });
 });
 
 test('removing only departments without items saves without asking', async () => {

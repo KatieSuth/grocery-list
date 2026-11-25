@@ -19,7 +19,7 @@ import {
 } from '@/domain/departments';
 import { MAX_NAME_LENGTH } from '@/domain/names';
 import type { Department, Store } from '@/domain/types';
-import { normalizeText } from '@/utils/text';
+import { normalizeText, sameName } from '@/utils/text';
 import { useFocusAfterRemove } from '@/hooks/use-focus-after-remove';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -41,6 +41,12 @@ type Props = {
   onNewNameChange: (text: string) => void;
   addError: string | undefined;
   onAddErrorChange: (error: string | undefined) => void;
+  /**
+   * Departments removed in this edit (not saved yet). Their names can't be added as new
+   * departments; Cancel removal puts the department back instead, with `onRestore`.
+   */
+  removedDepartments?: Department[];
+  onRestore?: (department: Department) => void;
 };
 
 /** Ordered department list: reorder, remove, and add departments (with suggestions from other stores). */
@@ -55,6 +61,8 @@ export function DepartmentEditor({
   onNewNameChange: setNewName,
   addError,
   onAddErrorChange: setAddError,
+  removedDepartments = [],
+  onRestore,
 }: Props) {
   const theme = useTheme();
   const { removeButtonRef, fieldRef, removed } = useFocusAfterRemove();
@@ -85,6 +93,9 @@ export function DepartmentEditor({
   // The suggestions sit below the field; keep them above the keyboard too, so they can be tapped.
   const suggestionsSpace = visibleSuggestions.length > 0 && suggestionsHeight > 0 ? suggestionsHeight + Spacing.two : 0;
 
+  // A department being removed that the typed name matches (see Cancel removal).
+  const removing = removedDepartments.find((d) => sameName(d.name, newName));
+
   const handleChangeText = (text: string) => {
     setNewName(text);
     setAddError(undefined);
@@ -92,7 +103,7 @@ export function DepartmentEditor({
 
   // Reuses the existing spelling when the typed name matches one from another store.
   const handleAdd = () => {
-    const result = addDepartmentFromStores(departments, newName, knownStores);
+    const result = addDepartmentFromStores(departments, newName, knownStores, removedDepartments);
     if (!result.ok) {
       setAddError(result.error);
       return;
@@ -229,6 +240,22 @@ export function DepartmentEditor({
           <Button compact variant="secondary" label="Add" accessibilityLabel="Add department" onPress={handleAdd} />
         </View>
       </View>
+      {addError && removing && onRestore ? (
+        <View style={styles.copy}>
+          <Button
+            compact
+            variant="secondary"
+            label="Cancel removal"
+            accessibilityLabel={`Cancel removal of ${removing.name}`}
+            accessibilityHint="Puts it back, with its items"
+            onPress={() => {
+              onRestore(removing);
+              setNewName('');
+              setAddError(undefined);
+            }}
+          />
+        </View>
+      ) : null}
 
       {visibleSuggestions.length > 0 ? (
         <View

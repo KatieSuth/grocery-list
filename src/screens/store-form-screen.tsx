@@ -28,7 +28,7 @@ import {
 } from '@/domain/store-draft';
 import { storeLabel } from '@/domain/describe';
 import { MAX_NAME_LENGTH } from '@/domain/names';
-import { addPendingDepartment } from '@/domain/departments';
+import { addPendingDepartment, restoreDepartment } from '@/domain/departments';
 import type { Department, Item, Store } from '@/domain/types';
 import { useItems, useStores } from '@/hooks/use-data';
 import { useDeleteStore, type DeleteStore } from '@/hooks/use-delete-store';
@@ -154,6 +154,12 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
   }, [backToForm]);
 
   const otherStores = stores.filter((s) => s.id !== store?.id);
+  // Editing: departments removed in this edit (not saved yet). Their names can't be added back
+  // as new departments; their removal is cancelled instead. (Copying has its own rule: a name
+  // added back gets the copied items, see copiedLocations.)
+  const removedDepartments = store
+    ? store.departments.filter((d) => !draft.departments.some((kept) => kept.id === d.id))
+    : [];
   const allErrors = validateStoreDraft(draft, otherStores);
   // When copying, say straight away if the name and location are already taken (the copy starts
   // out like its source, so this is easy to miss); other problems wait until Save, as usual.
@@ -167,7 +173,11 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
       ? { name: allErrors.name, location: allErrors.location }
       : {};
 
+  // Set at once, unlike `saving`, so a quick second tap can't start a second save.
+  const saveStarted = useRef(false);
   const save = async (toSave: StoreDraft, reassign?: Reassignments) => {
+    if (saveStarted.current) return;
+    saveStarted.current = true;
     setSaving(true);
     setSaveError(undefined);
     try {
@@ -187,6 +197,7 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
           ? `The copy was only partly saved, and couldn’t be undone. Check ${normalizeText(toSave.name)} on the Stores tab.`
           : `Could not ${copySource ? 'copy' : 'save'} this store. Please try again.`,
       );
+      saveStarted.current = false;
       setSaving(false);
     }
   };
@@ -194,7 +205,7 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
   const handleSave = () => {
     setSubmitted(true);
     // A department typed but not added yet is added now, rather than being lost.
-    const pending = addPendingDepartment(draft.departments, newDepartment, stores);
+    const pending = addPendingDepartment(draft.departments, newDepartment, stores, removedDepartments);
     if (!pending.ok) {
       setDepartmentAddError(pending.error);
       return;
@@ -237,7 +248,8 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
       <>
         {title}
         <ReassignDepartments
-          storeName={store.name}
+          // The name it's being saved with, in case it was changed in the same edit.
+          storeName={normalizeText(reassigning.draft.name)}
           groups={reassigning.groups}
           departments={reassigning.draft.departments}
           added={addedDepartments}
@@ -245,6 +257,9 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
           choices={choices}
           onChoicesChange={setChoices}
           knownStores={stores}
+          removedDepartments={(store as Store).departments.filter(
+            (d) => !reassigning.draft.departments.some((kept) => kept.id === d.id),
+          )}
           saving={busy}
           error={saveError}
           onCancel={cancelReassigning}
@@ -307,6 +322,10 @@ function StoreForm({ store, copySource, stores, items, backTo, deletion }: FormP
         onNewNameChange={setNewDepartment}
         addError={departmentAddError}
         onAddErrorChange={setDepartmentAddError}
+        removedDepartments={removedDepartments}
+        onRestore={(department) =>
+          setDraft((d) => ({ ...d, departments: restoreDepartment(d.departments, department, (store as Store).departments) }))
+        }
       />
       {copySource ? <CopyItemsSwitch source={copySource} items={items} value={copyItems} onChange={setCopyItems} /> : null}
       {saveError ? <ErrorText message={saveError} /> : null}

@@ -2,6 +2,7 @@ import {
   addDepartment,
   addDepartmentFromStores,
   addPendingDepartment,
+  restoreDepartment,
   copyDepartments,
   moveDepartment,
   removeDepartment,
@@ -116,5 +117,27 @@ describe('adding a typed name', () => {
     expect(addPendingDepartment(departments, ' ', stores)).toEqual({ ok: true, departments });
     expect(addPendingDepartment(departments, 'DELI', stores)).toEqual({ ok: true, departments });
     expect(addPendingDepartment(departments, 'Deli\u202E2', stores)).toMatchObject({ ok: false });
+  });
+});
+
+describe('departments being removed', () => {
+  const removed = [{ id: 'r', name: 'Deli' }];
+
+  test('their names can’t be added back as new departments, whether added or saved', () => {
+    const error = { ok: false, error: '"Deli" is being removed. Cancel the removal instead.' };
+    expect(addDepartmentFromStores([], ' deli ', [], removed)).toEqual(error);
+    expect(addPendingDepartment([], 'DELI', [], removed)).toEqual(error);
+    expect(addDepartmentFromStores([], 'Bakery', [], removed)).toMatchObject({ ok: true });
+  });
+
+  test('cancelling a removal puts the department back after those before it', () => {
+    const [a, b, c, d] = ['A', 'B', 'C', 'D'].map((name) => ({ id: name.toLowerCase(), name }));
+    const original = [a, b, c, d];
+    expect(restoreDepartment([a, c, d], b, original)).toEqual([a, b, c, d]);
+    // Moved since: still just after the last earlier one in the list.
+    expect(restoreDepartment([c, a, d], b, original)).toEqual([c, a, b, d]);
+    // None of those before it are left: first.
+    expect(restoreDepartment([c, d], a, original)).toEqual([a, c, d]);
+    expect(restoreDepartment([c, d], b, original)).toEqual([b, c, d]);
   });
 });

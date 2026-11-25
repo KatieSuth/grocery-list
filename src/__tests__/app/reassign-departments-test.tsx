@@ -31,7 +31,16 @@ async function seed(db: AppDatabase) {
     ],
     createdAt: 1,
   });
-  await db.stores.insert({ id: 'b1', name: 'Big Box', location: 'Main St', departments: [{ id: 'bd', name: 'Deli' }], createdAt: 2 });
+  await db.stores.insert({
+    id: 'b1',
+    name: 'Big Box',
+    location: 'Main St',
+    departments: [
+      { id: 'bd', name: 'Deli' },
+      { id: 'bs', name: 'Snacks' },
+    ],
+    createdAt: 2,
+  });
   await db.items.insert({
     id: 'ham',
     name: 'Ham',
@@ -66,6 +75,16 @@ async function choose(item: string, option: string) {
   let modal = button;
   while (modal.type !== 'Modal' && modal.parent) modal = modal.parent;
   // (Grabbed now: the test renderer's Modal goes as soon as it's hidden.)
+  const finishClosing = modal.props.onDismiss as () => void;
+  await fireEvent.press(button);
+  if (Platform.OS === 'ios') await act(async () => finishClosing());
+}
+
+/** Presses a button that closes its list or dialog; on iOS, the modal then finishes closing. */
+async function pressClosing(name: string) {
+  const button = await screen.findByRole('button', { name });
+  let modal = button;
+  while (modal.type !== 'Modal' && modal.parent) modal = modal.parent;
   const finishClosing = modal.props.onDismiss as () => void;
   await fireEvent.press(button);
   if (Platform.OS === 'ios') await act(async () => finishClosing());
@@ -111,7 +130,7 @@ test('removing a department with items shows each item, with where else it is an
     'accessibilityHint',
     'Add a department to Kroger for this item',
   );
-  await press('Cancel choosing a department for Ham');
+  await pressClosing('Cancel choosing a department for Ham');
   expect(lastFocused(focus)).toBe('Department at Kroger for Ham: Select');
 });
 
@@ -146,7 +165,7 @@ test('New department… asks for a name, checking it as it’s typed, and choose
 
   await type('Department name', ' bakery ');
   expect(screen.queryByText(/already in the list/)).toBeNull();
-  await press('Add department');
+  await pressClosing('Add department');
   expect(screen.queryByRole('header', { name: 'New department at Kroger' })).toBeNull();
   expect(field('Soup')).toHaveProp('accessibilityLabel', 'Department at Kroger for Soup: bakery');
   expect(screen.getByText('Added bakery at the end of Kroger’s departments.')).toBeOnTheScreen();
@@ -161,16 +180,29 @@ test('a name used at another store keeps that spelling; cancelling the dialog go
   await openReassign();
   await choose('Ham', 'Produce');
   await choose('Ham', 'New department…');
-  // Big Box spells it "Deli". (Kroger's Deli is the one being removed, so the name is free.)
+  // Deli is being removed, so it can't be made again here.
   await type('Department name', 'DELI');
-  expect(screen.queryByText(/already in the list/)).toBeNull();
-  await press('Cancel adding a department');
+  expect(
+    screen.getByText('"Deli" is being removed. To keep it, go back to the store and cancel the removal instead.'),
+  ).toBeOnTheScreen();
+  await press('Add department');
+  expect(screen.getByRole('header', { name: 'New department at Kroger' })).toBeOnTheScreen();
+  await pressClosing('Cancel adding a department');
   expect(field('Ham')).toHaveProp('accessibilityLabel', 'Department at Kroger for Ham: Select');
 
+  // Big Box spells it "Snacks".
   await choose('Soup', 'New department…');
-  await type('Department name', 'deli');
+  await type('Department name', 'snacks');
+  expect(screen.queryByText(/is being removed|already in the list/)).toBeNull();
+  const dialogModal = (() => {
+    let m = screen.getByLabelText('Department name');
+    while (m.type !== 'Modal' && m.parent) m = m.parent;
+    return m;
+  })();
+  const finishClosing = dialogModal.props.onDismiss as () => void;
   await fireEvent(screen.getByLabelText('Department name'), 'submitEditing');
-  expect(field('Soup')).toHaveProp('accessibilityLabel', 'Department at Kroger for Soup: Deli');
+  if (Platform.OS === 'ios') await act(async () => finishClosing());
+  expect(field('Soup')).toHaveProp('accessibilityLabel', 'Department at Kroger for Soup: Snacks');
 });
 
 test('Android’s back button cancels the dialog and the list', async () => {
@@ -189,8 +221,8 @@ test('saving moves each item to its chosen department; a new one goes last in th
   await choose('Ham', 'Produce');
   await choose('Soup', 'New department…');
   await type('Department name', 'Bakery');
-  await press('Add department');
-  await press('Reassign Items & Delete Department');
+  await pressClosing('Add department');
+  await press('Reassign items and delete Deli');
 
   expect(alert).not.toHaveBeenCalled();
   await eventually(async () => expect(screen).toHavePathname('/stores'));
@@ -211,7 +243,7 @@ test('items left without a department are warned about; keeping reassigning stay
   await choose('Ham', 'Produce');
   // Soup is left on "New department…" (the dialog was dismissed by Back).
   await choose('Soup', 'New department…');
-  await press('Reassign Items & Delete Department');
+  await press('Reassign items and delete Deli');
   expect(keep).toHaveBeenCalledWith(
     '1 item isn’t reassigned',
     'It’ll no longer be listed under Kroger. If it isn’t listed at another store, it will be left with no store, and won’t show up on a shopping trip.',
@@ -221,7 +253,7 @@ test('items left without a department are warned about; keeping reassigning stay
   keep.mockRestore();
 
   answerAlertWith('Continue');
-  await press('Reassign Items & Delete Department');
+  await press('Reassign items and delete Deli');
   await eventually(async () => expect(screen).toHavePathname('/stores'));
   expect(await locationsOf(db, 'soup')).toEqual([]);
   expect(await locationsOf(db, 'ham')).toEqual([
@@ -233,7 +265,7 @@ test('items left without a department are warned about; keeping reassigning stay
 test('several items unassigned are counted in the warning', async () => {
   const alert = answerAlertWith('Keep reassigning');
   await openReassign();
-  await press('Reassign Items & Delete Department');
+  await press('Reassign items and delete Deli');
   expect(alert).toHaveBeenCalledWith(
     '2 items aren’t reassigned',
     'They’ll no longer be listed under Kroger. Any that aren’t listed at another store will be left with no store, and won’t show up on a shopping trip.',
@@ -247,7 +279,7 @@ test('Cancel, or Back, returns to the form as it was, with nothing saved', async
   const db = await openReassign();
   await choose('Soup', 'New department…');
   await type('Department name', 'Bakery');
-  await press('Add department');
+  await pressClosing('Add department');
   await press('Cancel, back to the store');
 
   expect(screen).toHavePathnameWithParams('/store-form?id=k1');
@@ -280,16 +312,16 @@ test('a failed save keeps the choices, so it can be tried again; nothing can be 
   const db = await openReassign();
   await choose('Ham', 'Produce');
   await choose('Soup', 'Frozen');
-  await press('Reassign Items & Delete Department');
+  await press('Reassign items and delete Deli');
   expect(await screen.findByLabelText(/^Saving store… /)).toBeOnTheScreen();
   expect(screen.getByRole('button', { name: 'Cancel, back to the store' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: 'Reassign Items & Delete Department' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Reassign items and delete Deli' })).toBeDisabled();
   await act(async () => finish());
 
   expect(await screen.findByText('Could not save this store. Please try again.')).toBeOnTheScreen();
   expect(field('Soup')).toHaveProp('accessibilityLabel', 'Department at Kroger for Soup: Frozen');
   fail = false;
-  await press('Reassign Items & Delete Department');
+  await press('Reassign items and delete Deli');
   await act(async () => finish());
   await eventually(async () => expect(await locationsOf(db, 'soup')).toEqual([{ storeId: 'k1', departmentId: 'froz' }]));
 });
@@ -302,5 +334,20 @@ test('with several departments removed, items are grouped under each', async () 
   expect(await screen.findByRole('header', { name: 'Reassign 3 items from Produce and Deli' })).toBeOnTheScreen();
   expect(screen.getByText(/^Produce and Deli have 3 items at Kroger\. Deleting them takes those items off Kroger\./)).toBeOnTheScreen();
   expect(screen.getByRole('header', { name: 'From Produce, 1 item' })).toBeOnTheScreen();
-  expect(screen.getByRole('button', { name: 'Reassign Items & Delete Departments' })).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'Reassign items and delete Produce and Deli' })).toBeOnTheScreen();
+  expect(screen.getByText('Reassign items & delete')).toBeOnTheScreen();
+});
+
+test('a quick double tap saves only once', async () => {
+  const save = jest.spyOn(storesRepo, 'saveStore');
+  // Continue is tapped twice, before the screen re-renders with the buttons disabled.
+  jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+    const go = buttons?.find((b) => b.text === 'Continue')?.onPress;
+    go?.();
+    go?.();
+  });
+  await openReassign();
+  await press('Reassign items and delete Deli');
+  await eventually(async () => expect(screen).toHavePathname('/stores'));
+  expect(save).toHaveBeenCalledTimes(1);
 });
